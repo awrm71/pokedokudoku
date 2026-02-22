@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Streamlit
+.streamlit/
+
+# Local data/artifacts (don’t commit big/generated stuff)
+data/
+sprites/
+sprites_repo/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
