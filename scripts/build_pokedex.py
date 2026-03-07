@@ -35,9 +35,7 @@ def main():
         species = get(item["url"])
 
         # species["varieties"] contains the actual pokemon forms in /pokemon/
-        # We'll include each variety as a separate playable entry.
-        gen_name = species["generation"]["name"]  # "generation-i"
-        gen_num = int(gen_name.split("-")[-1].replace("i", "1").replace("v", "5")) if gen_name else None
+        # We'll include each varie
         # Above is a quick fallback; we’ll replace with a clean mapping in a later polish pass.
 
         base_flags = {
@@ -45,6 +43,24 @@ def main():
             "is_mythical": bool(species.get("is_mythical")),
             "is_baby": bool(species.get("is_baby")),
         }
+
+        def roman_to_int(s: str) -> int | None:
+            if not s:
+                return None
+            s = s.lower()
+            vals = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+            total = 0
+            prev = 0
+            for ch in reversed(s):
+                v = vals.get(ch)
+                if v is None:
+                    return None
+                if v < prev:
+                    total -= v
+                else:
+                    total += v
+                    prev = v
+            return total
 
         for v in species.get("varieties", []):
             p = get(v["pokemon"]["url"])  # /pokemon/<id or name> gives types
@@ -58,13 +74,21 @@ def main():
 
             key = p["name"]  # stable slug key
             display = slug_to_display(key)
+            pokemon_id = p["id"]
+
+            gen_name = species["generation"]["name"]  # "generation-ix"
+            roman = gen_name.split("-")[-1]
+            gen_num = roman_to_int(roman)
+
+
 
             rows.append(
                 {
                     "key": key,
                     "display_name": display,
                     "species_key": species["name"],
-                    "gen_raw": gen_name,
+                    "pokemon_id": pokemon_id,
+                    "gen": gen_num,
                     "type1": type1,
                     "type2": type2,
                     **base_flags,

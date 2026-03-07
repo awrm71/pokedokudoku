@@ -1,149 +1,342 @@
 import pandas as pd
 import streamlit as st
+from pathlib import Path
+import random
+from datetime import date
 
-st.set_page_config(page_title="Local PokeDoku", layout="wide")
+import engine
 
-# ---------- Data ----------
+
+# -------------------------
+# Config
+# -------------------------
+N = 3  # later: 9
+
+DEFAULT_CONSTRAINTS = engine.BoardConstraints(
+    min_candidates_per_cell=3,      # bump from 1 so boards aren't trivial; adjust as desired
+    max_candidates_per_cell=250,    # avoid overly broad intersections; adjust as desired
+    max_tries=2000,
+)
+
+SPRITES_REPO_DIR = Path("sprites_repo") / "sprites" / "pokemon"
+SPRITES_DIR = Path("sprites")
+
+
+# -------------------------
+# Data
+# -------------------------
 @st.cache_data
-def load_data(path: str = "pokemon.csv") -> pd.DataFrame:
-    df = pd.read_csv(path)
-    # Normalize blanks to empty strings
-    df["type2"] = df["type2"].fillna("").astype(str)
-    # Ensure bool columns are bool
-    for col in ["legendary", "mega"]:
-        df[col] = df[col].astype(str).str.lower().map({"true": True, "false": False})
+def load_data() -> pd.DataFrame:
+    data_dir = Path("data")
+    pq = data_dir / "pokedex.parquet"
+    csv = data_dir / "pokedex.csv"
+
+    if pq.exists():
+        df = pd.read_parquet(pq)
+    elif csv.exists():
+        df = pd.read_csv(csv)
+    else:
+        raise FileNotFoundError("No pokedex.parquet or pokedex.csv found in /data")
+
+    # Normalize required columns
+    if "type2" not in df.columns:
+        df["type2"] = ""
+    df["type2"] = df["type2"].fillna("")
+
+    for col in ["is_legendary", "is_mythical", "is_baby"]:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.lower()
+                .map({"true": True, "false": False})
+                .fillna(False)
+            )
+        else:
+            df[col] = False
+
+    if "gen" in df.columns:
+        df["gen"] = pd.to_numeric(df["gen"], errors="coerce").astype("Int64")
+
+    if "pokemon_id" in df.columns:
+        df["pokemon_id"] = pd.to_numeric(df["pokemon_id"], errors="coerce").astype("Int64")
+
+    # Basic sanity
+    required = ["key", "display_name", "type1", "type2", "gen"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns in pokedex: {missing}")
+
     return df
+
 
 df = load_data()
 
-# ---------- Rule system ----------
-# Each rule returns a boolean mask over df
-TYPES = sorted(set(df["type1"]).union(set(df["type2"])) - {""})
-GENS = sorted(df["gen"].unique().tolist())
+# Apply answer policy (forms/variants later live here)
+df_play = engine.apply_answer_policy(df, policy="species_only")
 
-RULES = {}
+# Engine objects (single source of truth)
+rules = engine.build_default_rules(df_play)
+rule_masks = engine.compute_rule_masks(df_play, rules)
+name_index = engine.build_name_index(df_play)
 
-# Types
-for t in TYPES:
-    RULES[f"Type: {t}"] = lambda d, t=t: (d["type1"] == t) | (d["type2"] == t)
 
-# Generations
-for g in GENS:
-    RULES[f"Gen: {g}"] = lambda d, g=g: d["gen"] == g
+# -------------------------
+# Sprites
+# -------------------------
+def sprite_path(row: pd.Series) -> str | None:
+    # Prefer numeric ID if available
+    if "pokemon_id" in row and pd.notna(row["pokemon_id"]):
+        pid = int(row["pokemon_id"])
+        for base in [SPRITES_DIR, SPRITES_REPO_DIR]:
+            p = base / f"{pid}.png"
+            if p.exists():
+                return str(p)
 
-# Flags
-RULES["Legendary"] = lambda d: d["legendary"] == True
-RULES["Has Mega"] = lambda d: d["mega"] == True
-RULES["Not Legendary"] = lambda d: d["legendary"] == False
+    # Fallback: key-based sprite (if you have it)
+    if "key" in row and pd.notna(row["key"]):
+        p = SPRITES_DIR / f"{row['key']}.png"
+        if p.exists():
+            return str(p)
 
-RULE_NAMES = sorted(RULES.keys())
+    return None
 
-def candidates_for_cell(row_rule: str, col_rule: str) -> pd.DataFrame:
-    m1 = RULES[row_rule](df)
-    m2 = RULES[col_rule](df)
-    return df[m1 & m2].copy()
 
-# ---------- UI ----------
-st.title("Local PokeDoku (3×3)")
+# -------------------------
+# Board / session helpers
+# -------------------------
+def clear_cell_state(n: int):
+    for i in range(n):
+        for j in range(n):
+            base = f"cell_{i}_{j}"
+            st.session_state.pop(base, None)
+            st.session_state.pop(f"{base}_typed", None)
+            st.session_state.pop(f"{base}_typed_pending", None)
+            st.session_state.pop(f"{base}_submitted", None)
+            st.session_state.pop(f"{base}_result", None)
+
+def ensure_board(seed: str):
+    board = engine.generate_board(
+        df=df_play,
+        rules=rules,
+        rule_masks=rule_masks,
+        seed=seed,
+        n=N,
+        constraints=DEFAULT_CONSTRAINTS,
+    )
+    if board is None:
+        st.error("Could not generate a valid board with current constraints. Try lowering min_candidates_per_cell.")
+        st.stop()
+    st.session_state["board"] = board
+
+
+if "board" not in st.session_state:
+    ensure_board(seed=str(date.today()))
+
+board: engine.Board = st.session_state["board"]
+
+
+# -------------------------
+# UI
+# -------------------------
+st.title(f"Local PokeDoku ({N}×{N})")
+
+with st.sidebar.expander("Debug: sprites", expanded=False):
+    st.write("Working dir:", str(Path(".").resolve()))
+    st.write("sprites exists:", SPRITES_DIR.exists())
+    st.write("example sprites:", [p.name for p in SPRITES_DIR.glob("*.png")][:10])
+    st.write("columns:", list(df_play.columns))
+    st.write("sample row:", df_play.iloc[0].to_dict())
 
 with st.sidebar:
     st.header("Board Setup")
 
-    if st.button("New Game (clear picks)"):
-        st.session_state.clear()
+    if st.button("Clear picks only"):
+        clear_cell_state(N)
+        st.rerun()
 
-    st.caption("Pick 3 row rules and 3 column rules.")
-    row_rules = []
-    col_rules = []
+    if st.button("Today (daily board)"):
+        clear_cell_state(N)
+        ensure_board(seed=str(date.today()))
+        st.rerun()
 
-    for i in range(3):
-        row_rules.append(
-            st.selectbox(
-                f"Row {i+1} rule",
-                RULE_NAMES,
-                key=f"row_rule_{i}",
-            )
-        )
+    if st.button("New random board"):
+        clear_cell_state(N)
+        ensure_board(seed=str(random.randint(1, 10**9)))
+        st.rerun()
 
-    for j in range(3):
-        col_rules.append(
-            st.selectbox(
-                f"Col {j+1} rule",
-                RULE_NAMES,
-                key=f"col_rule_{j}",
-            )
-        )
+    st.caption(f"Seed: {board.seed}  |  Size: {board.n}×{board.n}")
 
-# Track selected Pokémon across grid
+
+# Board rule ids + labels
+row_rule_ids = board.row_rule_ids
+col_rule_ids = board.col_rule_ids
+row_rules = [rules[rid].label for rid in row_rule_ids]
+col_rules = [rules[cid].label for cid in col_rule_ids]
+
+
+# Track picks
 used = set()
-grid_picks = {}
+grid_picks: dict[tuple[int, int], str] = {}
 
-# ---------- Render board ----------
-# Header row: column rules
-header_cols = st.columns([1.2, 1, 1, 1])
+
+# Header row
+header_cols = st.columns([1.2] + [1] * N)
 header_cols[0].markdown("### ")
-for j in range(3):
-    header_cols[j+1].markdown(f"### {col_rules[j]}")
+for j in range(N):
+    header_cols[j + 1].markdown(f"### {col_rules[j]}")
 
 st.divider()
 
-for i in range(3):
-    row = st.columns([1.2, 1, 1, 1])
+
+for i in range(N):
+    row = st.columns([1.2] + [1] * N)
     row[0].markdown(f"### {row_rules[i]}")
 
-    for j in range(3):
+    for j in range(N):
+        cell = row[j + 1]
         cell_key = f"cell_{i}_{j}"
-        cand = candidates_for_cell(row_rules[i], col_rules[j])
 
-        # Remove already-used Pokémon from options (except whatever is currently selected here)
-        current = st.session_state.get(cell_key, "")
-        options = [""] + sorted(cand["name"].tolist())
+        # Candidate set (used only for validation; NOT shown)
+        _ = engine.candidates_for_cell(df_play, rule_masks, row_rule_ids[i], col_rule_ids[j])
 
-        if current and current not in options:
-            # If rules changed and current pick no longer valid
-            current = ""
+        current_key = st.session_state.get(cell_key, "")
+        typed_key = f"{cell_key}_typed"
+        pending_key = f"{typed_key}_pending"
 
-        filtered_options = [options[0]] + [o for o in options[1:] if (o not in used) or (o == current)]
+        # Apply pending set (chosen suggestion -> textbox)
+        if st.session_state.get(pending_key, None) is not None:
+            st.session_state[typed_key] = st.session_state[pending_key]
+            st.session_state[pending_key] = None
 
-        pick = row[j+1].selectbox(
+        submitted_key = f"{cell_key}_submitted"
+        result_key = f"{cell_key}_result"
+
+        locked = bool(st.session_state.get(submitted_key, False))
+
+        typed = cell.text_input(
             label=f"({i+1},{j+1})",
-            options=filtered_options,
-            index=filtered_options.index(current) if current in filtered_options else 0,
-            key=cell_key,
+            key=typed_key,
             label_visibility="collapsed",
+            placeholder="Type a Pokémon name…",
+            disabled=locked,
+        
         )
 
+        # Hide suggestions if typed matches selected name
+        selected_name = ""
+        if current_key:
+            selected_name = df_play.loc[df_play["key"] == current_key, "display_name"].iloc[0]
+
+        if not locked:
+            if typed and engine.normalize_name(typed) == engine.normalize_name(selected_name):
+                sugs = []
+            else:
+                sugs = engine.suggest_names_global(typed, name_index, limit=10)
+
+            for sug_key, sug_name in sugs:
+                if (sug_key in used) and (sug_key != current_key):
+                    continue
+
+                cols = cell.columns([1, 3])
+                sug_row = df_play.loc[df_play["key"] == sug_key].iloc[0]
+                sp = sprite_path(sug_row)
+                if sp:
+                    cols[0].image(sp, width=36)
+                else:
+                    cols[0].write("")
+
+                if cols[1].button(sug_name, key=f"{cell_key}_pick_{sug_key}", disabled=locked):
+                    st.session_state[cell_key] = sug_key
+                    st.session_state[pending_key] = sug_name
+                    st.rerun()
+
+        pick = st.session_state.get(cell_key, "")
         grid_picks[(i, j)] = pick
 
-        # Visual feedback
-        if pick == "":
-            row[j+1].caption("—")
+        # Cell actions
+        action_cols = cell.columns([1, 1])
+
+        # Submit: validate and (if ok) lock
+        if action_cols[0].button("Submit", key=f"{cell_key}_submit", disabled=(locked or not pick)):
+            used_keys = {v for v in grid_picks.values() if v}
+            res = engine.validate_pick(
+                df=df_play,
+                rule_masks=rule_masks,
+                board=board,
+                row_i=i,
+                col_j=j,
+                pokemon_key=pick,
+                used_keys=used_keys - {pick},
+            )
+            st.session_state[result_key] = res.reason
+            # lock only if correct
+            if res.ok:
+                st.session_state[submitted_key] = True
+            st.rerun()
+
+        # Clear: unlock + clear pick + clear text
+        if action_cols[1].button("Clear", key=f"{cell_key}_clear", disabled=(not pick and not typed and not locked)):
+            st.session_state[cell_key] = ""
+            st.session_state[typed_key] = ""
+            st.session_state[pending_key] = None
+            st.session_state[submitted_key] = False
+            st.session_state[result_key] = None
+            st.rerun()
+
+        if not pick:
+            cell.caption("—")
         else:
-            valid = pick in cand["name"].values
-            if valid:
-                row[j+1].success("✅ Valid")
+            picked_row = df_play.loc[df_play["key"] == pick].iloc[0]
+            sp = sprite_path(picked_row)
+            if sp:
+                cell.image(sp, width=72)
+
+            used_keys = {v for v in grid_picks.values() if v}
+
+            # Render selected sprite + status
+        if not pick:
+            cell.caption("—")
+        else:
+            picked_row = df_play.loc[df_play["key"] == pick].iloc[0]
+            sp = sprite_path(picked_row)
+            if sp:
+                cell.image(sp, width=72)
+
+            if locked:
+                cell.success("✅ Correct")
             else:
-                row[j+1].error("❌ Invalid")
+                # show last submit result if any
+                last = st.session_state.get(result_key, None)
+                if last and last != "ok":
+                    msg = {
+                        "duplicate": "Already used.",
+                        "does_not_match": "Doesn't match the row/column rules.",
+                        "unknown_pokemon": "Unknown Pokémon.",
+                    }.get(last, last)
+                    cell.error(f"❌ {msg}")
+                else:
+                    cell.info("Not submitted")
 
-    # Update used set after row render to avoid “order” weirdness
-    used = set(v for v in grid_picks.values() if v)
+    used = {v for v in grid_picks.values() if v}
 
-# ---------- Summary ----------
+
+# Summary
 st.divider()
-
 filled = [v for v in grid_picks.values() if v]
-st.write(f"Filled: **{len(filled)}/9**  |  Unique used: **{len(set(filled))}**")
+st.write(f"Filled: **{len(filled)}/{N*N}**  |  Unique used: **{len(set(filled))}**")
 
-# Show mistakes / duplicates
-dupes = [name for name in set(filled) if filled.count(name) > 1]
+dupes = [k for k in set(filled) if filled.count(k) > 1]
 if dupes:
-    st.error(f"Duplicate Pokémon used: {', '.join(dupes)}")
+    pretty = df_play.set_index("key").loc[dupes, "display_name"].tolist()
+    st.error(f"Duplicate Pokémon used: {', '.join(pretty)}")
 
-# Optional: show candidate counts per cell to help debugging / balancing
-with st.expander("Show candidate counts per cell"):
+
+# Debug counts (optional)
+with st.expander("Debug: candidate counts per cell"):
     counts = []
-    for i in range(3):
-        for j in range(3):
-            cand = candidates_for_cell(row_rules[i], col_rules[j])
-            counts.append({"row": i+1, "col": j+1, "count": len(cand)})
+    for i in range(N):
+        for j in range(N):
+            cand = engine.candidates_for_cell(df_play, rule_masks, row_rule_ids[i], col_rule_ids[j])
+            counts.append({"row": i + 1, "col": j + 1, "count": len(cand)})
     st.dataframe(pd.DataFrame(counts))
