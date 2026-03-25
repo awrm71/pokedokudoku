@@ -6,21 +6,27 @@ from datetime import date
 
 import engine
 
-
+st.set_page_config(layout="wide")
 # -------------------------
 # Config
 # -------------------------
-N = 3  # later: 9
+N = 9  # later: 9
 
 DEFAULT_CONSTRAINTS = engine.BoardConstraints(
-    min_candidates_per_cell=3,      # bump from 1 so boards aren't trivial; adjust as desired
-    max_candidates_per_cell=250,    # avoid overly broad intersections; adjust as desired
-    max_tries=2000,
+    min_candidates_per_cell=1,      # bump from 1 so boards aren't trivial; adjust as desired
+    max_candidates_per_cell=1050,    # avoid overly broad intersections; adjust as desired
+    max_tries=5000,
 )
 
 SPRITES_REPO_DIR = Path("sprites_repo") / "sprites" / "pokemon"
 SPRITES_DIR = Path("sprites")
 
+def compact_rule_label(label: str) -> str:
+    label = label.replace("Type: ", "")
+    label = label.replace("Gen: ", "G")
+    label = label.replace("Legendary", "Leg")
+    label = label.replace("Mythical", "Myth")
+    return label
 
 # -------------------------
 # Data
@@ -115,6 +121,21 @@ def clear_cell_state(n: int):
             st.session_state.pop(f"{base}_submitted", None)
             st.session_state.pop(f"{base}_result", None)
 
+def clear_one_cell(i: int, j: int):
+    cell_key = f"cell_{i}_{j}"
+    typed_key = f"{cell_key}_typed"
+    pending_key = f"{typed_key}_pending"
+    submitted_key = f"{cell_key}_submitted"
+    result_key = f"{cell_key}_result"
+
+    st.session_state[cell_key] = ""
+    st.session_state[pending_key] = None
+    st.session_state[submitted_key] = False
+    st.session_state[result_key] = None
+    # Do not directly overwrite the active text_input key after instantiation.
+    # Instead, remove it so the next rerun recreates it empty.
+    st.session_state.pop(typed_key, None)
+
 def ensure_board(seed: str):
     board = engine.generate_board(
         df=df_play,
@@ -139,6 +160,7 @@ board: engine.Board = st.session_state["board"]
 # -------------------------
 # UI
 # -------------------------
+
 st.title(f"Local PokeDoku ({N}×{N})")
 
 with st.sidebar.expander("Debug: sprites", expanded=False):
@@ -171,8 +193,8 @@ with st.sidebar:
 # Board rule ids + labels
 row_rule_ids = board.row_rule_ids
 col_rule_ids = board.col_rule_ids
-row_rules = [rules[rid].label for rid in row_rule_ids]
-col_rules = [rules[cid].label for cid in col_rule_ids]
+row_rules = [compact_rule_label(rules[rid].label) for rid in row_rule_ids]
+col_rules = [compact_rule_label(rules[cid].label) for cid in col_rule_ids]
 
 
 # Track picks
@@ -181,17 +203,23 @@ grid_picks: dict[tuple[int, int], str] = {}
 
 
 # Header row
-header_cols = st.columns([1.2] + [1] * N)
-header_cols[0].markdown("### ")
+header_cols = st.columns([1.6] + [1] * N)
+header_cols[0].markdown("")
 for j in range(N):
-    header_cols[j + 1].markdown(f"### {col_rules[j]}")
+    header_cols[j + 1].markdown(
+        f"<div style='text-align:center; font-weight:700; font-size:20px;'>{col_rules[j]}</div>",
+        unsafe_allow_html=True
+    )
 
 st.divider()
 
 
 for i in range(N):
-    row = st.columns([1.2] + [1] * N)
-    row[0].markdown(f"### {row_rules[i]}")
+    row = st.columns([1.6] + [1] * N)
+    row[0].markdown(
+    f"<div style='font-weight:700; font-size:20px; line-height:1.2;'>{row_rules[i]}</div>",
+    unsafe_allow_html=True
+    )   
 
     for j in range(N):
         cell = row[j + 1]
@@ -226,13 +254,16 @@ for i in range(N):
         # Hide suggestions if typed matches selected name
         selected_name = ""
         if current_key:
+            sugs = []
             selected_name = df_play.loc[df_play["key"] == current_key, "display_name"].iloc[0]
 
         if not locked:
-            if typed and engine.normalize_name(typed) == engine.normalize_name(selected_name):
+            if current_key or not typed.strip():
+                sugs = []
+            elif typed and engine.normalize_name(typed) == engine.normalize_name(selected_name):
                 sugs = []
             else:
-                sugs = engine.suggest_names_global(typed, name_index, limit=10)
+                sugs = engine.suggest_names_global(typed, name_index, limit=5)
 
             for sug_key, sug_name in sugs:
                 if (sug_key in used) and (sug_key != current_key):
@@ -242,7 +273,7 @@ for i in range(N):
                 sug_row = df_play.loc[df_play["key"] == sug_key].iloc[0]
                 sp = sprite_path(sug_row)
                 if sp:
-                    cols[0].image(sp, width=36)
+                    cols[0].image(sp, width=24)
                 else:
                     cols[0].write("")
 
@@ -258,7 +289,7 @@ for i in range(N):
         action_cols = cell.columns([1, 1])
 
         # Submit: validate and (if ok) lock
-        if action_cols[0].button("Submit", key=f"{cell_key}_submit", disabled=(locked or not pick)):
+        if action_cols[0].button("OK", key=f"{cell_key}_submit", disabled=(locked or not pick)):
             used_keys = {v for v in grid_picks.values() if v}
             res = engine.validate_pick(
                 df=df_play,
@@ -276,13 +307,13 @@ for i in range(N):
             st.rerun()
 
         # Clear: unlock + clear pick + clear text
-        if action_cols[1].button("Clear", key=f"{cell_key}_clear", disabled=(not pick and not typed and not locked)):
-            st.session_state[cell_key] = ""
-            st.session_state[typed_key] = ""
-            st.session_state[pending_key] = None
-            st.session_state[submitted_key] = False
-            st.session_state[result_key] = None
-            st.rerun()
+        action_cols[1].button(
+            "X",
+            key=f"{cell_key}_clear",
+            disabled=(not pick and not typed and not locked),
+            on_click=clear_one_cell,
+            args=(i, j),
+)
 
         if not pick:
             cell.caption("—")
@@ -290,18 +321,12 @@ for i in range(N):
             picked_row = df_play.loc[df_play["key"] == pick].iloc[0]
             sp = sprite_path(picked_row)
             if sp:
-                cell.image(sp, width=72)
+                cell.image(sp, width=48)
 
             used_keys = {v for v in grid_picks.values() if v}
 
             # Render selected sprite + status
-        if not pick:
-            cell.caption("—")
-        else:
-            picked_row = df_play.loc[df_play["key"] == pick].iloc[0]
-            sp = sprite_path(picked_row)
-            if sp:
-                cell.image(sp, width=72)
+
 
             if locked:
                 cell.success("✅ Correct")
