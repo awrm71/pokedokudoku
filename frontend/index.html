@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PokeDoku Frontend Scaffold</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-a" aria-hidden="true"></div>
+    <div class="bg-orb orb-b" aria-hidden="true"></div>
+
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="hero-copy">
+          <p class="eyebrow">Portable Frontend</p>
+          <h1>PokeDoku Board Prototype</h1>
+          <p class="subtitle">
+            Fill the grid with unique Pokemon that satisfy each row and column rule.
+          </p>
+        </div>
+
+        <section class="player-actions" aria-label="Board actions">
+          <button type="button" id="loadToday">Daily Board</button>
+          <button type="button" id="loadRandom" class="ghost">Shuffle Board</button>
+        </section>
+
+        <!--
+          Developer controls (mode/API URL) intentionally hidden for player-first UX.
+          Re-enable this block when debugging backend/API behavior on developer devices.
+          <form id="controls" class="controls" aria-label="Board controls">
+            <label>
+              Data Mode
+              <select id="modeSelect">
+                <option value="auto" selected>Auto (API then Mock)</option>
+                <option value="api">API only</option>
+                <option value="mock">Mock only</option>
+              </select>
+            </label>
+            <label>
+              API Base URL
+              <input id="apiBase" type="text" value="http://127.0.0.1:8000" />
+            </label>
+            <div class="control-row">
+              <button type="button" id="loadToday">Load Today</button>
+              <button type="button" id="loadRandom" class="ghost">Load Random</button>
+            </div>
+          </form>
+        -->
+      </header>
+
+      <section class="status-row" aria-live="polite">
+        <p id="boardMeta">Board not loaded yet.</p>
+        <p id="message" class="message"></p>
+      </section>
+
+      <section class="legend" aria-label="Status legend">
+        <span><i class="dot ok"></i> Correct</span>
+        <span><i class="dot warn"></i> Not submitted</span>
+        <span><i class="dot err"></i> Validation error</span>
+      </section>
+
+      <div id="boardWrap" class="board-wrap" role="region" aria-label="PokeDoku board"></div>
+    </main>
+
+    <template id="cellTemplate">
+      <article class="cell" role="gridcell" tabindex="0">
+        <div class="cell-summary">
+          <img class="summary-sprite hidden" alt="Selected Pokemon" loading="lazy" />
+          <p class="picked-name-row">
+            <span class="picked-name">Tap to enter pick</span>
+            <span class="result-mark" aria-hidden="true"></span>
+          </p>
+          <div class="qual-stack">
+            <p class="qual-line qual-combo"></p>
+          </div>
+        </div>
+
+        <div class="cell-editor">
+          <label class="sr-only">Pokemon name</label>
+          <input type="text" class="name-input" placeholder="Pokemon name" autocomplete="off" />
+          <datalist class="suggestions"></datalist>
+          <div class="cell-actions">
+            <button type="button" class="ok-btn">OK</button>
+            <button type="button" class="clear-btn ghost">X</button>
+          </div>
+          <p class="cell-status">Not submitted</p>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

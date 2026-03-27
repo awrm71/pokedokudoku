@@ -20,6 +20,8 @@ DEFAULT_CONSTRAINTS = engine.BoardConstraints(
 
 SPRITES_REPO_DIR = Path("sprites_repo") / "sprites" / "pokemon"
 SPRITES_DIR = Path("sprites")
+SPRITES_CDN_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork"
+PLACEHOLDER_SPRITE = "https://placehold.co/96x96?text=%3F"
 
 def compact_rule_label(label: str) -> str:
     label = label.replace("Type: ", "")
@@ -90,7 +92,7 @@ name_index = engine.build_name_index(df_play)
 # -------------------------
 # Sprites
 # -------------------------
-def sprite_path(row: pd.Series) -> str | None:
+def sprite_path(row: pd.Series) -> str:
     # Prefer numeric ID if available
     if "pokemon_id" in row and pd.notna(row["pokemon_id"]):
         pid = int(row["pokemon_id"])
@@ -99,13 +101,16 @@ def sprite_path(row: pd.Series) -> str | None:
             if p.exists():
                 return str(p)
 
+        # No local file available: use CDN sprite so the app works on lightweight/dev machines.
+        return f"{SPRITES_CDN_BASE}/{pid}.png"
+
     # Fallback: key-based sprite (if you have it)
     if "key" in row and pd.notna(row["key"]):
         p = SPRITES_DIR / f"{row['key']}.png"
         if p.exists():
             return str(p)
 
-    return None
+    return PLACEHOLDER_SPRITE
 
 
 # -------------------------

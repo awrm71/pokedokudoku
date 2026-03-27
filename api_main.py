@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import pandas as pd
@@ -8,6 +9,15 @@ from datetime import date
 import engine
 
 app = FastAPI()
+
+# Dev-friendly CORS so a static frontend served from another local port can call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 N = 9
 
@@ -22,6 +32,12 @@ class ValidatePickRequest(BaseModel):
 class ValidatePickResponse(BaseModel):
     ok: bool
     reason: str
+
+
+class PokemonLookupResponse(BaseModel):
+    key: str
+    display_name: str
+    pokemon_id: Optional[int] = None
 
 DEFAULT_CONSTRAINTS = engine.BoardConstraints(
     min_candidates_per_cell=1,
@@ -72,6 +88,7 @@ df = load_data()
 df_play = engine.apply_answer_policy(df, policy="species_only")
 rules = engine.build_default_rules(df_play)
 rule_masks = engine.compute_rule_masks(df_play, rules)
+name_index = engine.build_name_index(df_play)
 
 def serialize_board(board):
     return {
@@ -81,6 +98,27 @@ def serialize_board(board):
         "col_rule_ids": board.col_rule_ids,
         "row_rule_labels": [compact_rule_label(rules[rid].label) for rid in board.row_rule_ids],
         "col_rule_labels": [compact_rule_label(rules[cid].label) for cid in board.col_rule_ids],
+    }
+
+
+def lookup_pokemon(name: str) -> Optional[dict]:
+    key = engine.resolve_input_to_key(name, name_index)
+    if not key:
+        return None
+
+    row = df_play.loc[df_play["key"] == key]
+    if row.empty:
+        return None
+
+    r0 = row.iloc[0]
+    pokemon_id = None
+    if "pokemon_id" in r0 and pd.notna(r0["pokemon_id"]):
+        pokemon_id = int(r0["pokemon_id"])
+
+    return {
+        "key": str(r0["key"]),
+        "display_name": str(r0["display_name"]),
+        "pokemon_id": pokemon_id,
     }
 
 @app.get("/board")
@@ -100,6 +138,36 @@ def get_board(seed: str | None = None, n: int = 9):
         raise HTTPException(status_code=500, detail="Could not generate board")
 
     return serialize_board(board)
+
+
+@app.get("/pokemon/resolve", response_model=PokemonLookupResponse)
+def resolve_pokemon(name: str):
+    result = lookup_pokemon(name)
+    if not result:
+        raise HTTPException(status_code=404, detail="Unknown pokemon")
+    return result
+
+
+@app.get("/pokemon/suggest", response_model=List[PokemonLookupResponse])
+def suggest_pokemon(prefix: str, limit: int = 8):
+    suggestions = engine.suggest_names_global(prefix, name_index, limit=max(1, min(limit, 20)))
+    out: List[PokemonLookupResponse] = []
+    for key, _display_name in suggestions:
+        row = df_play.loc[df_play["key"] == key]
+        if row.empty:
+            continue
+        r0 = row.iloc[0]
+        pokemon_id = None
+        if "pokemon_id" in r0 and pd.notna(r0["pokemon_id"]):
+            pokemon_id = int(r0["pokemon_id"])
+        out.append(
+            PokemonLookupResponse(
+                key=str(r0["key"]),
+                display_name=str(r0["display_name"]),
+                pokemon_id=pokemon_id,
+            )
+        )
+    return out
 
 @app.post("/validate", response_model=ValidatePickResponse)
 def validate_pick_api(payload: ValidatePickRequest):
