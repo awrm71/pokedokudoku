@@ -3,14 +3,1334 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PokeDoku Frontend Scaffold</title>
+    <title>PokeDokuDoku</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Silkscreen:wght@400;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
+
+    <!-- HUD + game UI styles — embedded to guarantee application -->
+    <style>
+      /* ── HUD strip ───────────────────────────────────────── */
+      .hud-strip {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0;
+        background: rgba(14, 7, 22, 0.90);
+        border: 1px solid rgba(58, 15, 50, 0.8);
+        border-radius: 12px;
+        padding: 0.5rem 0.9rem;
+        margin-bottom: 0.55rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(0, 196, 176, 0.06);
+      }
+
+      .hud-section {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.38rem;
+        flex-shrink: 0;
+      }
+
+      .hud-section.hud-mid {
+        flex: 1;
+        justify-content: center;
+        gap: 0.55rem;
+        min-width: 0;
+        padding: 0 0.8rem;
+      }
+
+      .hud-divider {
+        width: 1px;
+        height: 1.8rem;
+        background: rgba(58, 15, 50, 0.9);
+        flex-shrink: 0;
+      }
+
+      /* Lives */
+      .pip-life {
+        font-size: 1.3rem;
+        line-height: 1;
+        display: inline-block;
+        transition: filter 250ms ease, transform 280ms cubic-bezier(.34,1.56,.64,1), opacity 250ms ease;
+        filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.55));
+      }
+
+      .pip-life.spent {
+        filter: grayscale(1) brightness(0.35);
+        opacity: 0.25;
+        transform: scale(0.75);
+      }
+
+      /* Progress */
+      .hud-score {
+        font-family: "Silkscreen", "IBM Plex Mono", monospace;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #e8d0e4;
+        white-space: nowrap;
+        flex-shrink: 0;
+        letter-spacing: 0.04em;
+      }
+
+      .hud-bar {
+        flex: 1;
+        height: 6px;
+        background: rgba(58, 15, 50, 0.6);
+        border-radius: 99px;
+        overflow: hidden;
+        min-width: 60px;
+        border: 1px solid rgba(58, 15, 50, 0.8);
+      }
+
+      .hud-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #cc2255 0%, #e040a0 45%, #9b1fcc 100%);
+        border-radius: 99px;
+        transition: width 400ms cubic-bezier(.4, 0, .2, 1);
+        box-shadow: 0 0 8px rgba(204, 34, 85, 0.55);
+      }
+
+      .hud-tag {
+        font-family: "Silkscreen", "IBM Plex Mono", monospace;
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: #7a4d72;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      /* Hints */
+      .pip-hint {
+        background: none;
+        border: none;
+        padding: 0.1rem;
+        cursor: pointer;
+        font-size: 1.3rem;
+        line-height: 1;
+        box-shadow: none;
+        border-radius: 50%;
+        display: inline-block;
+        transition: filter 200ms ease, transform 240ms cubic-bezier(.34,1.56,.64,1), opacity 200ms ease;
+        filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.45));
+      }
+
+      .pip-hint:hover:not(.spent):not(:disabled) {
+        transform: scale(1.32) rotate(14deg);
+        filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.7));
+      }
+
+      .pip-hint:active:not(.spent):not(:disabled) { transform: scale(1.1); }
+
+      .pip-hint.spent,
+      .pip-hint:disabled {
+        filter: grayscale(1) brightness(0.35);
+        opacity: 0.22;
+        cursor: not-allowed;
+        transform: scale(0.75);
+      }
+
+      /* ── Game alerts ──────────────────────────────────────── */
+      .hud-alert {
+        display: none;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.65rem;
+        border-radius: 10px;
+        padding: 0.55rem 0.85rem;
+        margin-bottom: 0.55rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        font-family: "IBM Plex Mono", monospace;
+        animation: alert-in 340ms cubic-bezier(.34,1.56,.64,1) both;
+      }
+
+      .hud-alert.visible { display: flex; }
+
+      @keyframes alert-in {
+        from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+        to   { opacity: 1; transform: none; }
+      }
+
+      .hud-alert-dead {
+        background: rgba(244, 63, 94, 0.08);
+        border: 1.5px solid rgba(244, 63, 94, 0.35);
+        color: #f8a0b0;
+      }
+
+      .hud-alert-win {
+        background: rgba(16, 217, 138, 0.08);
+        border: 1.5px solid rgba(16, 217, 138, 0.35);
+        color: #80f0c0;
+      }
+
+      .hud-alert-icon { font-size: 1.4rem; flex-shrink: 0; }
+      .hud-alert-text { flex: 1; }
+      .hud-alert-text strong {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.9rem;
+        display: block;
+      }
+
+      /* ── Qual-combo two-line rule labels ──────────────────── */
+      .qual-combo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
+        width: 100%;
+        flex: 1;
+        padding: 0.15rem 0.1rem;
+      }
+      .q-row, .q-col {
+        font-family: var(--pixel-font);
+        font-size: 0.70rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: rgba(230, 165, 198, 0.88);
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        max-width: 100%;
+        line-height: 1.25;
+        text-align: center;
+        transition: color 150ms ease, font-size 150ms ease, text-shadow 150ms ease;
+      }
+      .q-col {
+        font-size: 0.68rem;
+        color: rgba(205, 140, 175, 0.72);
+      }
+      .q-sep {
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: rgba(220, 80, 130, 0.55);
+        line-height: 1;
+        font-family: "Silkscreen", "IBM Plex Mono", monospace;
+        letter-spacing: 0;
+        transition: color 150ms ease, font-size 150ms ease;
+      }
+      /* Hover: grow + brighten + glow — makes interaction obvious */
+      .cell:hover .q-row,
+      .cell:focus-within .q-row {
+        font-size: 0.88rem;
+        color: rgba(255, 210, 235, 1);
+        text-shadow: 0 0 10px rgba(220, 80, 140, 0.55);
+      }
+      .cell:hover .q-col,
+      .cell:focus-within .q-col {
+        font-size: 0.80rem;
+        color: rgba(240, 185, 215, 0.95);
+        text-shadow: 0 0 8px rgba(200, 70, 120, 0.40);
+      }
+      .cell:hover .q-sep,
+      .cell:focus-within .q-sep {
+        font-size: 0.72rem;
+        color: rgba(240, 90, 150, 0.80);
+      }
+      /* ── Mobile: keep qual-combo sizes readable but not huge ─── */
+      @media (max-width: 767px) {
+        .q-row           { font-size: 0.66rem; }
+        .q-col           { font-size: 0.60rem; }
+        .q-sep           { font-size: 0.52rem; }
+        .qual-combo      { gap: 0.14rem; }
+        /* Hover still shows size increase but capped at readable levels */
+        .cell:hover .q-row,
+        .cell:focus-within .q-row { font-size: 0.76rem; text-shadow: 0 0 8px rgba(220,80,140,0.4); }
+        .cell:hover .q-col,
+        .cell:focus-within .q-col { font-size: 0.70rem; }
+        .cell:hover .q-sep,
+        .cell:focus-within .q-sep { font-size: 0.60rem; }
+      }
+      /* Shrink labels when cell is filled — sprite takes over */
+      .cell.ok .q-row, .cell.ok .q-col,
+      .cell.hint-cell .q-row, .cell.hint-cell .q-col {
+        font-size: 0.5rem;
+        color: rgba(180, 120, 150, 0.42);
+        -webkit-line-clamp: 1;
+        text-shadow: none;
+      }
+      /* "Tap to enter" — readable but not dominant */
+      .cell:not(.ok):not(.hint-cell):not(.err):not(.drafted):not(.warn) .picked-name {
+        font-size: 0.5rem;
+        opacity: 0.40;
+        letter-spacing: 0.08em;
+      }
+
+      /* ── Cell modal overlay ────────────────────────────────── */
+      .cell-modal-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.82);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        z-index: 200;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+      }
+      .cell-modal-overlay.open { opacity: 1; pointer-events: all; }
+      .cell-modal-card {
+        background: rgba(14, 4, 22, 0.98);
+        border: 1px solid rgba(204, 34, 85, 0.52);
+        border-radius: 22px;
+        padding: 1.6rem 1.5rem 1.4rem;
+        width: min(520px, 94vw);
+        position: relative;
+        box-shadow: 0 0 60px rgba(204,34,85,0.18), 0 30px 80px rgba(0,0,0,0.8);
+        animation: modal-in 300ms cubic-bezier(.34,1.56,.64,1) both;
+      }
+      @keyframes modal-in {
+        from { opacity:0; transform: scale(0.90) translateY(20px); }
+        to   { opacity:1; transform: none; }
+      }
+      /* Modal header: rules centered in their own space,
+         hearts+close absolute in top-right corner of the card */
+      .modal-header {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 1rem;
+        /* No position:relative — lets .modal-header-right escape to the card */
+      }
+
+      /* Hearts + close: absolute within .cell-modal-card, never collides with rules */
+      .modal-header-right {
+        position: absolute;
+        top: 1.0rem;
+        right: 1.0rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        z-index: 2;
+      }
+
+      /* Rules: centered column — Water / × / Bug */
+      .modal-rules {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.28rem;
+        text-align: center;
+        /* Keep rule tags away from the absolute hearts in the top-right */
+        padding: 0 4.5rem;
+      }
+
+      .modal-rule-x {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.78rem;
+        color: rgba(204, 100, 140, 0.40);
+        line-height: 1;
+        align-self: center;
+      }
+      .modal-close-btn {
+        width: 2rem; height: 2rem; min-height: unset;
+        border-radius: 50%; flex-shrink: 0;
+        display: grid; place-items: center;
+        font-size: 0.9rem; padding: 0;
+        background: rgba(204,34,85,0.08);
+        border: 1px solid rgba(204,34,85,0.28);
+        color: rgba(220,160,190,0.65);
+        box-shadow: none; font-family: "IBM Plex Mono", monospace;
+      }
+      .modal-close-btn:hover {
+        background: rgba(204,34,85,0.18); border-color: rgba(204,34,85,0.6);
+        color: #e8d0e4; transform: none; box-shadow: none;
+      }
+      .modal-rule-tag {
+        font-family: "Silkscreen", monospace;
+        font-size: 0.82rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        background: rgba(204,34,85,0.10);
+        border: 1px solid rgba(204,34,85,0.38);
+        border-radius: 9px; padding: 0.38rem 0.7rem; color: #e8c0d0;
+      }
+      /* .modal-rule-x now defined in modal-header block above */
+      .modal-preview {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 0.35rem; min-height: 70px; margin-bottom: 1rem;
+      }
+      .modal-sprite {
+        width: 88px; height: 88px; object-fit: contain;
+        filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6));
+        transition: opacity 200ms ease;
+      }
+      .modal-sprite.hidden { display: none; }
+      .modal-picked-name {
+        margin: 0; font-family: "Silkscreen", monospace;
+        font-size: 1rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        color: #e8d0e4; min-height: 1.4em; text-align: center;
+      }
+      .modal-input-wrap { margin-bottom: 0.55rem; }
+      .modal-input {
+        width: 100%; padding: 0.75rem 1rem;
+        font-size: 1rem; font-family: "IBM Plex Mono", monospace;
+        background: rgba(204,34,85,0.05);
+        border: 1px solid rgba(204,34,85,0.32);
+        border-radius: 11px; color: #e8d0e4; outline: none;
+        transition: border-color 150ms, box-shadow 150ms;
+      }
+      .modal-input:focus {
+        border-color: rgba(204,34,85,0.7);
+        box-shadow: 0 0 16px rgba(204,34,85,0.22);
+      }
+      .modal-input::placeholder { color: rgba(200,140,170,0.38); }
+      .modal-suggestions {
+        margin-top: 0.45rem; display: flex; flex-direction: column;
+        gap: 0.22rem; max-height: 190px; overflow-y: auto;
+      }
+      .modal-suggestion-btn {
+        display: flex; align-items: center; gap: 0.75rem;
+        background: rgba(204,34,85,0.05);
+        border: 1px solid rgba(204,34,85,0.16);
+        border-radius: 10px; padding: 0.45rem 0.75rem;
+        text-align: left; color: #e8d0e4; font-size: 0.92rem;
+        box-shadow: none; width: 100%;
+        font-family: "IBM Plex Mono", monospace;
+        transition: background 130ms, border-color 130ms;
+        min-height: 60px;
+      }
+      .modal-suggestion-btn:hover {
+        background: rgba(204,34,85,0.16);
+        border-color: rgba(204,34,85,0.5);
+        transform: none; box-shadow: none;
+      }
+      .modal-sug-sprite {
+        width: 52px;
+        height: 52px;
+        object-fit: contain;
+        flex-shrink: 0;
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+      }
+      .modal-suggestions::-webkit-scrollbar { width: 5px; }
+      .modal-suggestions::-webkit-scrollbar-track { background: rgba(204,34,85,0.05); border-radius: 3px; }
+      .modal-suggestions::-webkit-scrollbar-thumb { background: rgba(204,34,85,0.28); border-radius: 3px; }
+      .modal-suggestions::-webkit-scrollbar-thumb:hover { background: rgba(204,34,85,0.5); }
+      .modal-footer { display:flex; flex-direction:column; gap:0.45rem; margin-top:0.3rem; }
+      .modal-status {
+        margin: 0; font-size: 0.76rem;
+        font-family: "IBM Plex Mono", monospace;
+        min-height: 1.1em; text-align: center;
+        color: rgba(200,140,170,0.6);
+      }
+      .modal-status.err  { color: #f87a98; }
+      .modal-status.warn { color: #fbbf24; }
+      .modal-status.ok   { color: #10d98a; }
+      .modal-actions { display: flex; gap: 0.55rem; }
+      .modal-ok-btn     { flex: 1;       padding: 0.68rem 1rem;   font-size: 0.88rem; border-radius: 11px; }
+      .modal-cancel-btn { flex-shrink: 0; padding: 0.68rem 0.95rem; font-size: 0.88rem; border-radius: 11px; }
+
+      /* ── Modal hint bar ───────────────────────────────────── */
+      .modal-hint-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        padding: 0.65rem 0 0.1rem;
+        border-top: 1px solid rgba(204, 34, 85, 0.15);
+        margin-top: 0.5rem;
+      }
+      .modal-hint-tag {
+        font-family: "Silkscreen", "IBM Plex Mono", monospace;
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: rgba(200, 130, 165, 0.58);
+        flex-shrink: 0;
+      }
+      .modal-pip-hint {
+        background: none;
+        border: none;
+        padding: 0.1rem;
+        cursor: pointer;
+        font-size: 1.45rem;
+        line-height: 1;
+        box-shadow: none;
+        border-radius: 50%;
+        display: inline-block;
+        transition: filter 180ms ease, transform 220ms cubic-bezier(.34,1.56,.64,1), opacity 180ms ease;
+        filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.45));
+      }
+      .modal-pip-hint:hover:not(.spent):not(:disabled) {
+        transform: scale(1.35) rotate(14deg);
+        filter: drop-shadow(0 0 12px rgba(34, 211, 238, 0.75));
+      }
+      .modal-pip-hint.spent,
+      .modal-pip-hint:disabled {
+        filter: grayscale(1) brightness(0.38);
+        opacity: 0.22;
+        cursor: not-allowed;
+        transform: scale(0.78);
+      }
+
+
+      /* ── Draft (typed but not confirmed) state ─────────────── */
+      .cell.drafted:not(.ok):not(.hint-cell) {
+        border-color: rgba(245, 158, 11, 0.42);
+        background: linear-gradient(160deg, rgba(245,158,11,0.06), rgba(20,10,28,0.97));
+      }
+      .cell.drafted:not(.ok):not(.hint-cell) .picked-name {
+        color: rgba(245, 158, 11, 0.72);
+        font-style: italic;
+      }
+      /* ── Mobile bottom-sheet modal ─────────────────────────── */
+      @media (max-width: 767px) {
+        /* ── Bottom-sheet overlay ── */
+        .cell-modal-overlay {
+          align-items: flex-end !important;
+          padding: 0 !important;
+        }
+
+        /* Drag handle */
+        .cell-modal-card::before {
+          content: '';
+          display: block;
+          width: 36px;
+          height: 4px;
+          background: rgba(204, 34, 85, 0.30);
+          border-radius: 3px;
+          margin: 0 auto 0.75rem;
+        }
+
+        /* Sheet card — compact so board stays visible above it */
+        .cell-modal-card {
+          width: 100% !important;
+          max-width: 100% !important;
+          border-radius: 20px 20px 0 0 !important;
+          /* Tight padding: leaves more board visible */
+          padding: 0.75rem 1rem max(1.2rem, env(safe-area-inset-bottom)) !important;
+          max-height: 78vh !important;
+          overflow-y: auto !important;
+          animation: sheet-up 260ms cubic-bezier(.22,.61,.36,1) both !important;
+        }
+        @keyframes sheet-up {
+          from { opacity: 0; transform: translateY(100%); }
+          to   { opacity: 1; transform: none; }
+        }
+
+        /* Rule tags — compact */
+        .modal-rules    { gap: 0.2rem !important; padding: 0 3.5rem !important; }
+        .modal-rule-tag { font-size: 0.7rem !important; padding: 0.24rem 0.44rem !important; }
+        .modal-rule-x   { font-size: 0.7rem !important; }
+        .modal-header   { margin-bottom: 0.5rem !important; }
+        .modal-header-right { top: 0.75rem !important; right: 0.75rem !important; }
+
+        /* Sprite preview — small and inline, collapses when empty */
+        .modal-preview {
+          flex-direction: row !important;    /* sprite + name side-by-side */
+          justify-content: center !important;
+          align-items: center !important;
+          gap: 0.6rem !important;
+          min-height: 0 !important;
+          margin-bottom: 0.6rem !important;
+        }
+        .modal-sprite      { width: 52px !important; height: 52px !important; }
+        .modal-picked-name { font-size: 0.82rem !important; text-align: left !important; }
+
+        /* Input */
+        .modal-input {
+          font-size: 0.9rem !important;
+          padding: 0.65rem 0.8rem !important;
+          border-radius: 9px !important;
+        }
+
+        /* Suggestion list */
+        .modal-suggestions    { max-height: 130px !important; }
+        .modal-suggestion-btn { font-size: 0.8rem !important; min-height: 46px !important; padding: 0.3rem 0.55rem !important; gap: 0.5rem !important; }
+        .modal-sug-sprite     { width: 38px !important; height: 38px !important; }
+
+        /* Footer */
+        .modal-status { font-size: 0.72rem !important; }
+        .modal-footer { gap: 0.35rem !important; margin-top: 0.25rem !important; }
+        .modal-actions { gap: 0.45rem !important; }
+        .modal-ok-btn, .modal-cancel-btn {
+          font-size: 0.82rem !important;
+          padding: 0.58rem 0.8rem !important;
+          min-height: 42px !important;
+          border-radius: 9px !important;
+        }
+
+        /* Lives row + close button — flex layout, just scale down sizes */
+        .modal-lives-row { gap: 0.14rem !important; }
+        .modal-heart     { font-size: 0.82rem !important; }
+        .modal-close-btn { width: 1.7rem !important; height: 1.7rem !important; font-size: 0.78rem !important; }
+        .modal-header    { margin-bottom: 0.55rem !important; gap: 0.35rem !important; }
+
+        /* Hint bar */
+        .modal-hint-bar { padding: 0.4rem 0 0 !important; margin-top: 0.3rem !important; gap: 0.4rem !important; }
+        .modal-hint-tag { font-size: 0.58rem !important; }
+        .modal-pip-hint { font-size: 1.15rem !important; }
+      }
+
+      /* ── Mobile HUD adjustments ──────────────────────────── */
+      @media (max-width: 767px) {
+        .hud-strip  { padding: 0.42rem 0.65rem; }
+        .hud-score  { font-size: 0.88rem; }
+        .hud-tag    { font-size: 0.58rem; letter-spacing: 0.1em; }
+        .pip-life   { font-size: 1.15rem; }
+        .pip-hint   { font-size: 1.15rem; }
+        .hud-divider { height: 1.6rem; }
+        .hud-bar    { min-width: 50px; }
+      }
+      /* Very narrow: progress bar goes full-width on second row */
+      @media (max-width: 400px) {
+        .hud-strip  { flex-wrap: wrap; gap: 0.35rem; justify-content: space-between; }
+        .hud-divider { display: none; }
+        .hud-section.hud-mid {
+          order: 3;
+          flex-basis: 100%;
+          justify-content: center;
+          padding: 0;
+          border-top: 1px solid rgba(58,15,50,0.5);
+          padding-top: 0.35rem;
+        }
+      }
+
+      /* ── Mobile scroll hint ──────────────────────────────── */
+      @media (max-width: 900px) {
+        .board-scroll-hint {
+          display: block;
+          text-align: center;
+          font-family: "IBM Plex Mono", monospace;
+          font-size: 0.65rem;
+          color: rgba(200, 130, 165, 0.45);
+          letter-spacing: 0.08em;
+          padding: 0.3rem 0 0;
+          animation: hint-fade 4s ease 1.5s forwards;
+          opacity: 1;
+        }
+        @keyframes hint-fade {
+          to { opacity: 0; }
+        }
+      }
+      @media (min-width: 901px) {
+        .board-scroll-hint { display: none; }
+      }
+
+      /* ── Modal lives indicator ────────────────────────────── */
+      /* Lives row is now inline in the flex header — no more absolute positioning */
+      .modal-lives-row {
+        display: flex;
+        gap: 0.18rem;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .modal-heart {
+        font-size: 1rem;
+        line-height: 1;
+        transition: filter 220ms ease, opacity 220ms ease, transform 220ms cubic-bezier(.34,1.56,.64,1);
+      }
+      .modal-heart.spent {
+        filter: grayscale(1) brightness(0.4);
+        opacity: 0.22;
+        transform: scale(0.78);
+      }
+
+      /* ── Hide rule labels on correctly-filled cells ─────────── */
+      /* Sprite + name give all needed context; labels just get cut off */
+      .cell.ok .qual-combo,
+      .cell.hint-cell .qual-combo {
+        display: none;
+      }
+
+      /* ── Wrong-attempt cell — keep red even after closing modal ─ */
+      .cell.err:not(.ok) .picked-name {
+        color: rgba(244, 63, 94, 0.82) !important;
+        font-style: italic;
+      }
+      .cell.err:not(.ok) {
+        border-color: rgba(244, 63, 94, 0.38);
+        background: linear-gradient(160deg, rgba(244,63,94,0.06), rgba(14,4,22,0.97));
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         Pokedex Palette — collection tracker (Daily Board catches only)
+         ══════════════════════════════════════════════════════════ */
+
+      .pokedex-modal-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.84);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        z-index: 210;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+      }
+      .pokedex-modal-overlay.open { opacity: 1; pointer-events: all; }
+
+      .pokedex-modal-card {
+        position: relative;
+        background: rgba(14, 4, 22, 0.98);
+        border: 1px solid rgba(204, 34, 85, 0.42);
+        border-radius: 24px;
+        padding: 1.6rem 1.6rem 1.4rem;
+        width: min(1180px, 96vw);
+        max-height: 88vh;
+        overflow: hidden;
+        display: flex; flex-direction: column;
+        box-shadow: 0 0 70px rgba(204,34,85,0.16), 0 30px 90px rgba(0,0,0,0.8);
+        animation: modal-in 300ms cubic-bezier(.34,1.56,.64,1) both;
+      }
+
+      .pokedex-close-btn { position: absolute; top: 1.1rem; right: 1.1rem; z-index: 3; }
+
+      .pokedex-header { text-align: center; margin-bottom: 1.1rem; padding-right: 2.2rem; }
+      .pokedex-eyebrow {
+        font-family: var(--pixel-font);
+        font-size: 0.62rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent-2);
+        opacity: 0.85;
+        margin: 0 0 0.3rem;
+      }
+      .pokedex-title {
+        margin: 0 0 0.35rem;
+        font-family: var(--pixel-font);
+        font-size: clamp(1.3rem, 3vw, 1.8rem);
+        letter-spacing: 0.02em;
+        background: linear-gradient(110deg, #e040a0 0%, #cc2255 45%, #9b1fcc 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .pokedex-subtitle {
+        margin: 0; font-size: 0.8rem; color: var(--ink-soft);
+        max-width: 520px; margin-inline: auto; line-height: 1.4;
+      }
+
+      /* ── Stats row: progress ring + explainer ──────────────── */
+      .pokedex-stats-row {
+        display: flex; align-items: center; gap: 1.3rem;
+        justify-content: center; margin-bottom: 1.3rem; flex-wrap: wrap;
+      }
+      .pokedex-ring-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+      .pokedex-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+      .pokedex-ring-track { fill: none; stroke: rgba(204, 34, 85, 0.14); stroke-width: 10; }
+      .pokedex-ring-fill {
+        fill: none;
+        stroke: url(#pokedexRingGradient);
+        stroke-width: 10;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 700ms cubic-bezier(.22,.61,.36,1);
+        filter: drop-shadow(0 0 6px rgba(204,34,85,0.5));
+      }
+      .pokedex-ring-label {
+        position: absolute; inset: 0; display: grid; place-items: center;
+        font-family: var(--pixel-font); font-size: 1.05rem; color: var(--ink);
+      }
+      .pokedex-stats-text { max-width: 420px; text-align: left; }
+      .pokedex-count {
+        margin: 0 0 0.25rem; font-family: var(--pixel-font);
+        font-size: 1.15rem; color: var(--ink);
+      }
+      .pokedex-hint-text { margin: 0; font-size: 0.74rem; color: var(--ink-soft); line-height: 1.45; }
+      .pokedex-hint-text strong { color: #e8a8c0; }
+
+      /* ── Palette strip: signature element — literal type "palette" ── */
+      .pokedex-palette-strip {
+        display: grid; grid-template-columns: repeat(9, 1fr);
+        gap: 0.4rem; margin-bottom: 1.2rem;
+      }
+      .palette-swatch {
+        position: relative; overflow: hidden;
+        height: 42px; border-radius: 9px;
+        border: 1px solid var(--line-strong);
+        background: rgba(20, 10, 28, 0.9);
+        padding: 0; box-shadow: none; cursor: pointer;
+        transition: transform 140ms ease, border-color 140ms ease;
+      }
+      .palette-swatch:hover { transform: translateY(-2px); box-shadow: none; }
+      .palette-swatch.active {
+        border-color: var(--swatch-color, var(--accent));
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.06) inset, 0 0 14px var(--swatch-color, transparent);
+      }
+      .palette-swatch.full::after {
+        content: '✦'; position: absolute; top: 2px; right: 3px;
+        font-size: 0.55rem; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.6);
+      }
+      .swatch-fill {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        background: var(--swatch-color, var(--accent));
+        opacity: 0.85;
+        transition: height 600ms cubic-bezier(.22,.61,.36,1);
+      }
+      .swatch-icon {
+        position: relative; z-index: 1;
+        display: grid; place-items: center; width: 100%; height: 100%;
+        font-size: 1.05rem; color: rgba(255,255,255,0.9);
+        font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols", sans-serif;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+      }
+
+      /* ── Controls ───────────────────────────────────────────── */
+      .pokedex-controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.1rem; }
+      .pokedex-search { flex: 1 1 220px; min-width: 0; }
+      .pokedex-filter-chips { display: flex; gap: 0.35rem; flex-shrink: 0; }
+      .pokedex-chip {
+        font-family: var(--pixel-font); font-size: 0.66rem; letter-spacing: 0.04em;
+        padding: 0.45rem 0.7rem; border-radius: 8px;
+        background: transparent; border: 1px solid var(--line-strong);
+        color: var(--ink-soft); box-shadow: none;
+      }
+      .pokedex-chip:hover { border-color: var(--accent); color: var(--ink); transform: none; box-shadow: none; }
+      .pokedex-chip.active { background: rgba(204, 34, 85, 0.16); border-color: var(--accent); color: var(--ink); }
+      .pokedex-gen-select { flex-shrink: 0; font-size: 0.78rem; padding: 0.5rem 0.6rem; border-radius: 9px; }
+
+      /* ── Card grid ──────────────────────────────────────────── */
+      .pokedex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 0.5rem; }
+
+      /* Cards are deliberately fixed-length now: sprite, name, type dots, and
+         a short date caption — nothing here grows with how much a Pokemon
+         has been used. Anything variable-length (rule pairing, confirmed vs.
+         locked categories, abilities) lives in the Detail modal instead,
+         opened by clicking a caught card. */
+      .dex-card {
+        position: relative; aspect-ratio: 3 / 4; border-radius: 10px;
+        border: 1px solid var(--line-strong); background: var(--card);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 0.2rem; padding: 0.4rem 0.3rem;
+        animation: cell-rise 260ms ease both;
+        animation-delay: calc(var(--card-index, 0) * 12ms);
+        transition: border-color 160ms ease, transform 160ms ease;
+      }
+      .dex-card.caught { cursor: pointer; border-color: rgba(16, 217, 138, 0.3); }
+      .dex-card.caught:hover { border-color: var(--accent); transform: translateY(-2px); }
+      .dex-card.recent { border-color: var(--accent-2); box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
+      .dex-card.recent::before {
+        content: 'NEW'; position: absolute; top: 4px; left: 4px;
+        font-family: var(--pixel-font); font-size: 0.45rem; letter-spacing: 0.05em;
+        color: #1a0f06; background: var(--accent-2); padding: 1px 4px; border-radius: 4px;
+      }
+
+      .dex-sprite { width: 62%; aspect-ratio: 1/1; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
+      .dex-card.uncaught .dex-sprite { filter: brightness(0) saturate(100%) opacity(0.5); }
+
+      .dex-name {
+        margin: 0; font-family: var(--pixel-font); font-size: 0.56rem;
+        letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink);
+        text-align: center; line-height: 1.2; max-width: 100%;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .dex-card.uncaught .dex-name { color: var(--ink-soft); }
+
+      .dex-type-row { display: flex; gap: 3px; }
+      .dex-type-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+      .dex-date-caption {
+        margin: 0; font-size: 0.5rem; color: var(--ink-soft);
+        font-family: "IBM Plex Mono", monospace; white-space: nowrap;
+      }
+      .dex-rare-mark { font-size: 0.6rem; color: var(--accent-2); margin-left: 2px; }
+
+      .pokedex-empty { text-align: center; color: var(--ink-soft); font-size: 0.85rem; padding: 2.5rem 1rem; line-height: 1.5; }
+      .pokedex-empty.hidden { display: none; }
+
+      .pokedex-modal-card::-webkit-scrollbar { width: 6px; }
+      .pokedex-modal-card::-webkit-scrollbar-track { background: rgba(204,34,85,0.05); border-radius: 3px; }
+      .pokedex-modal-card::-webkit-scrollbar-thumb { background: rgba(204,34,85,0.28); border-radius: 3px; }
+
+      /* ── Mobile ─────────────────────────────────────────────── */
+      @media (max-width: 767px) {
+        .pokedex-modal-overlay { align-items: flex-end; padding: 0; }
+        .pokedex-modal-card { padding: 1.1rem 1rem 1.2rem; border-radius: 20px 20px 0 0; max-height: 92vh; width: 100%; }
+        .pokedex-palette-strip { grid-template-columns: repeat(6, 1fr); }
+        .pokedex-stats-row { gap: 0.9rem; }
+        .pokedex-ring-wrap { width: 76px; height: 76px; }
+        .pokedex-ring-label { font-size: 0.86rem; }
+        .pokedex-stats-text { text-align: center; }
+        .pokedex-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 0.4rem; }
+        .dex-name { font-size: 0.5rem; }
+      }
+
+      /* ── Streak badge ───────────────────────────────────────── */
+      .pokedex-streak {
+        display: flex; align-items: center; gap: 0.4rem;
+        background: rgba(245, 158, 11, 0.10);
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        border-radius: 999px; padding: 0.4rem 0.8rem;
+        flex-shrink: 0;
+      }
+      .pokedex-streak.hidden { display: none; }
+      .pokedex-streak-flame { font-size: 1.05rem; filter: drop-shadow(0 0 5px rgba(245,158,11,0.6)); }
+      .pokedex-streak-text {
+        font-family: var(--pixel-font); font-size: 0.72rem;
+        letter-spacing: 0.03em; color: #fbbf24;
+      }
+
+      /* ── Milestone toast ─────────────────────────────────────── */
+      .pokedex-milestone-toast {
+        text-align: center;
+        font-family: var(--pixel-font);
+        font-size: 0.78rem;
+        letter-spacing: 0.03em;
+        color: #1a0f06;
+        background: linear-gradient(100deg, #f59e0b, #e040a0);
+        border-radius: 10px;
+        padding: 0.55rem 0.8rem;
+        margin: 0 0 1rem;
+        box-shadow: 0 0 22px rgba(245, 158, 11, 0.4);
+        animation: milestone-pop 420ms cubic-bezier(.34,1.56,.64,1) both;
+      }
+      .pokedex-milestone-toast.hidden { display: none; }
+      @keyframes milestone-pop {
+        from { opacity: 0; transform: scale(0.9) translateY(-6px); }
+        to   { opacity: 1; transform: none; }
+      }
+
+      /* ── View toggle (Palette grid / Catch Log) ─────────────── */
+      .pokedex-view-toggle {
+        display: flex; gap: 0.4rem; justify-content: center; margin-bottom: 1rem;
+      }
+      .pokedex-view-btn {
+        font-family: var(--pixel-font); font-size: 0.7rem; letter-spacing: 0.04em;
+        padding: 0.5rem 1rem; border-radius: 999px;
+        background: transparent; border: 1px solid var(--line-strong);
+        color: var(--ink-soft); box-shadow: none;
+      }
+      .pokedex-view-btn:hover { border-color: var(--accent); color: var(--ink); transform: none; box-shadow: none; }
+      .pokedex-view-btn.active {
+        background: var(--accent); color: #fff; border-color: var(--accent);
+        box-shadow: 0 0 14px rgba(204,34,85,0.35);
+      }
+
+      /* ── Rule-pairing chips — "caught via X × Y" — used in the Catch Log
+         rows and in the Detail modal's catch-context line ─────────────── */
+      .dex-rule-chips {
+        display: flex; align-items: center; gap: 0.25rem;
+        font-family: var(--pixel-font); font-size: 0.48rem;
+        letter-spacing: 0.02em; text-transform: uppercase;
+        flex-wrap: wrap; justify-content: center;
+      }
+      .dex-rule-chip {
+        background: rgba(204,34,85,0.12);
+        border: 1px solid rgba(204,34,85,0.32);
+        border-radius: 6px; padding: 0.12rem 0.32rem; color: #e8c0d0;
+      }
+      .dex-rule-x { color: rgba(204,100,140,0.5); font-size: 0.5rem; }
+
+      /* ── Catch Log (list) view ──────────────────────────────── */
+      .pokedex-log-list { display: flex; flex-direction: column; gap: 0.4rem; }
+      .pokedex-log-list.hidden { display: none; }
+      .pokedex-log-note {
+        text-align: center; font-size: 0.72rem; color: var(--ink-soft);
+        margin: -0.3rem 0 0.7rem;
+      }
+      .log-row {
+        display: flex; align-items: center; gap: 0.7rem;
+        background: var(--card);
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        animation: cell-rise 240ms ease both;
+        animation-delay: calc(var(--card-index, 0) * 10ms);
+        transition: border-color 160ms ease;
+      }
+      .log-row:hover { border-color: var(--accent); }
+      .log-row.recent { border-color: var(--accent-2); box-shadow: 0 0 10px rgba(245,158,11,0.25); }
+      .log-sprite { width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
+      .log-main { flex: 1; min-width: 0; }
+      .log-name-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+      .log-name {
+        font-family: var(--pixel-font); font-size: 0.76rem; letter-spacing: 0.02em;
+        color: var(--ink); margin: 0;
+      }
+      .log-meta { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.2rem; flex-wrap: wrap; }
+      .log-date {
+        font-size: 0.66rem; color: var(--ink-soft); flex-shrink: 0;
+        font-family: "IBM Plex Mono", monospace; white-space: nowrap;
+        text-align: right; padding-left: 0.5rem;
+      }
+      .log-empty-note { text-align: center; color: var(--ink-soft); font-size: 0.8rem; padding: 1.5rem; }
+
+      /* ── Shiny groundwork — dormant until shiny catching exists ── */
+      .dex-card.shiny, .log-row.shiny {
+        border-color: #ffe066 !important;
+        box-shadow: 0 0 16px rgba(255, 224, 102, 0.45);
+      }
+      .dex-card.shiny::after {
+        content: '✨'; position: absolute; bottom: 3px; right: 4px; font-size: 0.65rem;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         Two-pane layout: list pane (existing content) + detail pane.
+         The detail pane is COLLAPSED by default — it only expands once a
+         caught entry is actually selected (JS toggles "detail-open" on the
+         layout wrapper + "open" on the pane itself). Nothing sits there as
+         an empty placeholder taking up space before that.
+         ══════════════════════════════════════════════════════════ */
+      .pokedex-modal-layout {
+        display: flex;
+        flex: 1; min-height: 0; /* lets children scroll independently instead of growing the card */
+      }
+
+      .pokedex-list-pane {
+        width: 100%; min-width: 0; min-height: 0;
+        overflow-y: auto;
+        transition: width 280ms cubic-bezier(.22,.61,.36,1);
+      }
+      .pokedex-modal-layout.detail-open .pokedex-list-pane {
+        width: 56%; padding-right: 1.3rem;
+      }
+
+      /* Selected entry — reinforces the master/detail relationship */
+      .dex-card.selected {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 2px rgba(204,34,85,0.22), 0 0 14px rgba(204,34,85,0.3);
+      }
+      .log-row.selected { border-color: var(--accent) !important; background: rgba(204,34,85,0.08); }
+
+      /* ── Detail pane ──────────────────────────────────────────
+         Desktop: collapsed to zero width until opened, then expands in
+         place (list pane shrinks to make room). Mobile: collapsed off
+         to the right until opened, then slides in to fully cover the
+         list pane instead — no room for a side-by-side split there. */
+      .pokedex-detail-pane {
+        width: 0%; min-width: 0; min-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        border-left: none; padding-left: 0;
+        transition: width 280ms cubic-bezier(.22,.61,.36,1), opacity 200ms ease;
+      }
+      .pokedex-modal-layout.detail-open .pokedex-detail-pane {
+        width: 44%; min-width: 260px;
+        overflow-y: auto;
+        opacity: 1;
+        border-left: 1px solid var(--line-strong);
+        padding-left: 1.3rem;
+      }
+
+      .detail-pane-back {
+        font-family: var(--pixel-font); font-size: 0.7rem;
+        background: transparent; border: 1px solid var(--line-strong);
+        color: var(--ink-soft); border-radius: 8px; padding: 0.4rem 0.8rem;
+        margin-bottom: 0.9rem;
+      }
+      .detail-pane-back:hover { border-color: var(--accent); color: var(--ink); transform: none; box-shadow: none; }
+
+      .detail-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.9rem; }
+      .detail-sprite {
+        width: 76px; height: 76px; object-fit: contain; flex-shrink: 0;
+        filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+      }
+      .detail-header-text { min-width: 0; }
+      .detail-title {
+        margin: 0 0 0.3rem; font-family: var(--pixel-font);
+        font-size: 1.1rem; letter-spacing: 0.02em; color: var(--ink);
+      }
+      .detail-type-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+      .detail-type-pill {
+        font-family: var(--pixel-font); font-size: 0.58rem; letter-spacing: 0.03em;
+        text-transform: uppercase; padding: 0.2rem 0.55rem; border-radius: 999px;
+        color: #fff;
+      }
+
+      .detail-catch-row {
+        display: flex; align-items: center; gap: 0.5rem;
+        flex-wrap: wrap; margin-bottom: 1.2rem;
+        font-size: 0.74rem; color: var(--ink-soft);
+      }
+      .detail-catch-date { font-family: "IBM Plex Mono", monospace; }
+
+      .detail-section { margin-bottom: 1.1rem; }
+      .detail-section.hidden { display: none; }
+      .detail-section-head {
+        display: flex; align-items: baseline; justify-content: space-between;
+        margin-bottom: 0.5rem;
+      }
+      .detail-section-label {
+        font-family: var(--pixel-font); font-size: 0.68rem; letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .detail-section-progress {
+        font-family: var(--pixel-font); font-size: 0.6rem;
+      }
+      /* Section identity colors — General=pink, Abilities=cyan, Moves=amber,
+         so the three lists read as distinct at a glance. */
+      .section-general .detail-section-label,
+      .section-general .detail-section-progress { color: #e0708f; }
+      .section-abilities .detail-section-label,
+      .section-abilities .detail-section-progress { color: #5fd8ea; }
+      .section-moves .detail-section-label,
+      .section-moves .detail-section-progress { color: #f0ad4e; }
+
+      .detail-category-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+      /* Moves lists can run long (tens of entries) — its own scroll region
+         keeps the rest of the detail pane from ballooning with it. */
+      .detail-category-grid.moves-grid {
+        max-height: 230px; overflow-y: auto; padding-right: 0.3rem;
+      }
+
+      .detail-category-chip {
+        font-family: var(--pixel-font); font-size: 0.6rem; letter-spacing: 0.02em;
+        text-transform: uppercase; padding: 0.35rem 0.65rem; border-radius: 8px;
+        display: inline-flex; align-items: center; gap: 0.3rem;
+      }
+      .detail-category-chip.locked .lock-icon { font-size: 0.55rem; opacity: 0.8; flex-shrink: 0; }
+      /* Locked chips still render the real label (so width matches the real
+         answer's length — no layout jump when later confirmed) but blurred
+         past legibility, so nothing is actually given away. */
+      .detail-category-chip.locked .chip-label-blur {
+        filter: blur(5px);
+        user-select: none;
+      }
+      .sr-only {
+        position: absolute; width: 1px; height: 1px;
+        padding: 0; margin: -1px; overflow: hidden;
+        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+
+      /* General — pink (matches the primary rule-chip color everywhere else) */
+      .section-general .detail-category-chip.confirmed {
+        background: rgba(204,34,85,0.16); border: 1px solid rgba(204,34,85,0.4); color: #f0c8d8;
+      }
+      .section-general .detail-category-chip.locked {
+        background: rgba(255,255,255,0.02); border: 1px dashed rgba(204,34,85,0.3);
+        color: var(--ink-soft); opacity: 0.75;
+      }
+
+      /* Abilities — cyan */
+      .section-abilities .detail-category-chip.confirmed {
+        background: rgba(34,211,238,0.14); border: 1px solid rgba(34,211,238,0.4); color: #c0f0f8;
+      }
+      .section-abilities .detail-category-chip.locked {
+        background: rgba(255,255,255,0.02); border: 1px dashed rgba(34,211,238,0.32);
+        color: var(--ink-soft); opacity: 0.75;
+      }
+      /* Informational (no board rule exists for this trait — can't ever be
+         "earned", so it's just shown, distinct from both confirmed and locked) */
+      .section-abilities .detail-category-chip.info {
+        background: transparent; border: 1px solid rgba(34,211,238,0.2); color: #7fb8c2;
+      }
+
+      /* Moves — amber */
+      .section-moves .detail-category-chip.confirmed {
+        background: rgba(245,158,11,0.16); border: 1px solid rgba(245,158,11,0.45); color: #ffe4b0;
+      }
+      .section-moves .detail-category-chip.locked {
+        background: rgba(255,255,255,0.02); border: 1px dashed rgba(245,158,11,0.32);
+        color: var(--ink-soft); opacity: 0.75;
+      }
+      .section-moves .detail-category-chip.info {
+        background: transparent; border: 1px solid rgba(245,158,11,0.2); color: #c2a06e;
+      }
+
+      .pokedex-detail-pane::-webkit-scrollbar,
+      .pokedex-list-pane::-webkit-scrollbar,
+      .moves-grid::-webkit-scrollbar { width: 6px; }
+      .pokedex-detail-pane::-webkit-scrollbar-track,
+      .pokedex-list-pane::-webkit-scrollbar-track,
+      .moves-grid::-webkit-scrollbar-track { background: rgba(204,34,85,0.05); border-radius: 3px; }
+      .pokedex-detail-pane::-webkit-scrollbar-thumb,
+      .pokedex-list-pane::-webkit-scrollbar-thumb,
+      .moves-grid::-webkit-scrollbar-thumb { background: rgba(204,34,85,0.28); border-radius: 3px; }
+
+      @media (max-width: 767px) {
+        .pokedex-modal-layout { position: relative; }
+        .pokedex-modal-layout.detail-open .pokedex-list-pane { width: 100%; padding-right: 0; } /* mobile covers, doesn't shrink */
+        .pokedex-detail-pane {
+          position: absolute; inset: 0;
+          background: rgba(14, 4, 22, 0.98);
+          transform: translateX(100%);
+          transition: transform 260ms cubic-bezier(.34,1.2,.4,1);
+          z-index: 2;
+          padding: 0; /* width-based desktop padding doesn't apply here */
+        }
+        .pokedex-modal-layout.detail-open .pokedex-detail-pane {
+          width: 100%; min-width: 0;
+          border-left: none; padding-left: 0;
+          transform: translateX(0);
+        }
+      }
+      /* ══════════════════════════════════════════════════════════
+         Draft Board — build-your-own board from chosen categories.
+         Violet identity, distinct from Palette (pink)/Abilities (cyan)/
+         Moves (amber), so it reads as its own thing at a glance.
+         ══════════════════════════════════════════════════════════ */
+      .draft-modal-card {
+        width: min(760px, 94vw) !important;
+        display: block !important; /* override the two-pane flex-column from the Pokedex card */
+      }
+      .draft-eyebrow { color: #b494f0 !important; }
+      .draft-title {
+        background: linear-gradient(110deg, #b494f0 0%, #8b5cf6 45%, #6633cc 100%) !important;
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+
+      .draft-settings {
+        display: flex; flex-wrap: wrap; gap: 1.4rem;
+        justify-content: center; margin: 1.1rem 0 1rem;
+      }
+      .draft-setting { display: flex; align-items: center; gap: 0.5rem; }
+      .draft-toggle-label {
+        display: flex; align-items: center; gap: 0.55rem;
+        font-size: 0.82rem; color: var(--ink); cursor: pointer;
+      }
+      .draft-toggle-switch {
+        position: relative; display: inline-block; width: 38px; height: 21px;
+        flex-shrink: 0;
+      }
+      .draft-toggle-switch input {
+        position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1;
+      }
+      .draft-toggle-knob {
+        position: absolute; inset: 0;
+        background: rgba(255,255,255,0.08); border: 1px solid var(--line-strong);
+        border-radius: 999px; transition: background 160ms ease;
+      }
+      .draft-toggle-knob::after {
+        content: ''; position: absolute; top: 2px; left: 2px;
+        width: 15px; height: 15px; border-radius: 50%;
+        background: #cfcfe0; transition: transform 160ms ease, background 160ms ease;
+      }
+      .draft-toggle-switch input:checked + .draft-toggle-knob {
+        background: rgba(139, 92, 246, 0.45); border-color: #8b5cf6;
+      }
+      .draft-toggle-switch input:checked + .draft-toggle-knob::after {
+        transform: translateX(17px); background: #e8ddff;
+      }
+      .draft-info-icon {
+        color: var(--ink-soft); font-size: 0.9rem; cursor: help;
+        border-bottom: 1px dotted var(--ink-soft);
+      }
+      .draft-info-icon:hover, .draft-info-icon:focus { color: #b494f0; }
+
+      .draft-size-row {
+        display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+        flex-wrap: wrap; margin-bottom: 1.2rem;
+      }
+      .draft-size-label {
+        font-family: var(--pixel-font); font-size: 0.68rem; letter-spacing: 0.06em;
+        text-transform: uppercase; color: var(--ink-soft);
+      }
+      .draft-size-options { display: flex; gap: 0.35rem; }
+      .draft-size-btn {
+        font-family: var(--pixel-font); font-size: 0.68rem;
+        padding: 0.4rem 0.65rem; border-radius: 8px;
+        background: transparent; border: 1px solid var(--line-strong);
+        color: var(--ink-soft); box-shadow: none;
+      }
+      .draft-size-btn:hover { border-color: #8b5cf6; color: var(--ink); transform: none; box-shadow: none; }
+      .draft-size-btn.active {
+        background: rgba(139,92,246,0.18); border-color: #8b5cf6; color: #e8ddff;
+        box-shadow: 0 0 12px rgba(139,92,246,0.3);
+      }
+
+      .draft-category-row {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
+        margin-bottom: 0.6rem;
+      }
+      .draft-category-btn {
+        font-family: var(--pixel-font); font-size: 0.7rem;
+        padding: 0.6rem 0.7rem; border-radius: 9px;
+        background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.35);
+        color: #d8c8f8; box-shadow: none;
+        display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+      }
+      .draft-category-btn:hover { border-color: #8b5cf6; transform: none; box-shadow: none; }
+      .draft-category-btn.open { background: rgba(139,92,246,0.18); border-color: #8b5cf6; }
+      .draft-cat-count {
+        font-family: "IBM Plex Mono", monospace; font-size: 0.62rem; color: #b494f0; opacity: 0.85;
+      }
+      .draft-caret { font-size: 0.6rem; opacity: 0.7; transition: transform 160ms ease; }
+      .draft-category-btn.open .draft-caret { transform: rotate(180deg); }
+
+      .draft-dropdown-panel {
+        background: rgba(139,92,246,0.05);
+        border: 1px solid rgba(139,92,246,0.3);
+        border-radius: 12px;
+        padding: 0.9rem;
+        margin-bottom: 1rem;
+        animation: cell-rise 200ms ease both;
+      }
+      .draft-dropdown-panel.hidden { display: none; }
+      .draft-dropdown-head {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 0.6rem;
+      }
+      .draft-dropdown-title {
+        font-family: var(--pixel-font); font-size: 0.75rem; letter-spacing: 0.03em; color: #e8ddff;
+      }
+      .draft-all-toggle {
+        display: flex; align-items: center; gap: 0.35rem;
+        font-size: 0.75rem; color: var(--ink-soft); cursor: pointer;
+      }
+      .draft-all-toggle input { accent-color: #8b5cf6; width: 15px; height: 15px; }
+
+      .draft-dropdown-search { margin-bottom: 0.6rem; padding: 0.5rem 0.7rem; font-size: 0.8rem; }
+      .draft-dropdown-search.hidden { display: none; }
+
+      .draft-dropdown-list {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.3rem 0.6rem;
+        max-height: 260px; overflow-y: auto; padding-right: 0.3rem;
+      }
+      .draft-dropdown-item {
+        display: flex; align-items: center; gap: 0.5rem;
+        font-size: 0.8rem; color: var(--ink);
+        padding: 0.3rem 0.2rem; border-radius: 6px; cursor: pointer;
+      }
+      .draft-dropdown-item:hover { background: rgba(139,92,246,0.08); }
+      .draft-dropdown-item input { accent-color: #8b5cf6; width: 15px; height: 15px; flex-shrink: 0; }
+      .draft-dropdown-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .draft-dropdown-empty { grid-column: 1 / -1; text-align: center; color: var(--ink-soft); font-size: 0.8rem; padding: 1rem; }
+
+      .draft-dropdown-list::-webkit-scrollbar { width: 6px; }
+      .draft-dropdown-list::-webkit-scrollbar-track { background: rgba(139,92,246,0.05); border-radius: 3px; }
+      .draft-dropdown-list::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.3); border-radius: 3px; }
+
+      .draft-summary {
+        text-align: center; font-size: 0.8rem; color: var(--ink-soft);
+        margin-bottom: 0.9rem;
+      }
+
+      .draft-banner {
+        border-radius: 10px; padding: 0.7rem 0.9rem;
+        font-size: 0.8rem; line-height: 1.45; margin: 0 0 0.9rem;
+      }
+      .draft-banner.hidden { display: none; }
+      .draft-banner-info {
+        background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.32); color: #a8e8f0;
+      }
+      .draft-banner-error {
+        background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.35); color: #f5b0bd;
+      }
+
+      .draft-generate-btn {
+        display: block; width: 100%;
+        font-family: var(--pixel-font); font-size: 0.9rem; letter-spacing: 0.03em;
+        padding: 0.85rem; border-radius: 12px;
+        background: linear-gradient(100deg, #8b5cf6, #6633cc);
+        border: none; color: #fff;
+        box-shadow: 0 0 20px rgba(139,92,246,0.35);
+      }
+      .draft-generate-btn:hover { transform: translateY(-1px); box-shadow: 0 0 26px rgba(139,92,246,0.5); }
+      .draft-generate-btn:disabled {
+        opacity: 0.55; cursor: not-allowed; box-shadow: none; transform: none;
+      }
+
+      @media (max-width: 767px) {
+        .draft-modal-card { padding: 1.1rem 1rem 1.2rem; border-radius: 20px 20px 0 0; width: 100% !important; }
+        .draft-category-row { grid-template-columns: repeat(2, 1fr); }
+        .draft-dropdown-list { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); max-height: 200px; }
+        .draft-settings { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
+      }
+    </style>
   </head>
   <body>
     <div class="bg-orb orb-a" aria-hidden="true"></div>
@@ -19,81 +1339,340 @@
     <main class="app-shell">
       <header class="app-header">
         <div class="hero-copy">
-          <p class="eyebrow">Portable Frontend</p>
-          <h1>PokeDoku Board Prototype</h1>
+          <p class="eyebrow">★ Daily Pokémon Puzzle ★</p>
+          <h1>PokeDokuDoku</h1>
           <p class="subtitle">
-            Fill the grid with unique Pokemon that satisfy each row and column rule.
+            Fill the 9×9 grid — each cell needs a unique Pokémon matching its row &amp; column rule.
           </p>
         </div>
 
         <section class="player-actions" aria-label="Board actions">
           <button type="button" id="loadToday">Daily Board</button>
           <button type="button" id="loadRandom" class="ghost">Shuffle Board</button>
+          <button type="button" id="openDraftBtn" class="ghost">🃏 Draft Board</button>
+          <button type="button" id="openPokedexBtn" class="ghost">🎨 Your Palette</button>
         </section>
-
-        <!--
-          Developer controls (mode/API URL) intentionally hidden for player-first UX.
-          Re-enable this block when debugging backend/API behavior on developer devices.
-          <form id="controls" class="controls" aria-label="Board controls">
-            <label>
-              Data Mode
-              <select id="modeSelect">
-                <option value="auto" selected>Auto (API then Mock)</option>
-                <option value="api">API only</option>
-                <option value="mock">Mock only</option>
-              </select>
-            </label>
-            <label>
-              API Base URL
-              <input id="apiBase" type="text" value="http://127.0.0.1:8000" />
-            </label>
-            <div class="control-row">
-              <button type="button" id="loadToday">Load Today</button>
-              <button type="button" id="loadRandom" class="ghost">Load Random</button>
-            </div>
-          </form>
-        -->
       </header>
 
       <section class="status-row" aria-live="polite">
-        <p id="boardMeta">Board not loaded yet.</p>
+        <p id="boardMeta">Loading board…</p>
         <p id="message" class="message"></p>
       </section>
 
+      <!-- ── HUD strip ── -->
+      <div class="hud-strip" id="gameHud" role="status" aria-label="Game status">
+
+        <div class="hud-section" aria-label="Lives remaining">
+          <div id="livesDisplay" style="display:flex;gap:0.18rem;align-items:center">
+            <span class="pip-life" aria-label="Life 1">❤️</span>
+            <span class="pip-life" aria-label="Life 2">❤️</span>
+            <span class="pip-life" aria-label="Life 3">❤️</span>
+          </div>
+          <span class="hud-tag">Lives</span>
+        </div>
+
+        <div class="hud-divider"></div>
+
+        <div class="hud-section hud-mid" aria-label="Completion progress">
+          <span id="progressText" class="hud-score">0 / 81</span>
+          <div class="hud-bar" role="progressbar" aria-valuemin="0" aria-valuemax="81" aria-valuenow="0" id="progressBarWrap">
+            <div class="hud-fill" id="progressBar"></div>
+          </div>
+          <span class="hud-tag">Complete</span>
+        </div>
+
+        <div class="hud-divider"></div>
+
+        <div class="hud-section" aria-label="Hints available">
+          <span class="hud-tag">Hints</span>
+          <div id="hintsDisplay" style="display:flex;gap:0.18rem;align-items:center">
+            <button class="pip-hint" data-hint-index="0" title="Click a cell then press a star to reveal an answer">⭐</button>
+            <button class="pip-hint" data-hint-index="1" title="Click a cell then press a star to reveal an answer">⭐</button>
+            <button class="pip-hint" data-hint-index="2" title="Click a cell then press a star to reveal an answer">⭐</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Alerts (hidden by default) -->
+      <div class="hud-alert hud-alert-dead" id="gameOverBanner" role="alert">
+        <span class="hud-alert-icon">💀</span>
+        <span class="hud-alert-text">
+          <strong>Board locked</strong>
+          No lives remaining. Better luck next time!
+        </span>
+        <button type="button" id="retryBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">Try Again</button>
+      </div>
+
+      <div class="hud-alert hud-alert-win" id="winBanner" role="alert">
+        <span class="hud-alert-icon">🏆</span>
+        <span class="hud-alert-text">
+          <strong>Board complete!</strong>
+          You filled the whole grid. Incredible!
+        </span>
+        <button type="button" id="newAfterWinBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">New Board</button>
+      </div>
+
       <section class="legend" aria-label="Status legend">
-        <span><i class="dot ok"></i> Correct</span>
-        <span><i class="dot warn"></i> Not submitted</span>
-        <span><i class="dot err"></i> Validation error</span>
+        <span><i class="dot ok"></i>Correct</span>
+        <span><i class="dot warn"></i>Draft / Not confirmed</span>
+        <span><i class="dot err"></i>Wrong answer</span>
+        <span><i class="dot hint"></i>Hint used</span>
       </section>
 
-      <div id="boardWrap" class="board-wrap" role="region" aria-label="PokeDoku board"></div>
+      <div id="boardWrap" class="board-wrap" role="region" aria-label="PokeDokuDoku board"></div>
+      <p class="board-scroll-hint" aria-hidden="true">← scroll to see all columns →</p>
     </main>
 
     <template id="cellTemplate">
       <article class="cell" role="gridcell" tabindex="0">
         <div class="cell-summary">
-          <img class="summary-sprite hidden" alt="Selected Pokemon" loading="lazy" />
+          <img class="summary-sprite hidden" alt="Selected Pokémon" loading="lazy" />
           <p class="picked-name-row">
-            <span class="picked-name">Tap to enter pick</span>
+            <span class="picked-name">Tap to enter</span>
             <span class="result-mark" aria-hidden="true"></span>
           </p>
           <div class="qual-stack">
-            <p class="qual-line qual-combo"></p>
+            <div class="qual-combo"></div>
           </div>
-        </div>
-
-        <div class="cell-editor">
-          <label class="sr-only">Pokemon name</label>
-          <input type="text" class="name-input" placeholder="Pokemon name" autocomplete="off" />
-          <datalist class="suggestions"></datalist>
-          <div class="cell-actions">
-            <button type="button" class="ok-btn">OK</button>
-            <button type="button" class="clear-btn ghost">X</button>
-          </div>
-          <p class="cell-status">Not submitted</p>
         </div>
       </article>
     </template>
+
+    <!-- Global input modal — one shared instance for all cells -->
+    <div id="cellModal" class="cell-modal-overlay" role="dialog" aria-modal="true">
+      <div class="cell-modal-card">
+
+        <!-- Header: rule tags left, lives + close right — flex layout prevents overlap -->
+        <div class="modal-header">
+          <div class="modal-rules">
+            <span class="modal-rule-tag" id="modalRowRule"></span>
+            <span class="modal-rule-x">×</span>
+            <span class="modal-rule-tag" id="modalColRule"></span>
+          </div>
+          <div class="modal-header-right">
+            <div class="modal-lives-row" id="modalLivesRow" aria-label="Lives remaining">
+              <span class="modal-heart" id="mh0">❤️</span>
+              <span class="modal-heart" id="mh1">❤️</span>
+              <span class="modal-heart" id="mh2">❤️</span>
+            </div>
+            <button type="button" class="modal-close-btn" id="modalClose" aria-label="Close">✕</button>
+          </div>
+        </div>
+
+        <div class="modal-preview">
+          <img id="modalSprite" class="modal-sprite hidden" alt="" loading="lazy" />
+          <p id="modalPickedName" class="modal-picked-name"></p>
+        </div>
+
+        <div class="modal-input-wrap">
+          <input type="text" id="modalInput" class="modal-input" placeholder="Pokémon name…" autocomplete="off" />
+          <div id="modalSuggestions" class="modal-suggestions"></div>
+        </div>
+
+        <div class="modal-footer">
+          <p id="modalStatus" class="modal-status"></p>
+          <div class="modal-actions">
+            <button type="button" id="modalOk" class="modal-ok-btn">Confirm Pick</button>
+            <button type="button" id="modalCancel" class="ghost modal-cancel-btn">Cancel</button>
+          </div>
+          <!-- Hint stars live inside the modal so they're always reachable -->
+          <div class="modal-hint-bar" id="modalHintBar">
+            <span class="modal-hint-tag">Use a hint</span>
+            <button type="button" class="modal-pip-hint" data-modal-hint="0" title="Reveal a valid answer for this cell">⭐</button>
+            <button type="button" class="modal-pip-hint" data-modal-hint="1" title="Reveal a valid answer for this cell">⭐</button>
+            <button type="button" class="modal-pip-hint" data-modal-hint="2" title="Reveal a valid answer for this cell">⭐</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pokedex Palette modal — collection tracker, Daily Board catches only -->
+    <div id="pokedexModal" class="pokedex-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pokedexTitle">
+      <div class="pokedex-modal-card">
+        <button type="button" class="modal-close-btn pokedex-close-btn" id="pokedexClose" aria-label="Close">✕</button>
+
+        <div class="pokedex-modal-layout" id="pokedexModalLayout">
+          <div class="pokedex-list-pane" id="pokedexListPane">
+            <div class="pokedex-header">
+              <p class="pokedex-eyebrow">★ Daily Board Catches Only ★</p>
+              <h2 id="pokedexTitle" class="pokedex-title">Your Palette</h2>
+              <p class="pokedex-subtitle" id="pokedexSubtitle">Loading your collection…</p>
+            </div>
+
+            <div class="pokedex-stats-row">
+              <div class="pokedex-ring-wrap">
+                <svg class="pokedex-ring" viewBox="0 0 120 120" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="pokedexRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#e040a0" />
+                      <stop offset="55%" stop-color="#cc2255" />
+                      <stop offset="100%" stop-color="#9b1fcc" />
+                    </linearGradient>
+                  </defs>
+                  <circle class="pokedex-ring-track" cx="60" cy="60" r="52"></circle>
+                  <circle class="pokedex-ring-fill" id="pokedexRingFill" cx="60" cy="60" r="52"></circle>
+                </svg>
+                <div class="pokedex-ring-label"><span id="pokedexRingPct">0%</span></div>
+              </div>
+              <div class="pokedex-stats-text">
+                <p class="pokedex-count" id="pokedexCountText">0 / 0 caught</p>
+                <p class="pokedex-hint-text">
+                  Every correct pick on a <strong>Daily Board</strong> adds to your palette.
+                  Shuffle Boards don't count — this tracks real knowledge, not luck.
+                </p>
+              </div>
+
+              <div class="pokedex-streak hidden" id="pokedexStreak">
+                <span class="pokedex-streak-flame">🔥</span>
+                <span class="pokedex-streak-text" id="pokedexStreakText"></span>
+              </div>
+            </div>
+
+            <p class="pokedex-milestone-toast hidden" id="pokedexMilestoneToast"></p>
+
+            <div class="pokedex-palette-strip" id="pokedexPaletteStrip" aria-label="Filter by type"></div>
+
+            <div class="pokedex-view-toggle" id="pokedexViewToggle" role="tablist" aria-label="View mode">
+              <button type="button" class="pokedex-view-btn active" data-view="grid" role="tab" aria-selected="true">🎨 Palette</button>
+              <button type="button" class="pokedex-view-btn" data-view="log" role="tab" aria-selected="false">📜 Catch Log</button>
+            </div>
+
+            <div class="pokedex-controls">
+              <input type="text" id="pokedexSearch" class="modal-input pokedex-search" placeholder="Search a Pokémon…" autocomplete="off" />
+              <div class="pokedex-filter-chips" id="pokedexStatusChips">
+                <button type="button" class="pokedex-chip active" data-filter="all">All</button>
+                <button type="button" class="pokedex-chip" data-filter="caught">Caught</button>
+                <button type="button" class="pokedex-chip" data-filter="uncaught">Uncaught</button>
+              </div>
+              <select id="pokedexGenSelect" class="pokedex-gen-select">
+                <option value="">All Gens</option>
+              </select>
+            </div>
+
+            <div class="pokedex-grid" id="pokedexGrid" role="list"></div>
+            <div class="pokedex-log-list hidden" id="pokedexLogList" role="list"></div>
+            <p class="pokedex-empty hidden" id="pokedexEmpty"></p>
+          </div>
+
+          <!-- Detail pane — collapsed (zero width) until a caught entry is
+               selected. Desktop: expands the split in place, list pane
+               shrinks to make room. Mobile: slides in to fully cover the
+               list pane instead, since there's no room for both at once.
+               Either way, "← Back" collapses just this pane; the × in the
+               corner still closes the whole Pokedex. -->
+          <div class="pokedex-detail-pane" id="pokedexDetailPane">
+            <button type="button" class="detail-pane-back" id="detailPaneBack">← Back</button>
+
+            <div class="detail-header">
+              <img id="detailSprite" class="detail-sprite" alt="" loading="lazy" />
+              <div class="detail-header-text">
+                <h2 id="detailTitle" class="detail-title"></h2>
+                <div class="detail-type-row" id="detailTypeRow"></div>
+              </div>
+            </div>
+
+            <div class="detail-catch-row" id="detailCatchRow"></div>
+
+            <div class="detail-section section-general">
+              <div class="detail-section-head">
+                <span class="detail-section-label">General</span>
+                <span class="detail-section-progress" id="detailGeneralProgress"></span>
+              </div>
+              <div class="detail-category-grid" id="detailGeneralGrid"></div>
+            </div>
+
+            <div class="detail-section section-abilities" id="detailAbilitiesSection">
+              <div class="detail-section-head">
+                <span class="detail-section-label">Abilities</span>
+                <span class="detail-section-progress" id="detailAbilitiesProgress"></span>
+              </div>
+              <div class="detail-category-grid" id="detailAbilitiesGrid"></div>
+            </div>
+
+            <div class="detail-section section-moves" id="detailMovesSection">
+              <div class="detail-section-head">
+                <span class="detail-section-label">Moves</span>
+                <span class="detail-section-progress" id="detailMovesProgress"></span>
+              </div>
+              <div class="detail-category-grid moves-grid" id="detailMovesGrid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Draft Board — build a custom board from a chosen subset of categories -->
+    <div id="draftModal" class="pokedex-modal-overlay draft-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="draftTitle">
+      <div class="pokedex-modal-card draft-modal-card">
+        <button type="button" class="modal-close-btn draft-close-btn" id="draftClose" aria-label="Close">✕</button>
+
+        <div class="pokedex-header">
+          <p class="pokedex-eyebrow draft-eyebrow">★ Build It Your Way ★</p>
+          <h2 id="draftTitle" class="pokedex-title draft-title">Draft Board</h2>
+          <p class="pokedex-subtitle">Pick which categories are allowed in, then draft a board built entirely from your own rules.</p>
+        </div>
+
+        <div class="draft-settings">
+          <div class="draft-setting">
+            <label class="draft-toggle-label" for="draftAllowSingle">
+              <span class="draft-toggle-switch"><input type="checkbox" id="draftAllowSingle" checked /><span class="draft-toggle-knob"></span></span>
+              Allow Single-Answer Cells
+            </label>
+            <span class="draft-info-icon" tabindex="0"
+              title="When off, every cell is guaranteed at least 2 valid answers to pick from — a gentler board. When on, a cell may have only one possible correct answer.">ⓘ</span>
+          </div>
+          <div class="draft-setting">
+            <label class="draft-toggle-label" for="draftGuaranteedSolvable">
+              <span class="draft-toggle-switch"><input type="checkbox" id="draftGuaranteedSolvable" checked /><span class="draft-toggle-knob"></span></span>
+              Guaranteed Solvable
+            </label>
+            <span class="draft-info-icon" tabindex="0"
+              title="When on, we verify a full valid solution exists across every cell before showing you the board. Turning this off allows riskier, more unusual combinations that might not be fully fillable.">ⓘ</span>
+          </div>
+        </div>
+
+        <div class="draft-size-row">
+          <span class="draft-size-label">Board Size</span>
+          <div class="draft-size-options" id="draftSizeOptions">
+            <button type="button" class="draft-size-btn" data-size="4">4×4</button>
+            <button type="button" class="draft-size-btn" data-size="5">5×5</button>
+            <button type="button" class="draft-size-btn" data-size="6">6×6</button>
+            <button type="button" class="draft-size-btn" data-size="7">7×7</button>
+            <button type="button" class="draft-size-btn" data-size="8">8×8</button>
+            <button type="button" class="draft-size-btn active" data-size="9">9×9</button>
+          </div>
+        </div>
+
+        <div class="draft-category-row" id="draftCategoryRow">
+          <button type="button" class="draft-category-btn" data-group="type">Types <span class="draft-cat-count" id="draftCount-type"></span><span class="draft-caret">▾</span></button>
+          <button type="button" class="draft-category-btn" data-group="region">Regions <span class="draft-cat-count" id="draftCount-region"></span><span class="draft-caret">▾</span></button>
+          <button type="button" class="draft-category-btn" data-group="evolution">Evolution <span class="draft-cat-count" id="draftCount-evolution"></span><span class="draft-caret">▾</span></button>
+          <button type="button" class="draft-category-btn" data-group="move">Moves <span class="draft-cat-count" id="draftCount-move"></span><span class="draft-caret">▾</span></button>
+          <button type="button" class="draft-category-btn" data-group="ability">Abilities <span class="draft-cat-count" id="draftCount-ability"></span><span class="draft-caret">▾</span></button>
+          <button type="button" class="draft-category-btn" data-group="other">Other <span class="draft-cat-count" id="draftCount-other"></span><span class="draft-caret">▾</span></button>
+        </div>
+
+        <div class="draft-dropdown-panel hidden" id="draftDropdownPanel">
+          <div class="draft-dropdown-head">
+            <span class="draft-dropdown-title" id="draftDropdownTitle"></span>
+            <label class="draft-all-toggle">
+              <input type="checkbox" id="draftDropdownAllToggle" />
+              All
+            </label>
+          </div>
+          <input type="text" id="draftDropdownSearch" class="modal-input draft-dropdown-search hidden" placeholder="Search…" autocomplete="off" />
+          <div class="draft-dropdown-list" id="draftDropdownList"></div>
+        </div>
+
+        <div class="draft-summary" id="draftSummary">Loading categories…</div>
+
+        <p class="draft-banner draft-banner-info hidden" id="draftInfoBanner"></p>
+        <p class="draft-banner draft-banner-error hidden" id="draftErrorBanner"></p>
+
+        <button type="button" class="draft-generate-btn" id="draftGenerateBtn">🃏 Draft This Board</button>
+      </div>
+    </div>
 
     <script src="./app.js"></script>
   </body>

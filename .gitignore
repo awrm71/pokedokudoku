@@ -16,3 +16,7 @@ sprites_repo/
 .DS_Store
 Thumbs.db
 .vscode/
+data.zip
+frontend.zip
+scripts.zip
+.gitignore

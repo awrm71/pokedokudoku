@@ -14,8 +14,9 @@ N = 9  # later: 9
 
 DEFAULT_CONSTRAINTS = engine.BoardConstraints(
     min_candidates_per_cell=1,      # bump from 1 so boards aren't trivial; adjust as desired
-    max_candidates_per_cell=1050,    # avoid overly broad intersections; adjust as desired
+    max_candidates_per_cell=None,    # no cap on broad intersections (improves generation reliability)
     max_tries=5000,
+    require_distinct_solution=True,
 )
 
 SPRITES_REPO_DIR = Path("sprites_repo") / "sprites" / "pokemon"
@@ -51,17 +52,31 @@ def load_data() -> pd.DataFrame:
         df["type2"] = ""
     df["type2"] = df["type2"].fillna("")
 
-    for col in ["is_legendary", "is_mythical", "is_baby"]:
-        if col in df.columns:
-            df[col] = (
-                df[col]
-                .astype(str)
-                .str.lower()
-                .map({"true": True, "false": False})
-                .fillna(False)
-            )
-        else:
-            df[col] = False
+    def _coerce_bool_col(col: str) -> None:
+        if col not in df.columns:
+            return
+        s = df[col]
+        if s.dtype == bool:
+            return
+        if pd.api.types.is_numeric_dtype(s):
+            df[col] = pd.to_numeric(s, errors="coerce").fillna(0).astype(int).astype(bool)
+            return
+        df[col] = (
+            s.astype(str)
+            .str.lower()
+            .map({
+                "true": True,
+                "false": False,
+                "1": True,
+                "0": False,
+                "yes": True,
+                "no": False,
+            })
+            .fillna(False)
+        )
+
+    for col in [c for c in df.columns if str(c).startswith(("is_", "has_", "evolves_by_", "learns_", "has_ability_"))]:
+        _coerce_bool_col(str(col))
 
     if "gen" in df.columns:
         df["gen"] = pd.to_numeric(df["gen"], errors="coerce").astype("Int64")
