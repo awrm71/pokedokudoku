@@ -11,6 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./reverse.css" />
 
     <!-- HUD + game UI styles — embedded to guarantee application -->
     <style>
@@ -1168,8 +1169,9 @@
       }
       .draft-eyebrow { color: #b494f0 !important; }
       .draft-title {
-        background: linear-gradient(110deg, #b494f0 0%, #8b5cf6 45%, #6633cc 100%) !important;
-        -webkit-background-clip: text; background-clip: text; color: transparent;
+        background: linear-gradient(110deg, #b494f0 0%, #8b5cf6 45%, #6633cc 100%);
+        -webkit-background-clip: text; background-clip: text;
+        color: transparent; -webkit-text-fill-color: transparent;
       }
 
       .draft-settings {
@@ -1211,24 +1213,34 @@
       .draft-info-icon:hover, .draft-info-icon:focus { color: #b494f0; }
 
       .draft-size-row {
-        display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+        display: flex; align-items: center; justify-content: center; gap: 0.6rem;
         flex-wrap: wrap; margin-bottom: 1.2rem;
       }
       .draft-size-label {
         font-family: var(--pixel-font); font-size: 0.68rem; letter-spacing: 0.06em;
         text-transform: uppercase; color: var(--ink-soft);
       }
-      .draft-size-options { display: flex; gap: 0.35rem; }
-      .draft-size-btn {
-        font-family: var(--pixel-font); font-size: 0.68rem;
-        padding: 0.4rem 0.65rem; border-radius: 8px;
-        background: transparent; border: 1px solid var(--line-strong);
-        color: var(--ink-soft); box-shadow: none;
+      .draft-size-select {
+        font-family: var(--pixel-font); font-size: 0.78rem;
+        padding: 0.4rem 0.55rem; border-radius: 8px;
+        background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.4);
+        color: #e8ddff;
       }
-      .draft-size-btn:hover { border-color: #8b5cf6; color: var(--ink); transform: none; box-shadow: none; }
-      .draft-size-btn.active {
-        background: rgba(139,92,246,0.18); border-color: #8b5cf6; color: #e8ddff;
-        box-shadow: 0 0 12px rgba(139,92,246,0.3);
+      .draft-size-select:hover, .draft-size-select:focus { border-color: #8b5cf6; }
+      /* The OPEN popup list is rendered by the OS/browser, not this stylesheet —
+         most browsers (Chrome/Edge on Windows especially) ignore custom option
+         styling entirely and fall back to a plain white/light list regardless.
+         Dark text + a light background stays readable either way: it's correct
+         against that common unstylable white fallback, and still correct in the
+         browsers (mainly Firefox) that do honor this background color. */
+      .draft-size-select option {
+        color: #1a0f1f;
+        background: #f3ecff;
+      }
+      .draft-size-x { font-family: var(--pixel-font); font-size: 0.8rem; color: #b494f0; }
+      .draft-size-hint {
+        font-size: 0.68rem; color: var(--ink-soft);
+        width: 100%; text-align: center;
       }
 
       .draft-category-row {
@@ -1338,26 +1350,47 @@
 
     <main class="app-shell">
       <header class="app-header">
-        <div class="hero-copy">
-          <p class="eyebrow">★ Daily Pokémon Puzzle ★</p>
-          <h1>PokeDokuDoku</h1>
-          <p class="subtitle">
-            Fill the 9×9 grid — each cell needs a unique Pokémon matching its row &amp; column rule.
-          </p>
+        <div class="header-bar">
+          <div class="hero-copy">
+            <p class="eyebrow">★ Daily Pokémon Puzzle ★</p>
+            <h1>PokeDokuDoku</h1>
+            <p class="subtitle">
+              Fill the 9×9 grid — each cell needs a unique Pokémon matching its row &amp; column rule.
+            </p>
+          </div>
+
+          <!-- Palette is a collection view, reachable from every mode — not a game mode. -->
+          <button type="button" id="openPokedexBtn" class="palette-corner-btn">🎨 Your Palette</button>
         </div>
 
-        <section class="player-actions" aria-label="Board actions">
-          <button type="button" id="loadToday">Daily Board</button>
-          <button type="button" id="loadRandom" class="ghost">Shuffle Board</button>
-          <button type="button" id="openDraftBtn" class="ghost">🃏 Draft Board</button>
-          <button type="button" id="openPokedexBtn" class="ghost">🎨 Your Palette</button>
-        </section>
+        <!-- Mode tabs: exactly one is always active. -->
+        <nav class="mode-tabs" aria-label="Game mode">
+          <button type="button" class="mode-tab active" data-mode="daily" id="modeDailyTab">Daily Board</button>
+          <button type="button" class="mode-tab" data-mode="draft" id="modeDraftTab">🃏 Draft Board</button>
+          <button type="button" class="mode-tab" data-mode="reverse" id="modeReverseTab">🔍 Reverse Board</button>
+        </nav>
       </header>
 
-      <section class="status-row" aria-live="polite">
-        <p id="boardMeta">Loading board…</p>
-        <p id="message" class="message"></p>
-      </section>
+      <!-- Context bar: contents swap with the active mode. -->
+      <div class="mode-context" id="modeContext">
+        <div class="ctx-panel" data-ctx="daily">
+          <button type="button" class="ctx-btn" id="ctxShuffleBtn" title="Generate a fresh random board">🔀 Shuffle</button>
+          <span class="ctx-meta" id="boardMeta">Loading board…</span>
+          <span class="ctx-msg message" id="message"></span>
+        </div>
+        <div class="ctx-panel hidden" data-ctx="draft">
+          <button type="button" class="ctx-btn" id="ctxConfigureDraftBtn">⚙️ Configure Board</button>
+          <span class="ctx-meta" id="boardMetaDraft"></span>
+          <span class="ctx-msg message" id="messageDraft"></span>
+        </div>
+        <div class="ctx-panel hidden" data-ctx="reverse">
+          <button type="button" class="ctx-btn" id="revDailyBtn">🗓️ Daily</button>
+          <button type="button" class="ctx-btn" id="revCustomBtn">🎛️ Custom</button>
+          <button type="button" class="ctx-btn" id="revIndexBtn">📖 Category Index</button>
+          <span class="ctx-meta" id="revMeta"></span>
+          <span class="ctx-msg" id="revMessage"></span>
+        </div>
+      </div>
 
       <!-- ── HUD strip ── -->
       <div class="hud-strip" id="gameHud" role="status" aria-label="Game status">
@@ -1422,6 +1455,94 @@
 
       <div id="boardWrap" class="board-wrap" role="region" aria-label="PokeDokuDoku board"></div>
       <p class="board-scroll-hint" aria-hidden="true">← scroll to see all columns →</p>
+
+      <!-- Reverse Board view + modals. Hidden until the Reverse tab is active. -->
+      <section id="reverseView" aria-label="Reverse Board">
+        <div class="rev-progress">
+          <span id="revProgressText">0 / 18</span>
+          <div class="rev-progress-track"><div id="revProgressBar"></div></div>
+        </div>
+
+        <div id="revBoardWrap" class="board-wrap" role="region" aria-label="Reverse Board grid"></div>
+        <p class="board-scroll-hint" aria-hidden="true">← scroll to see all columns →</p>
+      </section>
+
+      <!-- Guess modal: pick the hidden category for a row or column -->
+      <div id="revGuessModal" class="rev-modal" role="dialog" aria-modal="true" aria-labelledby="revGuessTitle">
+        <div class="rev-modal-card">
+          <div class="rev-modal-head">
+            <h2 id="revGuessTitle">What do these share?</h2>
+            <button type="button" id="revGuessClose" class="rev-modal-close" aria-label="Close">✕</button>
+          </div>
+          <div class="rev-modal-body">
+            <div id="revGuessLine" class="rev-guess-line" aria-label="Pokémon in this line"></div>
+            <input type="text" id="revGuessSearch" class="rev-guess-search" placeholder="Search categories… (type, move, region…)" autocomplete="off">
+            <div id="revGuessGroups" class="rev-guess-groups"></div>
+            <div id="revGuessList" class="rev-guess-list"></div>
+            <p id="revGuessStatus" class="rev-guess-status"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Index -->
+      <div id="revIndexModal" class="rev-modal" role="dialog" aria-modal="true" aria-labelledby="revIndexTitle">
+        <div class="rev-modal-card">
+          <div class="rev-modal-head">
+            <h2 id="revIndexTitle">📖 Category Index</h2>
+            <button type="button" id="revIndexClose" class="rev-modal-close" aria-label="Close">✕</button>
+          </div>
+          <div class="rev-modal-body">
+            <div class="rev-index-progress">
+              <span id="revIndexProgress">0 / 0 categories found</span>
+              <div class="rev-index-track"><div id="revIndexBar"></div></div>
+            </div>
+            <div id="revIndexBody"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom board difficulty picker -->
+      <div id="revCustomModal" class="rev-modal" role="dialog" aria-modal="true" aria-labelledby="revCustomTitle">
+        <div class="rev-modal-card">
+          <div class="rev-modal-head">
+            <h2 id="revCustomTitle">🎛️ Custom Reverse Board</h2>
+            <button type="button" id="revCustomClose" class="rev-modal-close" aria-label="Close">✕</button>
+          </div>
+          <div class="rev-modal-body">
+            <p style="font-size:0.82rem;opacity:0.75;margin:0 0 0.4rem">
+              Practice board — won't count toward your Category Index. Difficulty sets how
+              pinned-down each line's answer is.
+            </p>
+            <div class="rev-diff-options">
+              <label class="rev-diff-option">
+                <input type="radio" name="revDiff" value="easy">
+                <span>
+                  <span class="rev-diff-name">Easy</span>
+                  <span class="rev-diff-desc">Lines often have a few valid answers — an easy observation usually works.</span>
+                </span>
+              </label>
+              <label class="rev-diff-option">
+                <input type="radio" name="revDiff" value="medium" checked>
+                <span>
+                  <span class="rev-diff-name">Medium</span>
+                  <span class="rev-diff-desc">Some slack, but you'll usually need the intended category.</span>
+                </span>
+              </label>
+              <label class="rev-diff-option">
+                <input type="radio" name="revDiff" value="hard">
+                <span>
+                  <span class="rev-diff-name">Hard</span>
+                  <span class="rev-diff-desc">Lines are near-unique — you must find the specific rule. (Same as Daily.)</span>
+                </span>
+              </label>
+            </div>
+            <button type="button" id="revCustomGo" class="rev-modal-close" style="width:100%;padding:0.6rem;border:1px solid var(--accent,#e84a7f);border-radius:10px;font-size:0.9rem;opacity:1">
+              Build Board
+            </button>
+          </div>
+        </div>
+      </div>
+      
     </main>
 
     <template id="cellTemplate">
@@ -1458,6 +1579,12 @@
             </div>
             <button type="button" class="modal-close-btn" id="modalClose" aria-label="Close">✕</button>
           </div>
+        </div>
+
+        <!-- Category explainers: one compact caption per rule, side by side. -->
+        <div class="modal-rule-help-row">
+          <p class="modal-rule-help" id="modalRowHelp"></p>
+          <p class="modal-rule-help" id="modalColHelp"></p>
         </div>
 
         <div class="modal-preview">
@@ -1634,14 +1761,30 @@
 
         <div class="draft-size-row">
           <span class="draft-size-label">Board Size</span>
-          <div class="draft-size-options" id="draftSizeOptions">
-            <button type="button" class="draft-size-btn" data-size="4">4×4</button>
-            <button type="button" class="draft-size-btn" data-size="5">5×5</button>
-            <button type="button" class="draft-size-btn" data-size="6">6×6</button>
-            <button type="button" class="draft-size-btn" data-size="7">7×7</button>
-            <button type="button" class="draft-size-btn" data-size="8">8×8</button>
-            <button type="button" class="draft-size-btn active" data-size="9">9×9</button>
-          </div>
+          <select id="draftRowsSelect" class="draft-size-select" aria-label="Number of rows">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9" selected>9</option>
+          </select>
+          <span class="draft-size-x">×</span>
+          <select id="draftColsSelect" class="draft-size-select" aria-label="Number of columns">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9" selected>9</option>
+          </select>
+          <span class="draft-size-hint">rows × columns — any combination works, e.g. 6×3</span>
         </div>
 
         <div class="draft-category-row" id="draftCategoryRow">
@@ -1674,6 +1817,8 @@
       </div>
     </div>
 
+    <script src="./category_help.js"></script>
     <script src="./app.js"></script>
+    <script src="./reverse.js"></script>
   </body>
 </html>

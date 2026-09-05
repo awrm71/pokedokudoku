@@ -219,9 +219,12 @@ button.ghost:hover {
 /* ── Board grid ──────────────────────────────────────────── */
 .board-grid {
   display: grid;
-  grid-template-columns: minmax(102px, 118px) repeat(9, minmax(102px, 1fr));
+  --board-header-min: 102px;
+  --board-header-max: 118px;
+  --board-col-min: 102px;
+  grid-template-columns: minmax(var(--board-header-min), var(--board-header-max)) repeat(var(--board-cols, 9), minmax(var(--board-col-min), 1fr));
   gap: 0.28rem;
-  min-width: 1080px;
+  min-width: calc(var(--board-header-min) + var(--board-cols, 9) * var(--board-col-min));
 }
 
 /* ── Rule / row headers ──────────────────────────────────── */
@@ -597,8 +600,11 @@ button.ghost:hover {
 /* ── Tablet (≤1024px) ────────────────────────────────────── */
 @media (max-width: 1024px) {
   .board-grid {
-    min-width: 960px;
-    grid-template-columns: minmax(92px, 105px) repeat(9, minmax(88px, 1fr));
+    --board-header-min: 92px;
+    --board-header-max: 105px;
+    --board-col-min: 88px;
+    grid-template-columns: minmax(var(--board-header-min), var(--board-header-max)) repeat(var(--board-cols, 9), minmax(var(--board-col-min), 1fr));
+    min-width: calc(var(--board-header-min) + var(--board-cols, 9) * var(--board-col-min));
   }
 }
 
@@ -630,9 +636,12 @@ button.ghost:hover {
      Sticky first column (row-heads) so users always know which row
      they are on while scrolling horizontally. */
   .board-grid {
-    min-width: 740px;
-    grid-template-columns: minmax(78px, 88px) repeat(9, minmax(72px, 1fr));
+    --board-header-min: 78px;
+    --board-header-max: 88px;
+    --board-col-min: 72px;
+    grid-template-columns: minmax(var(--board-header-min), var(--board-header-max)) repeat(var(--board-cols, 9), minmax(var(--board-col-min), 1fr));
     gap: 0.17rem;
+    min-width: calc(var(--board-header-min) + var(--board-cols, 9) * var(--board-col-min));
   }
 
   /* Column rule headers */
@@ -758,9 +767,12 @@ button.ghost:hover {
 /* ── Small phones (≤420px) ───────────────────────────────── */
 @media (max-width: 420px) {
   .board-grid {
-    min-width: 670px;
-    grid-template-columns: minmax(70px, 78px) repeat(9, minmax(64px, 1fr));
+    --board-header-min: 70px;
+    --board-header-max: 78px;
+    --board-col-min: 64px;
+    grid-template-columns: minmax(var(--board-header-min), var(--board-header-max)) repeat(var(--board-cols, 9), minmax(var(--board-col-min), 1fr));
     gap: 0.13rem;
+    min-width: calc(var(--board-header-min) + var(--board-cols, 9) * var(--board-col-min));
   }
 
   .cell { height: 76px; min-height: 76px; padding: 0.22rem 0.18rem; }

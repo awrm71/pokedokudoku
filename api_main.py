@@ -32,7 +32,8 @@ N = 9
 
 class ValidatePickRequest(BaseModel):
     seed: str
-    n: int
+    n_rows: int
+    n_cols: int
     row_i: int
     col_j: int
     pokemon_key: str
@@ -61,10 +62,6 @@ def compact_rule_label(label: str) -> str:
     # Safety: suppress stale gen-number labels
     if out.startswith("Gen: "):
         return ""
-
-    # Dataset quirk
-    if out in ("Paldea + DLC",):
-        return "Paldea"
 
     # Type labels
     if out.startswith("Type: "):
@@ -98,15 +95,15 @@ def compact_rule_label(label: str) -> str:
 
     # Evolution method — consistent "Evolves by X" pattern
     methods = {
-        "Evolves By: Level-up":   "Evolves by Level Up",
-        "Evolves By: Level-Up":   "Evolves by Level Up",
-        "Evolves By: Trade":      "Evolves by Trade",
-        "Evolves By: Friendship": "Evolves by Friendship",
-        "Evolves By: Item":       "Evolves by Item",
-        "Evolves: Level Up":      "Evolves by Level Up",
-        "Evolves: Trading":       "Evolves by Trade",
-        "Evolves: Friendship":    "Evolves by Friendship",
-        "Evolves: Item":          "Evolves by Item",
+        "Evolves By: Level-up":   "Evolved by Level Up",
+        "Evolves By: Level-Up":   "Evolved by Level Up",
+        "Evolves By: Trade":      "Evolved by Trade",
+        "Evolves By: Friendship": "Evolved by Friendship",
+        "Evolves By: Item":       "Evolved by Item",
+        "Evolves: Level Up":      "Evolved by Level Up",
+        "Evolves: Trading":       "Evolved by Trade",
+        "Evolves: Friendship":    "Evolved by Friendship",
+        "Evolves: Item":          "Evolved by Item",
     }
     if out in methods:
         return methods[out]
@@ -205,7 +202,8 @@ def is_daily_seed(seed: str) -> bool:
 def serialize_board(board):
     return {
         "seed": board.seed,
-        "n": board.n,
+        "n_rows": board.n_rows,
+        "n_cols": board.n_cols,
         "row_rule_ids": board.row_rule_ids,
         "col_rule_ids": board.col_rule_ids,
         "row_rule_labels": [compact_rule_label(rules[rid].label) for rid in board.row_rule_ids],
@@ -250,8 +248,8 @@ _CACHE_MAX = 30
 _draft_configs: dict = {}
 _DRAFT_CONFIG_MAX = 30
 
-def _get_or_generate_board(seed: str, n: int):
-    key = f"{seed}:{n}"
+def _get_or_generate_board(seed: str, n_rows: int, n_cols: int):
+    key = f"{seed}:{n_rows}x{n_cols}"
     with _cache_lock:
         if key in _board_cache:
             return _board_cache[key]
@@ -260,13 +258,13 @@ def _get_or_generate_board(seed: str, n: int):
     if draft_cfg is not None:
         board = engine.generate_board(
             df=df_play, rules=rules, rule_masks=rule_masks,
-            seed=seed, n=n, constraints=draft_cfg["constraints"],
+            seed=seed, n_rows=n_rows, n_cols=n_cols, constraints=draft_cfg["constraints"],
             allowed_rule_ids=draft_cfg["allowed_rule_ids"],
         )
     else:
         board = engine.generate_board(
             df=df_play, rules=rules, rule_masks=rule_masks,
-            seed=seed, n=n, constraints=DEFAULT_CONSTRAINTS,
+            seed=seed, n_rows=n_rows, n_cols=n_cols, constraints=DEFAULT_CONSTRAINTS,
         )
     with _cache_lock:
         if len(_board_cache) >= _CACHE_MAX:
@@ -275,14 +273,18 @@ def _get_or_generate_board(seed: str, n: int):
     return board
 
 @app.get("/board")
-async def get_board(seed: str | None = None, n: int = 9):
+async def get_board(seed: str | None = None, n: int = 9, n_rows: int | None = None, n_cols: int | None = None):
+    # n_rows/n_cols take priority when given; n stays as the simple square shorthand
+    # (and the fallback for any old client still calling /board?n=9).
+    row_count = n_rows if n_rows is not None else n
+    col_count = n_cols if n_cols is not None else n
     board_seed = seed or str(date.today())
     loop = asyncio.get_event_loop()
     try:
         board = await asyncio.wait_for(
             loop.run_in_executor(
                 _board_executor,
-                lambda: _get_or_generate_board(board_seed, n)
+                lambda: _get_or_generate_board(board_seed, row_count, col_count)
             ),
             timeout=25.0
         )
@@ -349,17 +351,22 @@ _DRAFT_TIMEOUT_SECONDS = 20.0
 
 class DraftBoardRequest(BaseModel):
     allowed_rule_ids: List[str]
-    n: int = 9
+    n_rows: int = 9
+    n_cols: int = 9
     allow_single_answers: bool = True
     guaranteed_solvable: bool = True
 
 
 class DraftBoardResponse(BaseModel):
     seed: str
-    n: int
+    n_rows: int
+    n_cols: int
+    row_rule_ids: List[str]
+    col_rule_ids: List[str]
     row_rule_labels: List[str]
     col_rule_labels: List[str]
-    adjusted_n: Optional[int] = None  # set only if the requested size wasn't feasible and we shrank it
+    adjusted_n_rows: Optional[int] = None  # set only if the requested size wasn't feasible and we shrank it
+    adjusted_n_cols: Optional[int] = None
     note: Optional[str] = None
 
 
@@ -372,11 +379,11 @@ def _draft_constraints(allow_single_answers: bool, guaranteed_solvable: bool) ->
     )
 
 
-def _attempt_draft_board(size: int, allowed: set, constraints: engine.BoardConstraints):
+def _attempt_draft_board(n_rows: int, n_cols: int, allowed: set, constraints: engine.BoardConstraints):
     seed = f"draft-{uuid.uuid4().hex}"
     board = engine.generate_board(
         df=df_play, rules=rules, rule_masks=rule_masks,
-        seed=seed, n=size, constraints=constraints, allowed_rule_ids=allowed,
+        seed=seed, n_rows=n_rows, n_cols=n_cols, constraints=constraints, allowed_rule_ids=allowed,
     )
     return board, seed
 
@@ -387,31 +394,40 @@ async def create_draft_board(payload: DraftBoardRequest):
     if len(allowed) < 2:
         raise HTTPException(status_code=422, detail="Select at least a couple of categories to build a board from.")
 
-    requested_n = max(3, min(9, payload.n))
+    # Each axis independently clamped to 1-9 — rectangular boards (e.g. 6x3)
+    # are fully supported, not just square ones.
+    requested_n_rows = max(1, min(9, payload.n_rows))
+    requested_n_cols = max(1, min(9, payload.n_cols))
     constraints = _draft_constraints(payload.allow_single_answers, payload.guaranteed_solvable)
     loop = asyncio.get_event_loop()
 
-    async def _try(size: int):
+    async def _try(n_rows: int, n_cols: int):
         try:
             return await asyncio.wait_for(
-                loop.run_in_executor(_board_executor, lambda: _attempt_draft_board(size, allowed, constraints)),
+                loop.run_in_executor(_board_executor, lambda: _attempt_draft_board(n_rows, n_cols, allowed, constraints)),
                 timeout=_DRAFT_TIMEOUT_SECONDS,
             )
         except asyncio.TimeoutError:
             return None, None
 
-    board, seed = await _try(requested_n)
+    board, seed = await _try(requested_n_rows, requested_n_cols)
 
-    adjusted_n = None
+    adjusted_n_rows = None
+    adjusted_n_cols = None
     note = None
-    if board is None and requested_n > 4:
-        fallback_n = max(4, requested_n - 3)
-        board, seed = await _try(fallback_n)
+    if board is None and (requested_n_rows > 3 or requested_n_cols > 3):
+        # Shrink whichever axes are still above a modest floor — an
+        # unrequested auto-shrink all the way down to 1 or 2 would feel like
+        # a bad surprise, so the automatic rescue only goes down to 3.
+        fallback_n_rows = max(3, requested_n_rows - 3)
+        fallback_n_cols = max(3, requested_n_cols - 3)
+        board, seed = await _try(fallback_n_rows, fallback_n_cols)
         if board is not None:
-            adjusted_n = fallback_n
+            adjusted_n_rows = fallback_n_rows
+            adjusted_n_cols = fallback_n_cols
             note = (
-                f"A {requested_n}\u00d7{requested_n} board wasn't feasible with these categories, "
-                f"so this is a {fallback_n}\u00d7{fallback_n} board instead. Enabling more categories "
+                f"A {requested_n_rows}\u00d7{requested_n_cols} board wasn't feasible with these categories, "
+                f"so this is a {fallback_n_rows}\u00d7{fallback_n_cols} board instead. Enabling more categories "
                 f"\u2014 Moves and Abilities especially \u2014 usually opens up more room."
             )
 
@@ -431,15 +447,26 @@ async def create_draft_board(payload: DraftBoardRequest):
         _draft_configs[seed] = {"allowed_rule_ids": allowed, "constraints": constraints}
         if len(_board_cache) >= _CACHE_MAX:
             del _board_cache[next(iter(_board_cache))]
-        _board_cache[f"{seed}:{board.n}"] = board
+        _board_cache[f"{seed}:{board.n_rows}x{board.n_cols}"] = board
 
     resp = serialize_board(board)
     return DraftBoardResponse(
-        seed=resp["seed"], n=resp["n"],
+        seed=resp["seed"], n_rows=resp["n_rows"], n_cols=resp["n_cols"],
+        row_rule_ids=resp["row_rule_ids"], col_rule_ids=resp["col_rule_ids"],
         row_rule_labels=resp["row_rule_labels"], col_rule_labels=resp["col_rule_labels"],
-        adjusted_n=adjusted_n, note=note,
+        adjusted_n_rows=adjusted_n_rows, adjusted_n_cols=adjusted_n_cols, note=note,
     )
 
+# ── Reverse Board: deduction mode ───────────────────────────────────────
+import reverse_api
+reverse_api.attach(app, reverse_api._Ctx(
+    df_play=df_play, rules=rules, rule_masks=rule_masks,
+    executor=_board_executor,
+    compact_rule_label=compact_rule_label,
+    is_daily_seed=is_daily_seed,
+    today_seed=lambda: str(date.today()),
+    pokedex_store_mod=pokedex_store,
+))
 
 @app.get("/sprite/{pokemon_id}.png")
 def get_sprite(pokemon_id: int):
@@ -485,7 +512,7 @@ def validate_pick_api(
     payload: ValidatePickRequest,
     x_client_id: str | None = Header(default=None, alias="X-Client-Id"),
 ):
-    board = _get_or_generate_board(payload.seed, payload.n)
+    board = _get_or_generate_board(payload.seed, payload.n_rows, payload.n_cols)
 
     if board is None:
         raise HTTPException(status_code=500, detail="Could not regenerate board for validation")
@@ -777,8 +804,10 @@ def claim_pokedex(payload: ClaimPokedexRequest):
 
 
 @app.get("/hint")
-def get_hint(seed: str, n: int = 9, row_i: int = 0, col_j: int = 0, used_keys: str = ""):
-    board = _get_or_generate_board(seed, n)
+def get_hint(seed: str, n: int = 9, n_rows: int | None = None, n_cols: int | None = None, row_i: int = 0, col_j: int = 0, used_keys: str = ""):
+    row_count = n_rows if n_rows is not None else n
+    col_count = n_cols if n_cols is not None else n
+    board = _get_or_generate_board(seed, row_count, col_count)
     if board is None:
         raise HTTPException(status_code=500, detail="Could not regenerate board")
 

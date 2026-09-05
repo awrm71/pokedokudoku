@@ -23,7 +23,8 @@ class Rule:
 
 @dataclass(frozen=True)
 class Board:
-    n: int
+    n_rows: int
+    n_cols: int
     seed: str
     row_rule_ids: List[str]
     col_rule_ids: List[str]
@@ -542,7 +543,8 @@ def generate_board(
     rules: Dict[str, Rule],
     rule_masks: Dict[str, pd.Series],
     seed: str,
-    n: int,
+    n_rows: int,
+    n_cols: Optional[int] = None,
     constraints: BoardConstraints = BoardConstraints(),
     allowed_rule_ids: Optional[Set[str]] = None,
 ) -> Optional[Board]:
@@ -550,14 +552,21 @@ def generate_board(
     Randomly samples row/col rules until all intersections meet constraints.
     Deterministic given seed.
 
+    n_cols defaults to n_rows (a square board) for full backward compatibility
+    with every existing caller — pass it explicitly for a rectangular board
+    (e.g. n_rows=6, n_cols=3).
+
     allowed_rule_ids: if given, restricts the entire candidate pool to just
     these rule ids (e.g. for a user-customized "Draft Board" where only
     certain categories are enabled). Every selection/weighting/diversity path
     below operates on `rule_ids`, so filtering it here is sufficient — no
     other logic needs to change. If the restriction leaves too few rules to
-    fill an n x n board, this returns None exactly like any other
+    fill the board, this returns None exactly like any other
     infeasible-constraints case.
     """
+    if n_cols is None:
+        n_cols = n_rows
+
     rng = random.Random(seed)
     rule_ids = list(rules.keys())
     if allowed_rule_ids is not None:
@@ -706,14 +715,14 @@ def generate_board(
             if not (_rule_group(rid) == "move"  and rule_support.get(rid, 0) > BROAD_MOVE_CUTOFF)
             and not (_rule_group(rid) not in ("type","move") and rule_support.get(rid, 0) > BROAD_OTHER_CUTOFF)
         ]
-        pool = filtered if len(filtered) >= n else pool
-        return pool if len(pool) >= n else rule_ids
+        pool = filtered if len(filtered) >= max(n_rows, n_cols) else pool
+        return pool if len(pool) >= max(n_rows, n_cols) else rule_ids
 
     def _caps_for_attempt(attempt: int) -> Dict[str, int]:
         if not constraints.require_distinct_solution:
             return {}
 
-        # For n=9, keep variety but avoid making generation expensive.
+        # Keep variety but avoid making generation expensive.
         # Relax caps late so we don't fail to generate.
         if attempt < int(constraints.max_tries * 0.40):
             move_cap    = 2          # max 2 move rules per axis — forces category variety
@@ -722,8 +731,8 @@ def generate_board(
             move_cap    = 3
             ability_cap = 1
         else:
-            move_cap    = n          # full relaxation in last 30% of tries
-            ability_cap = n
+            move_cap    = max(n_rows, n_cols)  # full relaxation in last 30% of tries
+            ability_cap = max(n_rows, n_cols)
 
         return {"move": int(move_cap), "ability": int(ability_cap), "region": 1}
 
@@ -761,7 +770,7 @@ def generate_board(
     def _group_count(rids: List[str], group: str) -> int:
         return sum(1 for rid in rids if _rule_group(rid) == group)
 
-    if len(rule_ids) < n:
+    if len(rule_ids) < max(n_rows, n_cols):
         return None
 
     for _ in range(constraints.max_tries):
@@ -784,16 +793,18 @@ def generate_board(
 
             # Require a reasonable amount of types per axis to keep boards readable/varied.
             # We enforce a random target in [2, 4] for both rows and columns.
-            # (If n is smaller, clamp accordingly.)
-            min_types = min(2, n)
-            max_types = min(3, n)   # cap at 3, not 4 — leaves room for region/evo rules
-            target_row_types = rng.randint(min_types, max_types) if max_types > 0 else 0
-            target_col_types = rng.randint(min_types, max_types) if max_types > 0 else 0
+            # (If an axis is smaller, clamp accordingly.)
+            row_min_types = min(2, n_rows)
+            row_max_types = min(3, n_rows)   # cap at 3, not 4 — leaves room for region/evo rules
+            col_min_types = min(2, n_cols)
+            col_max_types = min(3, n_cols)
+            target_row_types = rng.randint(row_min_types, row_max_types) if row_max_types > 0 else 0
+            target_col_types = rng.randint(col_min_types, col_max_types) if col_max_types > 0 else 0
 
-            def _type_gate(candidate: str, axis: List[str], target: int) -> bool:
+            def _type_gate(candidate: str, axis: List[str], target: int, axis_n: int) -> bool:
                 """Return True if candidate keeps axis able to reach exactly `target` types."""
                 cur_types = _group_count(axis, "type")
-                remaining_after = n - (len(axis) + 1)
+                remaining_after = axis_n - (len(axis) + 1)
                 is_type = (_rule_group(candidate) == "type")
                 new_types = cur_types + (1 if is_type else 0)
 
@@ -809,10 +820,10 @@ def generate_board(
                     return False
                 return True
 
-            def _must_pick_type(axis: List[str], target: int) -> bool:
+            def _must_pick_type(axis: List[str], target: int, axis_n: int) -> bool:
                 """True if all remaining picks must be types to hit the target."""
                 cur_types = _group_count(axis, "type")
-                remaining = n - len(axis)
+                remaining = axis_n - len(axis)
                 need = max(0, target - cur_types)
                 return need == remaining
 
@@ -823,7 +834,7 @@ def generate_board(
                 rid
                 for rid in seed_base
                 if _cap_ok(rid, row_rule_ids, caps)
-                and _type_gate(rid, row_rule_ids, target_row_types)
+                and _type_gate(rid, row_rule_ids, target_row_types, n_rows)
             ]
             seed_weights = [float(_support_weight(rid)) for rid in seed_candidates]
             first_row = _weighted_choice(seed_candidates, seed_weights)
@@ -842,7 +853,7 @@ def generate_board(
                 if rid not in col_rule_ids
                 and rid not in row_rule_ids
                 and _cap_ok(rid, col_rule_ids, caps)
-                and _type_gate(rid, col_rule_ids, target_col_types)
+                and _type_gate(rid, col_rule_ids, target_col_types, n_cols)
                 and candidate_count(rule_masks, first_row, rid) >= _seed_floor(rid, compat_min)
             ]
             if not col_seed_candidates:
@@ -851,7 +862,7 @@ def generate_board(
                     for rid in pool
                     if rid not in col_rule_ids
                     and _cap_ok(rid, col_rule_ids, caps)
-                    and _type_gate(rid, col_rule_ids, target_col_types)
+                    and _type_gate(rid, col_rule_ids, target_col_types, n_cols)
                     and candidate_count(rule_masks, first_row, rid) >= _seed_floor(rid, compat_min)
                 ]
             col_seed_weights = [float(_support_weight(rid)) for rid in col_seed_candidates]
@@ -861,21 +872,21 @@ def generate_board(
             col_rule_ids.append(first_col)
 
             # Alternate picking columns/rows, enforcing compatibility with the opposite axis.
-            while len(row_rule_ids) < n or len(col_rule_ids) < n:
-                if len(col_rule_ids) < n:
+            while len(row_rule_ids) < n_rows or len(col_rule_ids) < n_cols:
+                if len(col_rule_ids) < n_cols:
                     # If we've already picked many move rules for columns, nudge away from ultra-narrow intersections.
                     axis_compat_min = compat_min
                     if _group_count(col_rule_ids, "move") >= 4:
                         axis_compat_min = max(axis_compat_min, 3)
 
-                    must_type = _must_pick_type(col_rule_ids, target_col_types)
+                    must_type = _must_pick_type(col_rule_ids, target_col_types, n_cols)
                     col_candidates = [
                         rid
                         for rid in pool
                         if rid not in col_rule_ids
                         and rid not in row_rule_ids
                         and _cap_ok(rid, col_rule_ids, caps)
-                        and _type_gate(rid, col_rule_ids, target_col_types)
+                        and _type_gate(rid, col_rule_ids, target_col_types, n_cols)
                         and (not must_type or _rule_group(rid) == "type")
                     ]
                     col_weights = [
@@ -887,19 +898,19 @@ def generate_board(
                         break
                     col_rule_ids.append(pick)
 
-                if len(row_rule_ids) < n:
+                if len(row_rule_ids) < n_rows:
                     axis_compat_min = compat_min
                     if _group_count(row_rule_ids, "move") >= 4:
                         axis_compat_min = max(axis_compat_min, 3)
 
-                    must_type = _must_pick_type(row_rule_ids, target_row_types)
+                    must_type = _must_pick_type(row_rule_ids, target_row_types, n_rows)
                     row_candidates = [
                         rid
                         for rid in pool
                         if rid not in row_rule_ids
                         and rid not in col_rule_ids
                         and _cap_ok(rid, row_rule_ids, caps)
-                        and _type_gate(rid, row_rule_ids, target_row_types)
+                        and _type_gate(rid, row_rule_ids, target_row_types, n_rows)
                         and (not must_type or _rule_group(rid) == "type")
                     ]
                     row_weights = [
@@ -911,11 +922,11 @@ def generate_board(
                         break
                     row_rule_ids.append(pick)
 
-            if len(row_rule_ids) != n or len(col_rule_ids) != n:
+            if len(row_rule_ids) != n_rows or len(col_rule_ids) != n_cols:
                 continue
         else:
-            row_rule_ids = rng.sample(rule_ids, k=n)
-            col_rule_ids = rng.sample(rule_ids, k=n)
+            row_rule_ids = rng.sample(rule_ids, k=n_rows)
+            col_rule_ids = rng.sample(rule_ids, k=n_cols)
 
         ok = True
         for rr in row_rule_ids:
@@ -940,20 +951,21 @@ def generate_board(
                 for cc in col_rule_ids:
                     col_any |= rule_masks[cc].fillna(False)
 
-                # There must be at least n*n distinct Pokémon that match at least one row rule
-                # and at least one column rule (i.e., appear in at least one cell).
-                if int((row_any & col_any).sum()) < (n * n):
+                # There must be at least n_rows*n_cols distinct Pokémon that match at least one
+                # row rule and at least one column rule (i.e., appear in at least one cell).
+                if int((row_any & col_any).sum()) < (n_rows * n_cols):
                     continue
 
-                # Each row/col must have at least n distinct candidates across its cells.
+                # Each row must have at least n_cols distinct candidates across its cells
+                # (one per column), and each column at least n_rows (one per row).
                 for rr in row_rule_ids:
-                    if int((rule_masks[rr].fillna(False) & col_any).sum()) < n:
+                    if int((rule_masks[rr].fillna(False) & col_any).sum()) < n_cols:
                         ok = False
                         break
                 if not ok:
                     continue
                 for cc in col_rule_ids:
-                    if int((rule_masks[cc].fillna(False) & row_any).sum()) < n:
+                    if int((rule_masks[cc].fillna(False) & row_any).sum()) < n_rows:
                         ok = False
                         break
                 if not ok:
@@ -965,7 +977,7 @@ def generate_board(
             # The selection is unaffected; only display position changes.
             rng.shuffle(row_rule_ids)
             rng.shuffle(col_rule_ids)
-            return Board(n=n, seed=seed, row_rule_ids=row_rule_ids, col_rule_ids=col_rule_ids)
+            return Board(n_rows=n_rows, n_cols=n_cols, seed=seed, row_rule_ids=row_rule_ids, col_rule_ids=col_rule_ids)
 
     return None
 

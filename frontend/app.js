@@ -56,21 +56,39 @@ function seededPermutation(n, seedStr) {
   return perm;
 }
 function shuffleBoardDisplay(board) {
-  board.rowPerm = seededPermutation(board.n, board.seed + "_R");
-  board.colPerm = seededPermutation(board.n, board.seed + "_C");
-  board.row_rule_ids    = board.rowPerm.map(i => board.row_rule_ids[i]);
+  board.rowPerm = seededPermutation(board.n_rows, board.seed + "_R");
+  board.colPerm = seededPermutation(board.n_cols, board.seed + "_C");
+  // Defensive: row_rule_ids/col_rule_ids are only used for the hint-tooltip
+  // type-badge icon (see ruleHeadContent) — labels are what actually drive
+  // gameplay. If ids are ever missing (e.g. a stale server response), fall
+  // back to placeholders instead of crashing the whole board load.
+  const rowIds = board.row_rule_ids || board.row_rule_labels.map((_, i) => `row_${i}`);
+  const colIds = board.col_rule_ids || board.col_rule_labels.map((_, i) => `col_${i}`);
+  board.row_rule_ids    = board.rowPerm.map(i => rowIds[i]);
   board.row_rule_labels = board.rowPerm.map(i => board.row_rule_labels[i]);
-  board.col_rule_ids    = board.colPerm.map(i => board.col_rule_ids[i]);
+  board.col_rule_ids    = board.colPerm.map(i => colIds[i]);
   board.col_rule_labels = board.colPerm.map(i => board.col_rule_labels[i]);
 }
 
 const boardWrap = document.getElementById("boardWrap");
-const boardMeta = document.getElementById("boardMeta");
-const message = document.getElementById("message");
+// boardMeta / message now target whichever mode context panel is visible, so a
+// Draft board's status shows under the Draft tab and Daily's under Daily. Falls
+// back to the Daily panel's elements if nothing's active yet.
+const _dailyMeta = document.getElementById("boardMeta");
+const _dailyMsg = document.getElementById("message");
+function _activeCtxEl(cls, fallback) {
+  const panel = document.querySelector(".ctx-panel:not(.hidden)");
+  return (panel && panel.querySelector(cls)) || fallback;
+}
+const boardMeta = {
+  set textContent(v) { const el = _activeCtxEl(".ctx-meta", _dailyMeta); if (el) el.textContent = v; },
+  get textContent() { const el = _activeCtxEl(".ctx-meta", _dailyMeta); return el ? el.textContent : ""; },
+};
+const message = _dailyMsg; // legacy ref kept for any direct users; setMessage below is panel-aware
 const apiBaseInput = document.getElementById("apiBase");
 const modeSelect = document.getElementById("modeSelect");
-const loadTodayBtn = document.getElementById("loadToday");
-const loadRandomBtn = document.getElementById("loadRandom");
+// Old Daily/Shuffle buttons are gone; Shuffle now lives in the Daily context bar.
+const loadRandomBtn = document.getElementById("ctxShuffleBtn");
 const cellTemplate = document.getElementById("cellTemplate");
 
 const MOCK_POKEMON = [
@@ -304,8 +322,10 @@ async function validatePokemon(payload) {
 }
 
 function setMessage(text, tone = "") {
-  message.textContent = text;
-  message.style.color = tone || "";
+  const el = _activeCtxEl(".ctx-msg", _dailyMsg);
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = tone || "";
 }
 
 function getCellId(row, col) {
@@ -363,6 +383,18 @@ function buildTypeBadge(typeKey, cfg) {
 }
 
 function ruleHeadContent(label, ruleId) {
+  const el = _ruleHeadContentInner(label, ruleId);
+  // Attach a styled hover tooltip (see attachCategoryTooltip) instead of the
+  // browser's native title, so it matches the site and is readable.
+  const help = window.PDD_CATEGORY_HELP;
+  if (help && el) {
+    const text = help.explain(formatRuleLabel(label));
+    if (text) attachCategoryTooltip(el, formatRuleLabel(label), text);
+  }
+  return el;
+}
+
+function _ruleHeadContentInner(label, ruleId) {
   // Primary: rule ID format is always "type_<name>" — most reliable
   if (ruleId && ruleId.startsWith("type_")) {
     const typeKey = ruleId.slice(5);
@@ -379,6 +411,46 @@ function ruleHeadContent(label, ruleId) {
   span.className = "rule-badge text";
   span.textContent = formatRuleLabel(label);
   return span;
+}
+
+// ── Styled category hover tooltip ────────────────────────────────────────────
+// One shared floating element, positioned above (or beside) the hovered badge.
+// Matches the site's card/pixel style. Desktop hover + keyboard focus; on touch
+// there's no hover, but the cell modal already shows the same explainer inline.
+let _catTip = null;
+function _ensureCatTip() {
+  if (_catTip) return _catTip;
+  _catTip = document.createElement("div");
+  _catTip.className = "cat-tip";
+  _catTip.setAttribute("role", "tooltip");
+  _catTip.innerHTML = '<span class="cat-tip-title"></span><span class="cat-tip-body"></span>';
+  document.body.appendChild(_catTip);
+  return _catTip;
+}
+function attachCategoryTooltip(el, title, body) {
+  el.classList.add("has-cat-tip");
+  const show = () => {
+    const tip = _ensureCatTip();
+    tip.querySelector(".cat-tip-title").textContent = title;
+    tip.querySelector(".cat-tip-body").textContent = body;
+    tip.classList.add("visible");
+    // Position: centered above the badge; flip below if not enough room.
+    const r = el.getBoundingClientRect();
+    tip.style.left = "0px"; tip.style.top = "0px";  // reset for measure
+    const tr = tip.getBoundingClientRect();
+    let left = r.left + r.width / 2 - tr.width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tr.width - 8));
+    let top = r.top - tr.height - 10;
+    tip.classList.toggle("below", top < 8);
+    if (top < 8) top = r.bottom + 10;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  };
+  const hide = () => { if (_catTip) _catTip.classList.remove("visible"); };
+  el.addEventListener("mouseenter", show);
+  el.addEventListener("mouseleave", hide);
+  el.addEventListener("focus", show);
+  el.addEventListener("blur", hide);
 }
 
 function spriteFromPokemonId(pokemonId) {
@@ -469,7 +541,7 @@ function updateHUD() {
   for (const cell of state.cells.values()) {
     if (cell.locked) correct++;
   }
-  const total = state.board.n * state.board.n;
+  const total = state.board.n_rows * state.board.n_cols;
   const pct = total > 0 ? (correct / total) * 100 : 0;
 
   const progText = document.getElementById("progressText");
@@ -559,7 +631,8 @@ async function useHint() {
   try {
     const params = new URLSearchParams({
       seed: state.board.seed,
-      n: String(state.board.n),
+      n_rows: String(state.board.n_rows),
+      n_cols: String(state.board.n_cols),
       row_i: String(state.board?.rowPerm ? state.board.rowPerm[row] : row),
       col_j: String(state.board?.colPerm ? state.board.colPerm[col] : col),
       used_keys: usedKeys.join(","),
@@ -696,6 +769,15 @@ function openCellModal(cellId, row, col, rowLabel, colLabel) {
   document.getElementById("modalRowRule").textContent = formatRuleLabel(rowLabel);
   document.getElementById("modalColRule").textContent = formatRuleLabel(colLabel);
 
+  // Per-tag explainer captions, styled to sit directly under each rule tag.
+  const help = window.PDD_CATEGORY_HELP;
+  const rowHelpEl = document.getElementById("modalRowHelp");
+  const colHelpEl = document.getElementById("modalColHelp");
+  if (help) {
+    if (rowHelpEl) rowHelpEl.textContent = help.explain(formatRuleLabel(rowLabel)) || "";
+    if (colHelpEl) colHelpEl.textContent = help.explain(formatRuleLabel(colLabel)) || "";
+  }
+
   const input = document.getElementById("modalInput");
   input.value = state.cells.get(cellId)?.typed || "";
 
@@ -802,7 +884,8 @@ async function useHintFromModal() {
   try {
     const params = new URLSearchParams({
       seed: state.board.seed,
-      n: String(state.board.n),
+      n_rows: String(state.board.n_rows),
+      n_cols: String(state.board.n_cols),
       row_i: String(state.board?.rowPerm ? state.board.rowPerm[row] : row),
       col_j: String(state.board?.colPerm ? state.board.colPerm[col] : col),
       used_keys: usedKeys.join(","),
@@ -827,6 +910,10 @@ function createBoardGrid(board) {
   const grid = document.createElement("div");
   grid.className = "board-grid";
   grid.setAttribute("role", "grid");
+  // Drives grid-template-columns in styles.css — without this, anything
+  // other than a 9-wide board renders with the wrong number of columns
+  // (headers and data cells wrap into the wrong shape).
+  grid.style.setProperty("--board-cols", String(board.n_cols));
 
   const corner = document.createElement("div");
   corner.className = "rule-head corner";
@@ -843,15 +930,15 @@ function createBoardGrid(board) {
     grid.appendChild(head);
   });
 
-  for (let i = 0; i < board.n; i += 1) {
+  for (let i = 0; i < board.n_rows; i += 1) {
     const rowHead = document.createElement("div");
     rowHead.className = "row-head";
     rowHead.appendChild(ruleHeadContent(board.row_rule_labels[i], board.row_rule_ids && board.row_rule_ids[i]));
     grid.appendChild(rowHead);
 
-    for (let j = 0; j < board.n; j += 1) {
+    for (let j = 0; j < board.n_cols; j += 1) {
       const node = cellTemplate.content.firstElementChild.cloneNode(true);
-      node.style.setProperty("--cell-index", String(i * board.n + j));
+      node.style.setProperty("--cell-index", String(i * board.n_cols + j));
       const id = getCellId(i, j);
       state.cells.set(id, {
         locked: false,
@@ -876,7 +963,7 @@ function applyLoadedBoard(board, runtimeMode, message, tone = "var(--ok)") {
   shuffleBoardDisplay(state.board); // randomise display order; rowPerm/colPerm stored for validate/hint
   resetGameState();
   createBoardGrid(board);
-  boardMeta.textContent = `Seed: ${board.seed} | Board: ${board.n}x${board.n}`;
+  boardMeta.textContent = `Seed: ${board.seed} | Board: ${board.n_rows}x${board.n_cols}`;
   setMessage(message, tone);
   updateHUD();
 }
@@ -923,7 +1010,8 @@ function randomSeed() {
 const draftModal            = document.getElementById("draftModal");
 const draftAllowSingle       = document.getElementById("draftAllowSingle");
 const draftGuaranteedSolvable = document.getElementById("draftGuaranteedSolvable");
-const draftSizeOptions      = document.getElementById("draftSizeOptions");
+const draftRowsSelect       = document.getElementById("draftRowsSelect");
+const draftColsSelect       = document.getElementById("draftColsSelect");
 const draftCategoryRow      = document.getElementById("draftCategoryRow");
 const draftDropdownPanel    = document.getElementById("draftDropdownPanel");
 const draftDropdownTitle    = document.getElementById("draftDropdownTitle");
@@ -946,7 +1034,8 @@ const draftState = {
   catalog: null,     // { groups: { type: [{rule_id,label}], ... }, total_rules }
   selected: {},       // { type: Set(rule_id), region: Set(...), ... } — starts as "everything on"
   openGroup: null,    // which category's checklist is currently expanded
-  size: 9,
+  rows: 9,
+  cols: 9,
 };
 
 async function openDraftModal() {
@@ -1093,12 +1182,11 @@ draftDropdownAllToggle?.addEventListener("change", () => {
 
 draftDropdownSearch?.addEventListener("input", renderDraftDropdownList);
 
-draftSizeOptions?.querySelectorAll(".draft-size-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    draftSizeOptions.querySelectorAll(".draft-size-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    draftState.size = Number(btn.dataset.size);
-  });
+draftRowsSelect?.addEventListener("change", () => {
+  draftState.rows = Number(draftRowsSelect.value);
+});
+draftColsSelect?.addEventListener("change", () => {
+  draftState.cols = Number(draftColsSelect.value);
 });
 
 draftGenerateBtn?.addEventListener("click", generateDraftBoard);
@@ -1117,19 +1205,22 @@ async function generateDraftBoard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         allowed_rule_ids: allowedRuleIds,
-        n: draftState.size,
+        n_rows: draftState.rows,
+        n_cols: draftState.cols,
         allow_single_answers: draftAllowSingle.checked,
         guaranteed_solvable: draftGuaranteedSolvable.checked,
       }),
     });
 
     const board = {
-      seed: result.seed, n: result.n,
+      seed: result.seed, n_rows: result.n_rows, n_cols: result.n_cols,
+      row_rule_ids: result.row_rule_ids, col_rule_ids: result.col_rule_ids,
       row_rule_labels: result.row_rule_labels, col_rule_labels: result.col_rule_labels,
     };
     const message = result.note ? "Draft board loaded (size adjusted — see note)" : "Draft board loaded";
     applyLoadedBoard(board, "api", message);
     closeDraftModal();
+    if (window.PDD_SETMODE) window.PDD_SETMODE("draft");
 
     if (result.note) {
       // Surface the size-adjustment explanation as a normal game message too,
@@ -1137,6 +1228,10 @@ async function generateDraftBoard() {
       setMessage(result.note, "var(--warn)");
     }
   } catch (err) {
+    // Log the full error (with stack trace) to the console — the banner only
+    // ever showed err.message, which threw away exactly the information
+    // needed to pin down where a client-side crash actually happened.
+    console.error("Draft Board generation failed:", err);
     draftErrorBanner.textContent = err.message || "That combination didn't work out — try adjusting your selections.";
     draftErrorBanner.classList.remove("hidden");
   } finally {
@@ -1674,8 +1769,7 @@ function renderPokedexDetail(entry) {
 detailPaneBack?.addEventListener("click", closePokedexDetail);
 
 
-loadTodayBtn.addEventListener("click", () => loadBoard());
-loadRandomBtn.addEventListener("click", () => loadBoard(randomSeed()));
+loadRandomBtn?.addEventListener("click", () => loadBoard(randomSeed()));
 apiBaseInput?.addEventListener("change", () => {
   state.apiBase = apiBaseInput.value.trim() || state.apiBase;
 });
@@ -1808,7 +1902,8 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
 
   const payload = {
     seed: state.board.seed,
-    n: state.board.n,
+    n_rows: state.board.n_rows,
+    n_cols: state.board.n_cols,
     row_i: row,
     col_j: col,
     pokemon_key: _modalPicked.key,
@@ -1883,3 +1978,69 @@ document.addEventListener("keydown", (e) => {
 });
 
 loadBoard();
+
+window.PDD = {
+  state,
+  fetchJson,
+  formatRuleLabel,
+  ruleHeadContent,
+  spriteFromPokemonId,
+  setSpriteSafe,
+};
+
+// ── Mode-tab navigation ──────────────────────────────────────────────────────
+// Three game modes (Daily, Draft, Reverse); exactly one is active. Each mode's
+// controls live in its own context panel, so the active tab and its controls
+// are always in sync — no more "Daily lit while Reverse is showing". Palette is
+// NOT a mode; it opens from the corner over whatever mode is active.
+(function initModeTabs() {
+  const tabs = Array.from(document.querySelectorAll(".mode-tab"));
+  const panels = Array.from(document.querySelectorAll(".ctx-panel"));
+  if (!tabs.length) return;
+
+  let current = null;
+
+  function showPanel(mode) {
+    panels.forEach((p) => p.classList.toggle("hidden", p.dataset.ctx !== mode));
+  }
+  function highlight(mode) {
+    tabs.forEach((t) => t.classList.toggle("active", t.dataset.mode === mode));
+  }
+
+  function setMode(mode) {
+    if (mode === current) {
+      // Re-clicking Draft reopens the configurator; re-clicking others is a no-op.
+      if (mode === "draft") openDraftModal();
+      return;
+    }
+    current = mode;
+    highlight(mode);
+    showPanel(mode);
+
+    const rev = window.PDD_REVERSE;
+    if (mode === "reverse") {
+      if (rev) rev.enter();
+    } else {
+      if (rev) rev.exit();
+    }
+
+    if (mode === "daily") {
+      // Only auto-load a fresh daily if we're not already showing one.
+      if (!state.board || state.runtimeMode === "mock") loadBoard();
+    } else if (mode === "draft") {
+      // Clicking the Draft tab lands you straight in the configurator.
+      openDraftModal();
+    }
+  }
+
+  tabs.forEach((t) => t.addEventListener("click", () => setMode(t.dataset.mode)));
+
+  // When a Draft board is successfully generated, app.js already swaps the
+  // board in; we just make sure the Draft tab stays lit.
+  window.PDD_SETMODE = setMode;
+
+  // Start on Daily (matches the initial loadBoard() above).
+  current = "daily";
+  highlight("daily");
+  showPanel("daily");
+})();
