@@ -1,0 +1,383 @@
+/* ============================================================================
+   mobile.css — phone layout for the forward board (pairs with mobile.js)
+   Load AFTER styles.css so these win without piling on !important.
+   Everything is inside the ≤767px query; desktop is untouched.
+   ============================================================================ */
+
+.m-bar { display: none; }
+.m-chip { display: none; }
+
+@media (max-width: 767px) {
+
+  /* ── Control bar ─────────────────────────────────────────────────────────── */
+  .m-bar.m-ready { display: block; margin: 0 0 0.55rem; }
+  body.reverse-active .m-bar-fwd,
+  body:not(.reverse-active) .m-bar-rev { display: none; }
+
+  /* :where() keeps this reset at zero specificity so the component classes win */
+  :where(.m-bar) button {
+    all: unset;
+    box-sizing: border-box;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .m-bar button:focus-visible { outline: 2px solid #ff5c9a; outline-offset: 2px; }
+
+  .m-views {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    padding: 3px;
+    margin-bottom: 0.55rem;
+    border: 1px solid var(--line-strong, rgba(204, 34, 85, 0.35));
+    border-radius: 12px;
+    background: rgba(10, 3, 16, 0.7);
+  }
+  .m-view-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--pixel-font);
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft, #b99aad);
+    padding: 0.55rem 0.3rem;
+    min-height: 38px;
+    border-radius: 9px;
+    transition: background 160ms ease, color 160ms ease;
+  }
+  .m-view-btn[aria-pressed="true"] {
+    color: var(--ink, #f7e6ef);
+    background: rgba(204, 34, 85, 0.24);
+    box-shadow: inset 0 0 0 1px rgba(255, 92, 154, 0.55);
+  }
+
+  /* ── Dashboard: overview map + focused rule ──────────────────────────────── */
+  .m-dash {
+    display: grid;
+    grid-template-columns: minmax(0, 46%) 1fr;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  .m-dash[hidden] { display: none; }
+
+  .m-mini {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--m-cols, 9), 1fr);
+    grid-template-rows: repeat(var(--m-rows, 9), 1fr);
+    gap: 2px;
+    aspect-ratio: var(--m-cols, 9) / var(--m-rows, 9);
+    align-self: start;
+    padding: 4px;
+    border-radius: 10px;
+    background: #0a0310;
+    border: 1px solid var(--line-strong, rgba(204, 34, 85, 0.35));
+  }
+  .m-sq {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+  }
+  .m-sq img { width: 118%; height: 118%; object-fit: contain; pointer-events: none; }
+  .m-sq img:not([src]) { display: none; }
+  .m-sq.is-line { background: rgba(204, 34, 85, 0.20); }
+  .m-sq[data-state="ok"]    { background: rgba(16, 217, 138, 0.16); box-shadow: inset 0 0 0 1px rgba(16, 217, 138, 0.55); }
+  .m-sq[data-state="hint"]  { background: rgba(34, 211, 238, 0.14); box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.55); }
+  .m-sq[data-state="err"]   { background: rgba(244, 63, 94, 0.30); }
+  .m-sq[data-state="draft"] { background: rgba(245, 158, 11, 0.28); }
+
+  .m-band {
+    z-index: 2;
+    margin: -2px;
+    border: 2px solid #ff5c9a;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(255, 92, 154, 0.45);
+    pointer-events: none;
+  }
+
+  .m-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+  .m-where {
+    margin: 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    color: var(--ink-soft, #b99aad);
+  }
+  .m-rule {
+    display: flex;
+    align-items: center;
+    min-height: 2.4rem;
+    font-size: 0.95rem;
+  }
+  .m-rule .rule-badge.text {
+    display: inline-block;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    padding: 0.35rem 0.55rem;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+  .m-rule .type-badge-custom { font-size: 0.8rem; }
+  .m-help {
+    margin: 0;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--ink-soft, #b99aad);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .m-help[hidden] { display: none; }
+
+  .m-count {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: auto;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem;
+    color: var(--ink-soft, #b99aad);
+  }
+  .m-track {
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+  .m-fill {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: #ff5c9a;
+    transition: width 300ms ease;
+  }
+  .m-count.done { color: var(--ok, #10d98a); }
+  .m-count.done .m-fill { background: var(--ok, #10d98a); }
+
+  .m-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .m-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    line-height: 1;
+    padding: 0.45rem 0;
+    min-height: 40px;
+    border-radius: 10px;
+    color: var(--ink, #f7e6ef);
+    border: 1px solid var(--line-strong, rgba(204, 34, 85, 0.35));
+    background: rgba(204, 34, 85, 0.08);
+  }
+  .m-nav-btn:active { background: rgba(204, 34, 85, 0.25); }
+
+  /* ── Focus view: the board shows one line as big tiles ───────────────────── */
+  .m-focus {
+    overflow: visible;
+    padding: 0.45rem;
+  }
+  .m-focus .board-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+    gap: 0.45rem;
+    touch-action: pan-y;               /* horizontal swipes come to mobile.js */
+  }
+  .m-focus .board-grid > .rule-head,
+  .m-focus .board-grid > .row-head,
+  .m-focus .board-grid > .cell:not(.m-in) { display: none; }
+
+  .m-focus .board-grid > .cell {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 128px;
+    padding: 0.4rem 0.3rem 0.45rem;
+    border-radius: 12px;
+    animation-delay: calc(var(--m-k, 0) * 28ms) !important;
+  }
+  .m-focus .cell .cell-summary {
+    flex: 1;
+    justify-content: center;
+    gap: 0.3rem;
+  }
+  .m-focus .cell .qual-stack { display: none; }
+
+  /* The chip names the rule this tile adds on top of the focused line. */
+  .m-rows .cell .m-chip-col,
+  .m-cols .cell .m-chip-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 2.1rem;
+    margin-bottom: 0.1rem;
+  }
+  .m-focus .m-chip .rule-badge.text {
+    font-size: 0.56rem;
+    line-height: 1.25;
+    padding: 0.2rem 0.3rem;
+    text-align: center;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .m-focus .m-chip .type-badge-custom { font-size: 0.62rem; }
+
+  .m-focus .summary-sprite { width: 64px; height: 64px; }
+  .m-focus .picked-name { font-size: 0.64rem; }
+  .m-focus .picked-name-row { justify-content: center; }
+
+  /* Empty tile: a faint Poké Ball outline where the Pokémon will go. */
+  :is(.m-focus, .m-fit) .cell:has(.summary-sprite.hidden) .cell-summary::before {
+    content: "";
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 92, 154, 0.28);
+    background:
+      radial-gradient(circle, rgba(10, 3, 16, 1) 0 5px, rgba(255, 92, 154, 0.35) 5px 8px, transparent 8.5px),
+      linear-gradient(rgba(204, 34, 85, 0.16) 0 46%, rgba(255, 92, 154, 0.35) 46% 54%, rgba(255, 255, 255, 0.04) 54%);
+  }
+  :is(.m-focus, .m-fit) .cell.drafted:has(.summary-sprite.hidden) .cell-summary::before { border-color: rgba(245, 158, 11, 0.5); }
+  :is(.m-focus, .m-fit) .cell.err:has(.summary-sprite.hidden) .cell-summary::before     { border-color: rgba(244, 63, 94, 0.6); }
+
+
+  /* ── Full grid view: keep the scroll board, fix what was broken ──────────── */
+  /* Wider header column + smaller type so rules like EARTHQUAKE aren't clipped */
+  :where(.board-wrap, #revBoardWrap) .board-grid {
+    --board-header-min: 98px;
+    --board-header-max: 104px;
+  }
+  :where(.board-wrap, #revBoardWrap) .row-head,
+  :where(.board-wrap, #revBoardWrap) .rule-head.corner {
+    font-size: 0.5rem;
+    /* The sticky column stuck inside the wrap's padding, so scrolled cells
+       showed through that strip on the left. A solid spread shadow paints
+       over it; the soft one keeps the right-edge separator. */
+    box-shadow: -0.5rem 0 0 0 #0a0310, 3px 0 10px rgba(0, 0, 0, 0.7);
+  }
+  :where(.board-wrap, #revBoardWrap) .row-head .rule-badge.text,
+  :where(.board-wrap, #revBoardWrap) .rule-head.corner .rule-badge.text { font-size: 0.5rem; }
+
+  /* The row rule is pinned on the left, so cells only need the column rule. */
+  .m-grid .cell .q-row,
+  .m-grid .cell .q-sep { display: none; }
+
+
+  /* ── Info panel extras (Reverse) ─────────────────────────────────────────── */
+  .m-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+  .m-status {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.62rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    color: var(--ink-soft, #b99aad);
+    border: 1px solid var(--line-strong, rgba(204, 34, 85, 0.35));
+  }
+  .m-status.done { color: var(--ok, #10d98a); border-color: rgba(16, 217, 138, 0.5); }
+  .m-status[hidden], .m-guess[hidden], .m-count[hidden] { display: none; }
+  .m-rule .rev-qmark { font-size: 1.1rem; padding: 0.25rem 0.8rem; }
+
+  .m-guess {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    margin-top: auto;
+    border-radius: 10px;
+    font-family: var(--pixel-font);
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
+    color: #fff;
+    background: linear-gradient(100deg, #e0306f, #b01d56);
+    box-shadow: 0 0 16px rgba(224, 48, 111, 0.35);
+  }
+  .m-guess:active { filter: brightness(1.15); }
+
+  /* Reverse map: every square has a Pokémon, so brightness carries progress —
+     dim until either of its lines is solved, full once both are. */
+  .m-bar-rev .m-sq img { opacity: 0.32; filter: grayscale(0.6); }
+  .m-bar-rev .m-sq[data-state="half"] img { opacity: 0.7; filter: none; }
+  .m-bar-rev .m-sq[data-state="ok"] img { opacity: 1; filter: none; }
+  .m-sq[data-state="half"] { background: rgba(16, 217, 138, 0.07); box-shadow: inset 0 0 0 1px rgba(16, 217, 138, 0.25); }
+
+  /* Reverse tiles: chip on top, Pokémon below */
+  .m-focus .board-grid > .rev-cell { justify-content: flex-start; gap: 0.2rem; }
+  .m-focus .rev-cell .rev-cell-sprite { width: 64px; height: 64px; margin-top: auto; }
+  .m-focus .rev-cell .rev-cell-name { margin-bottom: auto; font-size: 0.64rem; }
+  .m-focus .m-chip .rev-qmark { font-size: 0.95rem; padding: 0.1rem 0.7rem; }
+
+  /* ── Fitted grid: boards 5×5 and smaller (Draft) ─────────────────────────── */
+  .m-fit { overflow: visible; }
+  .m-fit .board-grid {
+    grid-template-columns: minmax(0, 5.2rem) repeat(var(--board-cols, 5), minmax(0, 1fr));
+    min-width: 0;
+    gap: 0.25rem;
+  }
+  .m-fit .row-head,
+  .m-fit .rule-head.corner { position: static; box-shadow: none; }
+  .m-fit :is(.rule-head, .row-head) { min-height: 2.8rem; padding: 0.2rem; font-size: 0.5rem; }
+  .m-fit :is(.rule-head, .row-head) .rule-badge.text { font-size: 0.5rem; line-height: 1.25; }
+  .m-dense .board-grid > .rule-head:not(.corner) {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);   /* read bottom-to-top, like spreadsheet headers */
+    min-height: 5.6rem;
+    padding: 0.3rem 0.1rem;
+  }
+  .m-dense .board-grid > .rule-head:not(.corner) .rule-badge.text { padding: 0.3rem 0.15rem; }
+  .m-fit .board-grid > .cell {
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 1;
+    padding: 0.2rem;
+    border-radius: 9px;
+  }
+  .m-fit .cell .cell-summary { justify-content: center; gap: 0.1rem; }
+  .m-fit .cell .qual-stack { display: none; }
+  .m-fit .summary-sprite { width: 78%; height: auto; aspect-ratio: 1; }
+  .m-fit .picked-name { font-size: 0.46rem; -webkit-line-clamp: 1; }
+  .m-fit .result-mark { display: none; }
+  .m-fit .cell:not(.locked):not(.drafted):not(.err) .picked-name-row { display: none; }
+  .m-fit .cell:has(.summary-sprite.hidden) .cell-summary::before { width: 58%; height: auto; aspect-ratio: 1; }
+
+  /* Small fitted boards shouldn't balloon either: cap tiles around 88px. */
+  .m-fit .board-grid { max-width: calc(5.2rem + var(--board-cols, 5) * 92px); margin-inline: auto; }
+
+  /* Type badges in narrow row/column headers ("✦ PSYCHIC", "∞ DRAGON") were
+     wider than the header and got cut off. Shrink them to fit instead. */
+  :where(.board-wrap, #revBoardWrap) :is(.row-head, .rule-head) .type-badge-custom {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    font-size: 0.5rem;
+    padding: 0.22rem 0.4rem;
+    gap: 0.2em;
+    letter-spacing: 0.02em;
+  }
+  :where(.board-wrap, #revBoardWrap) :is(.row-head, .rule-head) .type-badge-custom :is(.tbn, .tbi) {
+    font-size: inherit;
+    min-width: 0;
+  }
+  :where(.board-wrap, #revBoardWrap) :is(.row-head, .rule-head) .type-badge-custom .tbn {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .board-scroll-hint.m-hide { display: none !important; }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .m-focus .board-grid > .cell { animation: none !important; }
+  .m-fill, .m-view-btn { transition: none; }
+}
