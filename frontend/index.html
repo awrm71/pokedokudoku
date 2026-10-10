@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Tints the phone browser bars to match the page -->
+    <meta name="theme-color" content="#08030f" />
     <title>PokeDokuDoku</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -654,559 +656,74 @@
         background: linear-gradient(160deg, rgba(244,63,94,0.06), rgba(14,4,22,0.97));
       }
 
-      /* ══════════════════════════════════════════════════════════
-         Pokedex Palette — collection tracker (Daily Board catches only)
-         ══════════════════════════════════════════════════════════ */
-
-      .pokedex-modal-overlay {
-        position: fixed; inset: 0;
-        background: rgba(0,0,0,0.84);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        z-index: 210;
-        display: grid;
-        place-items: center;
-        padding: 1rem;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 200ms ease;
-      }
-      .pokedex-modal-overlay.open { opacity: 1; pointer-events: all; }
-
-      .pokedex-modal-card {
-        position: relative;
-        background: rgba(14, 4, 22, 0.98);
-        border: 1px solid rgba(204, 34, 85, 0.42);
-        border-radius: 24px;
-        padding: 1.6rem 1.6rem 1.4rem;
-        width: min(1180px, 96vw);
-        max-height: 88vh;
-        overflow: hidden;
-        display: flex; flex-direction: column;
-        box-shadow: 0 0 70px rgba(204,34,85,0.16), 0 30px 90px rgba(0,0,0,0.8);
-        animation: modal-in 300ms cubic-bezier(.34,1.56,.64,1) both;
-      }
-
-      .pokedex-close-btn { position: absolute; top: 1.1rem; right: 1.1rem; z-index: 3; }
-
-      .pokedex-header { text-align: center; margin-bottom: 1.1rem; padding-right: 2.2rem; }
-      .pokedex-eyebrow {
-        font-family: var(--pixel-font);
-        font-size: 0.62rem;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--accent-2);
-        opacity: 0.85;
-        margin: 0 0 0.3rem;
-      }
-      .pokedex-title {
-        margin: 0 0 0.35rem;
-        font-family: var(--pixel-font);
-        font-size: clamp(1.3rem, 3vw, 1.8rem);
-        letter-spacing: 0.02em;
-        background: linear-gradient(110deg, #e040a0 0%, #cc2255 45%, #9b1fcc 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-      }
-      .pokedex-subtitle {
-        margin: 0; font-size: 0.8rem; color: var(--ink-soft);
-        max-width: 520px; margin-inline: auto; line-height: 1.4;
-      }
-
-      /* ── Stats row: progress ring + explainer ──────────────── */
-      .pokedex-stats-row {
-        display: flex; align-items: center; gap: 1.3rem;
-        justify-content: center; margin-bottom: 1.3rem; flex-wrap: wrap;
-      }
-      .pokedex-ring-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
-      .pokedex-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
-      .pokedex-ring-track { fill: none; stroke: rgba(204, 34, 85, 0.14); stroke-width: 10; }
-      .pokedex-ring-fill {
-        fill: none;
-        stroke: url(#pokedexRingGradient);
-        stroke-width: 10;
-        stroke-linecap: round;
-        transition: stroke-dashoffset 700ms cubic-bezier(.22,.61,.36,1);
-        filter: drop-shadow(0 0 6px rgba(204,34,85,0.5));
-      }
-      .pokedex-ring-label {
-        position: absolute; inset: 0; display: grid; place-items: center;
-        font-family: var(--pixel-font); font-size: 1.05rem; color: var(--ink);
-      }
-      .pokedex-stats-text { max-width: 420px; text-align: left; }
-      .pokedex-count {
-        margin: 0 0 0.25rem; font-family: var(--pixel-font);
-        font-size: 1.15rem; color: var(--ink);
-      }
-      .pokedex-hint-text { margin: 0; font-size: 0.74rem; color: var(--ink-soft); line-height: 1.45; }
-      .pokedex-hint-text strong { color: #e8a8c0; }
-
-      /* ── Palette strip: signature element — literal type "palette" ── */
-      .pokedex-palette-strip {
-        display: grid; grid-template-columns: repeat(9, 1fr);
-        gap: 0.4rem; margin-bottom: 1.2rem;
-      }
-      .palette-swatch {
-        position: relative; overflow: hidden;
-        height: 42px; border-radius: 9px;
-        border: 1px solid var(--line-strong);
-        background: rgba(20, 10, 28, 0.9);
-        padding: 0; box-shadow: none; cursor: pointer;
-        transition: transform 140ms ease, border-color 140ms ease;
-      }
-      .palette-swatch:hover { transform: translateY(-2px); box-shadow: none; }
-      .palette-swatch.active {
-        border-color: var(--swatch-color, var(--accent));
-        box-shadow: 0 0 0 2px rgba(255,255,255,0.06) inset, 0 0 14px var(--swatch-color, transparent);
-      }
-      .palette-swatch.full::after {
-        content: '✦'; position: absolute; top: 2px; right: 3px;
-        font-size: 0.55rem; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.6);
-      }
-      .swatch-fill {
-        position: absolute; left: 0; right: 0; bottom: 0;
-        background: var(--swatch-color, var(--accent));
-        opacity: 0.85;
-        transition: height 600ms cubic-bezier(.22,.61,.36,1);
-      }
-      .swatch-icon {
-        position: relative; z-index: 1;
-        display: grid; place-items: center; width: 100%; height: 100%;
-        font-size: 1.05rem; color: rgba(255,255,255,0.9);
-        font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols", sans-serif;
-        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
-      }
-
-      /* ── Controls ───────────────────────────────────────────── */
-      .pokedex-controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.1rem; }
-      .pokedex-search { flex: 1 1 220px; min-width: 0; }
-      .pokedex-filter-chips { display: flex; gap: 0.35rem; flex-shrink: 0; }
-      .pokedex-chip {
-        font-family: var(--pixel-font); font-size: 0.66rem; letter-spacing: 0.04em;
-        padding: 0.45rem 0.7rem; border-radius: 8px;
-        background: transparent; border: 1px solid var(--line-strong);
-        color: var(--ink-soft); box-shadow: none;
-      }
-      .pokedex-chip:hover { border-color: var(--accent); color: var(--ink); transform: none; box-shadow: none; }
-      .pokedex-chip.active { background: rgba(204, 34, 85, 0.16); border-color: var(--accent); color: var(--ink); }
-      .pokedex-gen-select { flex-shrink: 0; font-size: 0.78rem; padding: 0.5rem 0.6rem; border-radius: 9px; }
-
-      /* ── Card grid ──────────────────────────────────────────── */
-      .pokedex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 0.5rem; }
-
-      /* Cards are deliberately fixed-length now: sprite, name, type dots, and
-         a short date caption — nothing here grows with how much a Pokemon
-         has been used. Anything variable-length (rule pairing, confirmed vs.
-         locked categories, abilities) lives in the Detail modal instead,
-         opened by clicking a caught card. */
-      .dex-card {
-        position: relative; aspect-ratio: 3 / 4; border-radius: 10px;
-        border: 1px solid var(--line-strong); background: var(--card);
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 0.2rem; padding: 0.4rem 0.3rem;
-        animation: cell-rise 260ms ease both;
-        animation-delay: calc(var(--card-index, 0) * 12ms);
-        transition: border-color 160ms ease, transform 160ms ease;
-      }
-      .dex-card.caught { cursor: pointer; border-color: rgba(16, 217, 138, 0.3); }
-      .dex-card.caught:hover { border-color: var(--accent); transform: translateY(-2px); }
-      .dex-card.recent { border-color: var(--accent-2); box-shadow: 0 0 16px rgba(245, 158, 11, 0.35); }
-      .dex-card.recent::before {
-        content: 'NEW'; position: absolute; top: 4px; left: 4px;
-        font-family: var(--pixel-font); font-size: 0.45rem; letter-spacing: 0.05em;
-        color: #1a0f06; background: var(--accent-2); padding: 1px 4px; border-radius: 4px;
-      }
-
-      .dex-sprite { width: 62%; aspect-ratio: 1/1; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
-      .dex-card.uncaught .dex-sprite { filter: brightness(0) saturate(100%) opacity(0.5); }
-
-      .dex-name {
-        margin: 0; font-family: var(--pixel-font); font-size: 0.56rem;
-        letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink);
-        text-align: center; line-height: 1.2; max-width: 100%;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      .dex-card.uncaught .dex-name { color: var(--ink-soft); }
-
-      .dex-type-row { display: flex; gap: 3px; }
-      .dex-type-dot { width: 7px; height: 7px; border-radius: 50%; }
-
-      .dex-date-caption {
-        margin: 0; font-size: 0.5rem; color: var(--ink-soft);
-        font-family: "IBM Plex Mono", monospace; white-space: nowrap;
-      }
-      .dex-rare-mark { font-size: 0.6rem; color: var(--accent-2); margin-left: 2px; }
-
-      .pokedex-empty { text-align: center; color: var(--ink-soft); font-size: 0.85rem; padding: 2.5rem 1rem; line-height: 1.5; }
-      .pokedex-empty.hidden { display: none; }
-
-      .pokedex-modal-card::-webkit-scrollbar { width: 6px; }
-      .pokedex-modal-card::-webkit-scrollbar-track { background: rgba(204,34,85,0.05); border-radius: 3px; }
-      .pokedex-modal-card::-webkit-scrollbar-thumb { background: rgba(204,34,85,0.28); border-radius: 3px; }
-
-      /* ── Mobile ─────────────────────────────────────────────── */
-      @media (max-width: 767px) {
-        .pokedex-modal-overlay { align-items: flex-end; padding: 0; }
-        .pokedex-modal-card { padding: 1.1rem 1rem 1.2rem; border-radius: 20px 20px 0 0; max-height: 92vh; width: 100%; }
-        .pokedex-palette-strip { grid-template-columns: repeat(6, 1fr); }
-        .pokedex-stats-row { gap: 0.9rem; }
-        .pokedex-ring-wrap { width: 76px; height: 76px; }
-        .pokedex-ring-label { font-size: 0.86rem; }
-        .pokedex-stats-text { text-align: center; }
-        .pokedex-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 0.4rem; }
-        .dex-name { font-size: 0.5rem; }
-      }
-
-      /* ── Streak badge ───────────────────────────────────────── */
-      .pokedex-streak {
-        display: flex; align-items: center; gap: 0.4rem;
-        background: rgba(245, 158, 11, 0.10);
-        border: 1px solid rgba(245, 158, 11, 0.35);
-        border-radius: 999px; padding: 0.4rem 0.8rem;
-        flex-shrink: 0;
-      }
-      .pokedex-streak.hidden { display: none; }
-      .pokedex-streak-flame { font-size: 1.05rem; filter: drop-shadow(0 0 5px rgba(245,158,11,0.6)); }
-      .pokedex-streak-text {
-        font-family: var(--pixel-font); font-size: 0.72rem;
-        letter-spacing: 0.03em; color: #fbbf24;
-      }
-
-      /* ── Milestone toast ─────────────────────────────────────── */
-      .pokedex-milestone-toast {
-        text-align: center;
-        font-family: var(--pixel-font);
-        font-size: 0.78rem;
-        letter-spacing: 0.03em;
-        color: #1a0f06;
-        background: linear-gradient(100deg, #f59e0b, #e040a0);
-        border-radius: 10px;
-        padding: 0.55rem 0.8rem;
-        margin: 0 0 1rem;
-        box-shadow: 0 0 22px rgba(245, 158, 11, 0.4);
-        animation: milestone-pop 420ms cubic-bezier(.34,1.56,.64,1) both;
-      }
-      .pokedex-milestone-toast.hidden { display: none; }
-      @keyframes milestone-pop {
-        from { opacity: 0; transform: scale(0.9) translateY(-6px); }
-        to   { opacity: 1; transform: none; }
-      }
-
-      /* ── View toggle (Palette grid / Catch Log) ─────────────── */
-      .pokedex-view-toggle {
-        display: flex; gap: 0.4rem; justify-content: center; margin-bottom: 1rem;
-      }
-      .pokedex-view-btn {
-        font-family: var(--pixel-font); font-size: 0.7rem; letter-spacing: 0.04em;
-        padding: 0.5rem 1rem; border-radius: 999px;
-        background: transparent; border: 1px solid var(--line-strong);
-        color: var(--ink-soft); box-shadow: none;
-      }
-      .pokedex-view-btn:hover { border-color: var(--accent); color: var(--ink); transform: none; box-shadow: none; }
-      .pokedex-view-btn.active {
-        background: var(--accent); color: #fff; border-color: var(--accent);
-        box-shadow: 0 0 14px rgba(204,34,85,0.35);
-      }
-
-      /* ── Rule-pairing chips — "caught via X × Y" — used in the Catch Log
-         rows and in the Detail modal's catch-context line ─────────────── */
-      .dex-rule-chips {
-        display: flex; align-items: center; gap: 0.25rem;
-        font-family: var(--pixel-font); font-size: 0.48rem;
-        letter-spacing: 0.02em; text-transform: uppercase;
-        flex-wrap: wrap; justify-content: center;
-      }
-      .dex-rule-chip {
-        background: rgba(204,34,85,0.12);
-        border: 1px solid rgba(204,34,85,0.32);
-        border-radius: 6px; padding: 0.12rem 0.32rem; color: #e8c0d0;
-      }
-      .dex-rule-x { color: rgba(204,100,140,0.5); font-size: 0.5rem; }
-
-      /* ── Catch Log (list) view ──────────────────────────────── */
-      .pokedex-log-list { display: flex; flex-direction: column; gap: 0.4rem; }
-      .pokedex-log-list.hidden { display: none; }
-      .pokedex-log-note {
-        text-align: center; font-size: 0.72rem; color: var(--ink-soft);
-        margin: -0.3rem 0 0.7rem;
-      }
-      .log-row {
-        display: flex; align-items: center; gap: 0.7rem;
-        background: var(--card);
-        border: 1px solid var(--line-strong);
-        border-radius: 10px;
-        padding: 0.5rem 0.75rem;
-        cursor: pointer;
-        animation: cell-rise 240ms ease both;
-        animation-delay: calc(var(--card-index, 0) * 10ms);
-        transition: border-color 160ms ease;
-      }
-      .log-row:hover { border-color: var(--accent); }
-      .log-row.recent { border-color: var(--accent-2); box-shadow: 0 0 10px rgba(245,158,11,0.25); }
-      .log-sprite { width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
-      .log-main { flex: 1; min-width: 0; }
-      .log-name-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-      .log-name {
-        font-family: var(--pixel-font); font-size: 0.76rem; letter-spacing: 0.02em;
-        color: var(--ink); margin: 0;
-      }
-      .log-meta { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.2rem; flex-wrap: wrap; }
-      .log-date {
-        font-size: 0.66rem; color: var(--ink-soft); flex-shrink: 0;
-        font-family: "IBM Plex Mono", monospace; white-space: nowrap;
-        text-align: right; padding-left: 0.5rem;
-      }
-      .log-empty-note { text-align: center; color: var(--ink-soft); font-size: 0.8rem; padding: 1.5rem; }
-
-      /* ── Shiny groundwork — dormant until shiny catching exists ── */
-      .dex-card.shiny, .log-row.shiny {
-        border-color: #ffe066 !important;
-        box-shadow: 0 0 16px rgba(255, 224, 102, 0.45);
-      }
-      .dex-card.shiny::after {
-        content: '✨'; position: absolute; bottom: 3px; right: 4px; font-size: 0.65rem;
-      }
-
-      /* ══════════════════════════════════════════════════════════
-         Two-pane layout: list pane (existing content) + detail pane.
-         The detail pane is COLLAPSED by default — it only expands once a
-         caught entry is actually selected (JS toggles "detail-open" on the
-         layout wrapper + "open" on the pane itself). Nothing sits there as
-         an empty placeholder taking up space before that.
-         ══════════════════════════════════════════════════════════ */
-      .pokedex-modal-layout {
-        display: flex;
-        flex: 1; min-height: 0; /* lets children scroll independently instead of growing the card */
-      }
-
-      .pokedex-list-pane {
-        width: 100%; min-width: 0; min-height: 0;
-        overflow-y: auto;
-        transition: width 280ms cubic-bezier(.22,.61,.36,1);
-      }
-      .pokedex-modal-layout.detail-open .pokedex-list-pane {
-        width: 56%; padding-right: 1.3rem;
-      }
-
-      /* Selected entry — reinforces the master/detail relationship */
-      .dex-card.selected {
-        border-color: var(--accent) !important;
-        box-shadow: 0 0 0 2px rgba(204,34,85,0.22), 0 0 14px rgba(204,34,85,0.3);
-      }
-      .log-row.selected { border-color: var(--accent) !important; background: rgba(204,34,85,0.08); }
-
-      /* ── Detail pane ──────────────────────────────────────────
-         Desktop: collapsed to zero width until opened, then expands in
-         place (list pane shrinks to make room). Mobile: collapsed off
-         to the right until opened, then slides in to fully cover the
-         list pane instead — no room for a side-by-side split there. */
-      .pokedex-detail-pane {
-        width: 0%; min-width: 0; min-height: 0;
-        overflow: hidden;
-        opacity: 0;
-        border-left: none; padding-left: 0;
-        transition: width 280ms cubic-bezier(.22,.61,.36,1), opacity 200ms ease;
-      }
-      .pokedex-modal-layout.detail-open .pokedex-detail-pane {
-        width: 44%; min-width: 260px;
-        overflow-y: auto;
-        opacity: 1;
-        border-left: 1px solid var(--line-strong);
-        padding-left: 1.3rem;
-      }
-
-      .detail-pane-back {
-        font-family: var(--pixel-font); font-size: 0.7rem;
-        background: transparent; border: 1px solid var(--line-strong);
-        color: var(--ink-soft); border-radius: 8px; padding: 0.4rem 0.8rem;
-        margin-bottom: 0.9rem;
-      }
-      .detail-pane-back:hover { border-color: var(--accent); color: var(--ink); transform: none; box-shadow: none; }
-
-      .detail-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.9rem; }
-      .detail-sprite {
-        width: 76px; height: 76px; object-fit: contain; flex-shrink: 0;
-        filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
-      }
-      .detail-header-text { min-width: 0; }
-      .detail-title {
-        margin: 0 0 0.3rem; font-family: var(--pixel-font);
-        font-size: 1.1rem; letter-spacing: 0.02em; color: var(--ink);
-      }
-      .detail-type-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-      .detail-type-pill {
-        font-family: var(--pixel-font); font-size: 0.58rem; letter-spacing: 0.03em;
-        text-transform: uppercase; padding: 0.2rem 0.55rem; border-radius: 999px;
-        color: #fff;
-      }
-
-      .detail-catch-row {
-        display: flex; align-items: center; gap: 0.5rem;
-        flex-wrap: wrap; margin-bottom: 1.2rem;
-        font-size: 0.74rem; color: var(--ink-soft);
-      }
-      .detail-catch-date { font-family: "IBM Plex Mono", monospace; }
-
-      .detail-section { margin-bottom: 1.1rem; }
-      .detail-section.hidden { display: none; }
-      .detail-section-head {
-        display: flex; align-items: baseline; justify-content: space-between;
-        margin-bottom: 0.5rem;
-      }
-      .detail-section-label {
-        font-family: var(--pixel-font); font-size: 0.68rem; letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-      .detail-section-progress {
-        font-family: var(--pixel-font); font-size: 0.6rem;
-      }
-      /* Section identity colors — General=pink, Abilities=cyan, Moves=amber,
-         so the three lists read as distinct at a glance. */
-      .section-general .detail-section-label,
-      .section-general .detail-section-progress { color: #e0708f; }
-      .section-abilities .detail-section-label,
-      .section-abilities .detail-section-progress { color: #5fd8ea; }
-      .section-moves .detail-section-label,
-      .section-moves .detail-section-progress { color: #f0ad4e; }
-
-      .detail-category-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-      /* Moves lists can run long (tens of entries) — its own scroll region
-         keeps the rest of the detail pane from ballooning with it. */
-      .detail-category-grid.moves-grid {
-        max-height: 230px; overflow-y: auto; padding-right: 0.3rem;
-      }
-
-      .detail-category-chip {
-        font-family: var(--pixel-font); font-size: 0.6rem; letter-spacing: 0.02em;
-        text-transform: uppercase; padding: 0.35rem 0.65rem; border-radius: 8px;
-        display: inline-flex; align-items: center; gap: 0.3rem;
-      }
-      .detail-category-chip.locked .lock-icon { font-size: 0.55rem; opacity: 0.8; flex-shrink: 0; }
-      /* Locked chips still render the real label (so width matches the real
-         answer's length — no layout jump when later confirmed) but blurred
-         past legibility, so nothing is actually given away. */
-      .detail-category-chip.locked .chip-label-blur {
-        filter: blur(5px);
-        user-select: none;
-      }
-      .sr-only {
-        position: absolute; width: 1px; height: 1px;
-        padding: 0; margin: -1px; overflow: hidden;
-        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-      }
-
-      /* General — pink (matches the primary rule-chip color everywhere else) */
-      .section-general .detail-category-chip.confirmed {
-        background: rgba(204,34,85,0.16); border: 1px solid rgba(204,34,85,0.4); color: #f0c8d8;
-      }
-      .section-general .detail-category-chip.locked {
-        background: rgba(255,255,255,0.02); border: 1px dashed rgba(204,34,85,0.3);
-        color: var(--ink-soft); opacity: 0.75;
-      }
-
-      /* Abilities — cyan */
-      .section-abilities .detail-category-chip.confirmed {
-        background: rgba(34,211,238,0.14); border: 1px solid rgba(34,211,238,0.4); color: #c0f0f8;
-      }
-      .section-abilities .detail-category-chip.locked {
-        background: rgba(255,255,255,0.02); border: 1px dashed rgba(34,211,238,0.32);
-        color: var(--ink-soft); opacity: 0.75;
-      }
-      /* Informational (no board rule exists for this trait — can't ever be
-         "earned", so it's just shown, distinct from both confirmed and locked) */
-      .section-abilities .detail-category-chip.info {
-        background: transparent; border: 1px solid rgba(34,211,238,0.2); color: #7fb8c2;
-      }
-
-      /* Moves — amber */
-      .section-moves .detail-category-chip.confirmed {
-        background: rgba(245,158,11,0.16); border: 1px solid rgba(245,158,11,0.45); color: #ffe4b0;
-      }
-      .section-moves .detail-category-chip.locked {
-        background: rgba(255,255,255,0.02); border: 1px dashed rgba(245,158,11,0.32);
-        color: var(--ink-soft); opacity: 0.75;
-      }
-      .section-moves .detail-category-chip.info {
-        background: transparent; border: 1px solid rgba(245,158,11,0.2); color: #c2a06e;
-      }
-
-      .pokedex-detail-pane::-webkit-scrollbar,
-      .pokedex-list-pane::-webkit-scrollbar,
-      .moves-grid::-webkit-scrollbar { width: 6px; }
-      .pokedex-detail-pane::-webkit-scrollbar-track,
-      .pokedex-list-pane::-webkit-scrollbar-track,
-      .moves-grid::-webkit-scrollbar-track { background: rgba(204,34,85,0.05); border-radius: 3px; }
-      .pokedex-detail-pane::-webkit-scrollbar-thumb,
-      .pokedex-list-pane::-webkit-scrollbar-thumb,
-      .moves-grid::-webkit-scrollbar-thumb { background: rgba(204,34,85,0.28); border-radius: 3px; }
-
-      @media (max-width: 767px) {
-        .pokedex-modal-layout { position: relative; }
-        .pokedex-modal-layout.detail-open .pokedex-list-pane { width: 100%; padding-right: 0; } /* mobile covers, doesn't shrink */
-        .pokedex-detail-pane {
-          position: absolute; inset: 0;
-          background: rgba(14, 4, 22, 0.98);
-          transform: translateX(100%);
-          transition: transform 260ms cubic-bezier(.34,1.2,.4,1);
-          z-index: 2;
-          padding: 0; /* width-based desktop padding doesn't apply here */
-        }
-        .pokedex-modal-layout.detail-open .pokedex-detail-pane {
-          width: 100%; min-width: 0;
-          border-left: none; padding-left: 0;
-          transform: translateX(0);
-        }
-      }
     </style>
 
     <!-- Loaded after the inline styles above so they win ties -->
     <link rel="stylesheet" href="./mobile.css" />
     <link rel="stylesheet" href="./draft.css" />
+    <link rel="stylesheet" href="./shell.css" />
+    <link rel="stylesheet" href="./pokedex.css" />
+    <link rel="stylesheet" href="./shiny.css" />
   </head>
   <body>
     <div class="bg-orb orb-a" aria-hidden="true"></div>
     <div class="bg-orb orb-b" aria-hidden="true"></div>
 
     <main class="app-shell">
-      <header class="app-header">
-        <div class="header-bar">
-          <div class="hero-copy">
-            <p class="eyebrow">★ Daily Pokémon Puzzle ★</p>
+      <!-- Brand bar: logo + the two things reachable from every mode. -->
+      <header class="app-header topbar">
+        <div class="brand">
+          <span class="brand-ball" aria-hidden="true"></span>
+          <div>
             <h1>PokeDokuDoku</h1>
-            <p class="subtitle">
-              Fill the 9×9 grid — each cell needs a unique Pokémon matching its row &amp; column rule.
-            </p>
+            <span class="brand-tag">Pokémon logic grids</span>
           </div>
-
-          <!-- Palette is a collection view, reachable from every mode — not a game mode. -->
-          <button type="button" id="openPokedexBtn" class="palette-corner-btn">🎨 Your Palette</button>
         </div>
-
-        <!-- Mode tabs: exactly one is always active. -->
-        <nav class="mode-tabs" aria-label="Game mode">
-          <button type="button" class="mode-tab active" data-mode="daily" id="modeDailyTab">Daily Board</button>
-          <button type="button" class="mode-tab" data-mode="draft" id="modeDraftTab">🃏 Draft Board</button>
-          <button type="button" class="mode-tab" data-mode="reverse" id="modeReverseTab">🔍 Reverse Board</button>
-        </nav>
+        <div class="topbar-actions">
+          <button type="button" id="howToBtn" class="icon-btn" aria-label="How to play">
+            <span class="icon-btn-q" aria-hidden="true">?</span><span class="icon-btn-label">How to play</span>
+          </button>
+          <!-- The Pokédex is a collection view, reachable from every mode — not a game mode. -->
+          <button type="button" id="openPokedexBtn" class="icon-btn" aria-label="Pokédex">
+            <span class="dex-mini-icon" aria-hidden="true"></span><span class="icon-btn-label">Pokédex</span>
+          </button>
+        </div>
       </header>
 
+      <!-- Mode tabs: exactly one is always active. -->
+      <nav class="mode-tabs" aria-label="Game mode">
+        <button type="button" class="mode-tab active" data-mode="daily" id="modeDailyTab">
+          <span class="mt-icon" aria-hidden="true">📅</span>
+          <span class="mt-text"><span class="mt-name">Daily</span><span class="mt-sub">New grid every day</span></span>
+        </button>
+        <button type="button" class="mode-tab" data-mode="draft" id="modeDraftTab">
+          <span class="mt-icon" aria-hidden="true">🃏</span>
+          <span class="mt-text"><span class="mt-name">Draft</span><span class="mt-sub">Build your own board</span></span>
+        </button>
+        <button type="button" class="mode-tab" data-mode="reverse" id="modeReverseTab">
+          <span class="mt-icon" aria-hidden="true">🔍</span>
+          <span class="mt-text"><span class="mt-name">Reverse</span><span class="mt-sub">Guess the hidden rules</span></span>
+        </button>
+      </nav>
+
+      <!-- Console: board label + mode actions on top, HUD underneath. -->
+      <section class="console" aria-label="Board controls">
       <!-- Context bar: contents swap with the active mode. -->
       <div class="mode-context" id="modeContext">
         <div class="ctx-panel" data-ctx="daily">
-          <button type="button" class="ctx-btn" id="ctxShuffleBtn" title="Generate a fresh random board">🔀 Shuffle</button>
+          <button type="button" class="ctx-btn" id="ctxShuffleBtn" title="Deal a fresh random board">🔀 Shuffle</button>
           <span class="ctx-meta" id="boardMeta">Loading board…</span>
           <span class="ctx-msg message" id="message"></span>
         </div>
         <div class="ctx-panel hidden" data-ctx="draft">
-          <button type="button" class="ctx-btn" id="ctxConfigureDraftBtn">⚙️ Configure Board</button>
+          <button type="button" class="ctx-btn" id="ctxConfigureDraftBtn">⚙️ Edit draft</button>
           <span class="ctx-meta" id="boardMetaDraft"></span>
           <span class="ctx-msg message" id="messageDraft"></span>
         </div>
         <div class="ctx-panel hidden" data-ctx="reverse">
           <button type="button" class="ctx-btn" id="revDailyBtn">🗓️ Daily</button>
           <button type="button" class="ctx-btn" id="revCustomBtn">🎛️ Custom</button>
-          <button type="button" class="ctx-btn" id="revIndexBtn">📖 Category Index</button>
+          <button type="button" class="ctx-btn" id="revIndexBtn">📖 Categories</button>
           <span class="ctx-meta" id="revMeta"></span>
           <span class="ctx-msg" id="revMessage"></span>
         </div>
@@ -1246,6 +763,7 @@
         </div>
 
       </div>
+      </section>
 
       <!-- Alerts (hidden by default) -->
       <div class="hud-alert hud-alert-dead" id="gameOverBanner" role="alert">
@@ -1266,15 +784,15 @@
         <button type="button" id="newAfterWinBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">New Board</button>
       </div>
 
-      <section class="legend" aria-label="Status legend">
-        <span><i class="dot ok"></i>Correct</span>
-        <span><i class="dot warn"></i>Draft / Not confirmed</span>
-        <span><i class="dot err"></i>Wrong answer</span>
-        <span><i class="dot hint"></i>Hint used</span>
-      </section>
-
       <div id="boardWrap" class="board-wrap" role="region" aria-label="PokeDokuDoku board"></div>
       <p class="board-scroll-hint" aria-hidden="true">← scroll to see all columns →</p>
+
+      <section class="legend" aria-label="Status legend">
+        <span><i class="dot ok"></i>Correct</span>
+        <span><i class="dot warn"></i>Not confirmed</span>
+        <span><i class="dot err"></i>Wrong</span>
+        <span><i class="dot hint"></i>Hint used</span>
+      </section>
 
       <!-- Reverse Board view + modals. Hidden until the Reverse tab is active. -->
       <section id="reverseView" aria-label="Reverse Board">
@@ -1434,125 +952,147 @@
       </div>
     </div>
 
-    <!-- Pokedex Palette modal — collection tracker, Daily Board catches only -->
-    <div id="pokedexModal" class="pokedex-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pokedexTitle">
-      <div class="pokedex-modal-card">
-        <button type="button" class="modal-close-btn pokedex-close-btn" id="pokedexClose" aria-label="Close">✕</button>
+    <!-- Pokédex — collection tracker for Daily Board catches (pokedex.js / pokedex.css) -->
+    <div id="pokedexModal" class="dex-overlay" role="dialog" aria-modal="true" aria-labelledby="pokedexTitle">
+      <div class="dex-shell">
+        <header class="dex-top">
+          <div class="dex-lens" aria-hidden="true">
+            <span class="dex-lens-glass"></span>
+            <span class="dex-led r"></span><span class="dex-led y"></span><span class="dex-led g"></span>
+          </div>
+          <div class="dex-heading">
+            <h2 id="pokedexTitle">Pokédex</h2>
+            <p>Every correct Daily Board pick registers here</p>
+          </div>
+          <button type="button" class="dex-x" id="dexClose" aria-label="Close Pokédex">✕</button>
+        </header>
 
-        <div class="pokedex-modal-layout" id="pokedexModalLayout">
-          <div class="pokedex-list-pane" id="pokedexListPane">
-            <div class="pokedex-header">
-              <p class="pokedex-eyebrow">★ Daily Board Catches Only ★</p>
-              <h2 id="pokedexTitle" class="pokedex-title">Your Palette</h2>
-              <p class="pokedex-subtitle" id="pokedexSubtitle">Loading your collection…</p>
-            </div>
-
-            <div class="pokedex-stats-row">
-              <div class="pokedex-ring-wrap">
-                <svg class="pokedex-ring" viewBox="0 0 120 120" aria-hidden="true">
+        <div class="dex-layout" id="dexLayout">
+          <div class="dex-main" id="dexBody" data-view="dex">
+            <div class="dx-stats">
+              <div class="dx-stat dx-stat-ring">
+                <svg viewBox="0 0 80 80" aria-hidden="true">
                   <defs>
-                    <linearGradient id="pokedexRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stop-color="#e040a0" />
-                      <stop offset="55%" stop-color="#cc2255" />
+                    <linearGradient id="dexRingGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#ff5c9a" />
+                      <stop offset="60%" stop-color="#cc2255" />
                       <stop offset="100%" stop-color="#9b1fcc" />
                     </linearGradient>
                   </defs>
-                  <circle class="pokedex-ring-track" cx="60" cy="60" r="52"></circle>
-                  <circle class="pokedex-ring-fill" id="pokedexRingFill" cx="60" cy="60" r="52"></circle>
+                  <circle class="dx-ring-track" cx="40" cy="40" r="34"></circle>
+                  <circle class="dx-ring-fill" id="dexRingFill" cx="40" cy="40" r="34"></circle>
                 </svg>
-                <div class="pokedex-ring-label"><span id="pokedexRingPct">0%</span></div>
+                <span class="dx-ring-pct" id="dexRingPct">0%</span>
+                <div class="dx-stat-text">
+                  <strong><span id="dexCaught">0</span><small> / <span id="dexTotal">0</span></small></strong>
+                  <span>registered</span>
+                </div>
               </div>
-              <div class="pokedex-stats-text">
-                <p class="pokedex-count" id="pokedexCountText">0 / 0 caught</p>
-                <p class="pokedex-hint-text">
-                  Every correct pick on a <strong>Daily Board</strong> adds to your palette.
-                  Shuffle Boards don't count — this tracks real knowledge, not luck.
-                </p>
+              <div class="dx-stat dx-stat-streak">
+                <span class="dx-stat-icon" aria-hidden="true">🔥</span>
+                <div class="dx-stat-text"><strong id="dexStreak">—</strong><span id="dexStreakSub">Daily streak</span></div>
               </div>
-
-              <div class="pokedex-streak hidden" id="pokedexStreak">
-                <span class="pokedex-streak-flame">🔥</span>
-                <span class="pokedex-streak-text" id="pokedexStreakText"></span>
+              <div class="dx-stat dx-stat-next">
+                <span class="dx-stat-icon" aria-hidden="true">🏅</span>
+                <div class="dx-stat-text">
+                  <strong id="dexNext">—</strong><span id="dexNextSub">Next milestone</span>
+                  <span class="dx-mini-track"><span id="dexNextBar"></span></span>
+                </div>
               </div>
+              <button type="button" class="dx-stat dx-stat-shiny" id="dexShinyStat" hidden aria-label="Shiny odds and Shiny Charm"></button>
+              <button type="button" class="dx-stat dx-stat-latest" id="dexLatest" hidden>
+                <img id="dexLatestImg" alt="" />
+                <div class="dx-stat-text"><strong id="dexLatestName"></strong><span>Latest catch</span></div>
+              </button>
             </div>
 
-            <p class="pokedex-milestone-toast hidden" id="pokedexMilestoneToast"></p>
+            <div class="dx-banner" id="dexBanner" role="status" hidden></div>
 
-            <div class="pokedex-palette-strip" id="pokedexPaletteStrip" aria-label="Filter by type"></div>
-
-            <div class="pokedex-view-toggle" id="pokedexViewToggle" role="tablist" aria-label="View mode">
-              <button type="button" class="pokedex-view-btn active" data-view="grid" role="tab" aria-selected="true">🎨 Palette</button>
-              <button type="button" class="pokedex-view-btn" data-view="log" role="tab" aria-selected="false">📜 Catch Log</button>
+            <div class="dx-sealbar" id="dexSealBar" hidden>
+              <span>✦ Pokédex complete!</span>
+              <button type="button">Seal it &amp; earn a Shiny Charm</button>
             </div>
 
-            <div class="pokedex-controls">
-              <input type="text" id="pokedexSearch" class="modal-input pokedex-search" placeholder="Search a Pokémon…" autocomplete="off" />
-              <div class="pokedex-filter-chips" id="pokedexStatusChips">
-                <button type="button" class="pokedex-chip active" data-filter="all">All</button>
-                <button type="button" class="pokedex-chip" data-filter="caught">Caught</button>
-                <button type="button" class="pokedex-chip" data-filter="uncaught">Uncaught</button>
+            <div class="dx-types" id="dexTypes" aria-label="Filter by type"></div>
+
+            <div class="dx-bar-row">
+              <div class="dx-tabs" id="dexTabs" role="tablist" aria-label="Pokédex view">
+                <button type="button" role="tab" data-view="dex" aria-selected="true">Dex</button>
+                <button type="button" role="tab" data-view="log" aria-selected="false">Catch log</button>
+                <button type="button" role="tab" data-view="progress" aria-selected="false">Progress</button>
               </div>
-              <select id="pokedexGenSelect" class="pokedex-gen-select">
-                <option value="">All Gens</option>
-              </select>
+              <span class="dx-showing" id="dexShowing"></span>
             </div>
 
-            <div class="pokedex-grid" id="pokedexGrid" role="list"></div>
-            <div class="pokedex-log-list hidden" id="pokedexLogList" role="list"></div>
-            <p class="pokedex-empty hidden" id="pokedexEmpty"></p>
+            <div class="dx-toolbar" id="dexToolbar">
+              <label class="dx-search">
+                <span aria-hidden="true">⌕</span>
+                <input type="search" id="dexSearch" placeholder="Name or #number" autocomplete="off" aria-label="Search the Pokédex" />
+              </label>
+              <div class="dx-seg" id="dexStatus" role="group" aria-label="Show">
+                <button type="button" data-status="all" aria-pressed="true">All</button>
+                <button type="button" data-status="caught" aria-pressed="false">Caught</button>
+                <button type="button" data-status="missing" aria-pressed="false">Missing</button>
+                <button type="button" data-status="shiny" aria-pressed="false">✨ Shiny</button>
+              </div>
+              <select id="dexGen" class="dx-select" aria-label="Generation"><option value="">All gens</option></select>
+            </div>
+
+            <div class="dx-grid" id="dexGrid"></div>
+            <div class="dx-log" id="dexLog" hidden></div>
+            <div class="dx-progress" id="dexProgress" hidden></div>
+            <p class="dx-empty" id="dexEmpty" hidden></p>
           </div>
 
-          <!-- Detail pane — collapsed (zero width) until a caught entry is
-               selected. Desktop: expands the split in place, list pane
-               shrinks to make room. Mobile: slides in to fully cover the
-               list pane instead, since there's no room for both at once.
-               Either way, "← Back" collapses just this pane; the × in the
-               corner still closes the whole Pokedex. -->
-          <div class="pokedex-detail-pane" id="pokedexDetailPane">
-            <button type="button" class="detail-pane-back" id="detailPaneBack">← Back</button>
-
-            <div class="detail-header">
-              <img id="detailSprite" class="detail-sprite" alt="" loading="lazy" />
-              <div class="detail-header-text">
-                <h2 id="detailTitle" class="detail-title"></h2>
-                <div class="detail-type-row" id="detailTypeRow"></div>
-              </div>
-            </div>
-
-            <div class="detail-catch-row" id="detailCatchRow"></div>
-
-            <div class="detail-section section-general">
-              <div class="detail-section-head">
-                <span class="detail-section-label">General</span>
-                <span class="detail-section-progress" id="detailGeneralProgress"></span>
-              </div>
-              <div class="detail-category-grid" id="detailGeneralGrid"></div>
-            </div>
-
-            <div class="detail-section section-abilities" id="detailAbilitiesSection">
-              <div class="detail-section-head">
-                <span class="detail-section-label">Abilities</span>
-                <span class="detail-section-progress" id="detailAbilitiesProgress"></span>
-              </div>
-              <div class="detail-category-grid" id="detailAbilitiesGrid"></div>
-            </div>
-
-            <div class="detail-section section-moves" id="detailMovesSection">
-              <div class="detail-section-head">
-                <span class="detail-section-label">Moves</span>
-                <span class="detail-section-progress" id="detailMovesProgress"></span>
-              </div>
-              <div class="detail-category-grid moves-grid" id="detailMovesGrid"></div>
-            </div>
-          </div>
+          <aside class="dex-detail" id="dexDetail" aria-hidden="true" aria-label="Pokémon details">
+            <div id="dexDetailInner"></div>
+          </aside>
         </div>
       </div>
     </div>
 
+    <!-- How to play: opens on a first visit and from the "?" button. -->
+    <dialog class="howto" id="howToDialog" aria-labelledby="howToTitle">
+      <div class="howto-inner">
+        <div class="howto-head">
+          <span class="brand-ball" aria-hidden="true"></span>
+          <h2 id="howToTitle">Welcome, Trainer!</h2>
+        </div>
+        <p class="howto-lede">
+          Fill the grid with Pokémon. Each square needs one that fits both its row rule and its column rule,
+          and every Pokémon can only be used once.
+        </p>
+        <div class="howto-modes">
+          <div class="howto-mode" data-m="daily">
+            <span class="mt-icon" aria-hidden="true">📅</span>
+            <div><strong>Daily</strong><p>A new board every day. A wrong answer costs one of your 3 lives.</p></div>
+          </div>
+          <div class="howto-mode" data-m="draft">
+            <span class="mt-icon" aria-hidden="true">🃏</span>
+            <div><strong>Draft</strong><p>Pick the size and the categories, and we'll deal a board made from just those.</p></div>
+          </div>
+          <div class="howto-mode" data-m="reverse">
+            <span class="mt-icon" aria-hidden="true">🔍</span>
+            <div><strong>Reverse</strong><p>The Pokémon are already placed. Work out the hidden rule behind each row and column.</p></div>
+          </div>
+        </div>
+        <ul class="howto-tips">
+          <li><span aria-hidden="true">👆</span><span>Tap a square to enter a Pokémon.</span></li>
+          <li><span aria-hidden="true">⭐</span><span>Stuck? Spend a hint to reveal an answer.</span></li>
+          <li><span aria-hidden="true">✨</span><span>Every correct pick has a 1 in 4,096 shot at a shiny. Daily shinies go in your Shiny Dex forever.</span></li>
+          <li><span aria-hidden="true">📕</span><span>Every correct Daily pick registers in your Pokédex.</span></li>
+        </ul>
+        <button type="button" class="howto-go" data-close>Let's play</button>
+      </div>
+    </dialog>
+
     <script src="./category_help.js"></script>
     <script src="./app.js"></script>
+    <script src="./shiny.js"></script>
     <script src="./draft.js"></script>
+    <script src="./pokedex.js"></script>
     <script src="./reverse.js"></script>
     <script src="./mobile.js"></script>
+    <script src="./shell.js"></script>
   </body>
 </html>

@@ -1,0 +1,210 @@
+/* ============================================================================
+   shiny.css — shiny cells, the found-a-shiny celebration, and the Shiny
+   Charm gem used in the Pokédex. Pairs with shiny.js. Load after pokedex.css.
+   ============================================================================ */
+
+:root {
+  --shiny-gold: #ffd95a;
+  --shiny-hot: #ff8fd0;
+}
+
+/* ── A shiny on the board (Daily/Draft cells and Reverse tiles) ─────────── */
+.cell.shiny,
+.rev-cell.shiny {
+  position: relative;
+  border-color: rgba(255, 217, 90, 0.75) !important;
+  background:
+    radial-gradient(70% 60% at 50% 40%, rgba(255, 217, 90, 0.22), transparent 70%),
+    linear-gradient(160deg, rgba(255, 143, 208, 0.12), rgba(20, 10, 28, 0.96)) !important;
+  box-shadow: 0 0 0 1px rgba(255, 217, 90, 0.35), 0 0 18px rgba(255, 217, 90, 0.35);
+  animation: shiny-glow 2.6s ease-in-out infinite;
+}
+@keyframes shiny-glow {
+  50% { box-shadow: 0 0 0 1px rgba(255, 217, 90, 0.6), 0 0 28px rgba(255, 143, 208, 0.45); }
+}
+/* Twinkling stars in the corners */
+.cell.shiny::before,
+.cell.shiny::after,
+.rev-cell.shiny::before,
+.rev-cell.shiny::after {
+  content: "✦";
+  position: absolute;
+  z-index: 3;
+  color: var(--shiny-gold);
+  text-shadow: 0 0 6px rgba(255, 217, 90, 0.9);
+  pointer-events: none;
+  animation: twinkle 1.8s ease-in-out infinite;
+}
+.cell.shiny::before, .rev-cell.shiny::before { top: 4px; left: 6px; font-size: 0.75rem; }
+.cell.shiny::after, .rev-cell.shiny::after { bottom: 5px; right: 6px; font-size: 0.55rem; animation-delay: 0.9s; }
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.7) rotate(0); }
+  50% { opacity: 1; transform: scale(1.15) rotate(20deg); }
+}
+.cell.shiny .summary-sprite,
+.rev-cell.shiny .rev-cell-sprite { filter: drop-shadow(0 0 6px rgba(255, 217, 90, 0.75)); }
+
+/* The moment it lands */
+.cell.shiny-hit { animation: shiny-hit 1.2s cubic-bezier(.2, 1.4, .4, 1) both, shiny-glow 2.6s ease-in-out 1.2s infinite; z-index: 20; }
+@keyframes shiny-hit {
+  0% { transform: scale(1); }
+  18% { transform: scale(1.22) rotate(-3deg); box-shadow: 0 0 0 4px #fff, 0 0 60px rgba(255, 217, 90, 1); filter: brightness(1.8); }
+  40% { transform: scale(0.96) rotate(1deg); filter: none; }
+  100% { transform: scale(1); }
+}
+
+/* Stars flying out of the cell */
+.shiny-burst {
+  position: fixed;
+  z-index: 9500;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.shiny-burst i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-style: normal;
+  font-size: calc(1rem * var(--s, 1));
+  color: var(--shiny-gold);
+  text-shadow: 0 0 8px rgba(255, 217, 90, 0.9), 0 0 2px #fff;
+  animation: star-fly 1100ms cubic-bezier(.15, .8, .3, 1) var(--d, 0ms) both;
+}
+.shiny-burst i:nth-child(3n) { color: var(--shiny-hot); text-shadow: 0 0 8px rgba(255, 143, 208, 0.9); }
+@keyframes star-fly {
+  0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1) rotate(160deg); opacity: 0; }
+}
+.shiny-burst b {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 245, 200, 0.95);
+  animation: ring-out 800ms ease-out both;
+}
+@keyframes ring-out { to { transform: scale(9); opacity: 0; border-width: 1px; } }
+
+/* ── Celebration banner ─────────────────────────────────────────────────── */
+.shiny-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 9400;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 217, 90, 0.16), rgba(5, 2, 10, 0.55) 60%);
+  animation: sb-fade 250ms ease both;
+  cursor: pointer;
+}
+.shiny-banner.out { animation: sb-fade 280ms ease reverse both; }
+.shiny-banner.wait .shiny-banner-card { visibility: hidden; animation: none; }
+@keyframes sb-fade { from { opacity: 0; } }
+.shiny-banner-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  width: min(86vw, 22rem);
+  padding: 1.4rem 1.2rem 1.3rem;
+  border-radius: 22px;
+  text-align: center;
+  color: #fff;
+  background:
+    radial-gradient(90% 60% at 50% 25%, rgba(255, 217, 90, 0.3), transparent 70%),
+    linear-gradient(180deg, #2a1336, #12061c);
+  border: 1px solid rgba(255, 217, 90, 0.6);
+  box-shadow: 0 0 0 4px rgba(255, 217, 90, 0.12), 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 217, 90, 0.35);
+  overflow: hidden;
+  animation: sb-pop 520ms cubic-bezier(.2, 1.5, .4, 1) both;
+}
+@keyframes sb-pop { from { transform: scale(0.6) rotate(-4deg); opacity: 0; } }
+.shiny-banner-rays {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: 520px;
+  height: 520px;
+  margin: -260px 0 0 -260px;
+  background: repeating-conic-gradient(rgba(255, 217, 90, 0.16) 0 8deg, transparent 8deg 22deg);
+  animation: rays 9s linear infinite;
+  pointer-events: none;
+}
+@keyframes rays { to { transform: rotate(360deg); } }
+.shiny-banner-img {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(255, 217, 90, 0.8));
+  animation: sb-float 2.4s ease-in-out infinite;
+}
+@keyframes sb-float { 50% { transform: translateY(-8px) scale(1.03); } }
+.shiny-banner-kicker {
+  position: relative;
+  margin: 0.2rem 0 0;
+  font-family: var(--pixel-font);
+  font-size: 0.66rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--shiny-gold);
+}
+.shiny-banner-name {
+  position: relative;
+  margin: 0;
+  font-family: var(--pixel-font);
+  font-size: 1.3rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #fff6c9, var(--shiny-gold), var(--shiny-hot), #fff6c9);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sb-sheen 2.4s linear infinite;
+}
+@keyframes sb-sheen { to { background-position: -300% 0; } }
+.shiny-banner-sub {
+  position: relative;
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #e9d8ec;
+}
+
+/* ── Shiny Charm gem (used in the Pokédex) ──────────────────────────────── */
+.charm-gem {
+  --ga: #e6ecf5;
+  --gb: #8fa3bd;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  clip-path: polygon(50% 0, 62% 34%, 100% 38%, 70% 60%, 80% 100%, 50% 78%, 20% 100%, 30% 60%, 0 38%, 38% 34%);
+  background: linear-gradient(145deg, #fff 0%, var(--ga) 30%, var(--gb) 100%);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--ga) 70%, transparent));
+  animation: gem-spin 6s ease-in-out infinite;
+}
+.charm-gem::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 35%, rgba(255, 255, 255, 0.8) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: gem-sheen 3.2s ease-in-out infinite;
+}
+.charm-gem.none { filter: grayscale(1) opacity(0.4); animation: none; }
+.charm-gem.none::after { display: none; }
+@keyframes gem-spin { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg) scale(1.05); } }
+@keyframes gem-sheen { 0%, 60% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cell.shiny, .rev-cell.shiny, .cell.shiny-hit, .shiny-banner-card, .shiny-banner-rays,
+  .shiny-banner-img, .shiny-banner-name, .charm-gem, .charm-gem::after,
+  .cell.shiny::before, .cell.shiny::after, .rev-cell.shiny::before, .rev-cell.shiny::after { animation: none !important; }
+}

@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import pandas as pd
 import json
+import os
+import secrets
 import uuid
 from pathlib import Path
 from datetime import date
@@ -42,6 +44,52 @@ class ValidatePickRequest(BaseModel):
 class ValidatePickResponse(BaseModel):
     ok: bool
     reason: str
+    # Set on a correct pick that rolled shiny. shiny_registered is True only
+    # on today's Daily Board, where the shiny goes into the Shiny Dex; on
+    # Draft and Shuffle boards it's a sighting that isn't kept.
+    shiny: bool = False
+    shiny_registered: bool = False
+
+
+# ── Shiny odds ──────────────────────────────────────────────────────────────
+# Mirrors the main-series games from Gen 6 on: every Pokémon is a 1-in-4096
+# roll, and the Shiny Charm works by re-rolling (+2 extra rolls), the same
+# way the real charm takes 1/4096 to ~1/1365.
+#   • Each completed-and-restarted Pokédex = one Shiny Charm = +2 rolls.
+#   • Daily streak bonus, our take on chaining: +1 roll at 7 days, +2 at 30.
+# Charms stop adding rolls after MAX_CHARMS so shinies never stop being rare.
+SHINY_BASE = 4096
+# Test mode: start the server with PDD_SHINY_BASE=2 (for example) to make
+# shinies 1-in-2 so you can see the whole flow. Never set this in production.
+_test_base = os.environ.get("PDD_SHINY_BASE", "").strip()
+if _test_base.isdigit() and int(_test_base) >= 1:
+    SHINY_BASE = int(_test_base)
+    print(f"[shiny] TEST MODE: base odds 1 in {SHINY_BASE}")
+ROLLS_PER_CHARM = 2
+MAX_CHARMS = 10
+STREAK_TIERS = ((30, 2), (7, 1))   # (days needed, bonus rolls), highest first
+
+
+def streak_bonus(streak: int) -> int:
+    for days, bonus in STREAK_TIERS:
+        if streak >= days:
+            return bonus
+    return 0
+
+
+def shiny_rolls_for(charms: int, streak: int) -> int:
+    return 1 + ROLLS_PER_CHARM * min(max(charms, 0), MAX_CHARMS) + streak_bonus(streak)
+
+
+def shiny_odds(rolls: int) -> int:
+    """'1 in N' for a given number of rolls, rounded the way the games' wikis do."""
+    chance = 1 - (1 - 1 / SHINY_BASE) ** max(rolls, 1)
+    return max(1, round(1 / chance))
+
+
+def roll_shiny(rolls: int) -> bool:
+    # secrets uses the OS's secure RNG, so outcomes can't be predicted.
+    return any(secrets.randbelow(SHINY_BASE) == 0 for _ in range(max(rolls, 1)))
 
 
 class PokemonLookupResponse(BaseModel):
@@ -468,6 +516,16 @@ reverse_api.attach(app, reverse_api._Ctx(
     pokedex_store_mod=pokedex_store,
 ))
 
+@app.get("/sprite/shiny/{pokemon_id}.png")
+def get_shiny_sprite(pokemon_id: int):
+    """Shiny version of /sprite/{id}.png: local file if the sprites repo has
+    it, otherwise the matching shiny official artwork on the CDN."""
+    local = SPRITES_REPO_DIR / "shiny" / f"{pokemon_id}.png"
+    if local.exists():
+        return FileResponse(local, media_type="image/png")
+    return RedirectResponse(url=f"{SPRITES_CDN_BASE}/shiny/{pokemon_id}.png")
+
+
 @app.get("/sprite/{pokemon_id}.png")
 def get_sprite(pokemon_id: int):
     """Serve a local sprite when available, otherwise redirect to the official-artwork CDN."""
@@ -536,11 +594,28 @@ def validate_pick_api(
     # when the client sent an id. Shuffle boards (random-int seeds) never
     # reach this branch because is_daily_seed() checks against today's date,
     # which the client cannot spoof by relabeling a shuffle board as "daily".
+    shiny = False
+    shiny_registered = False
     if res.ok and x_client_id and is_daily_seed(payload.seed):
         row_rule_id = board.row_rule_ids[payload.row_i]
         col_rule_id = board.col_rule_ids[payload.col_j]
         row_label = compact_rule_label(rules[row_rule_id].label)
         col_label = compact_rule_label(rules[col_rule_id].label)
+
+        # Shiny roll: once per cell per day (see pokedex_store.roll_once),
+        # using this player's charms and streak (today counts).
+        pokedex_store.record_daily_activity(x_client_id, payload.seed)
+        rolls = shiny_rolls_for(
+            len(pokedex_store.get_prestige(x_client_id)),
+            pokedex_store.get_streak(x_client_id),
+        )
+        shiny = pokedex_store.roll_once(
+            x_client_id, payload.seed, payload.row_i, payload.col_j,
+            payload.pokemon_key, lambda: roll_shiny(rolls),
+        )
+        if shiny:
+            pokedex_store.record_shiny(x_client_id, payload.pokemon_key, payload.seed)
+            shiny_registered = True
 
         pokedex_store.record_catch(
             client_id=x_client_id,
@@ -548,6 +623,7 @@ def validate_pick_api(
             board_seed=payload.seed,
             row_rule_label=row_label,
             col_rule_label=col_label,
+            is_shiny=shiny,
         )
         # Recorded on every correct catch, not just the first — this is what
         # lets a Pokemon you already have keep building out a fuller list of
@@ -555,7 +631,13 @@ def validate_pick_api(
         pokedex_store.record_rule_use(x_client_id, payload.pokemon_key, row_label)
         pokedex_store.record_rule_use(x_client_id, payload.pokemon_key, col_label)
 
-    return ValidatePickResponse(ok=res.ok, reason=res.reason)
+    elif res.ok:
+        # Draft and Shuffle boards: same odds (charms count; streaks don't,
+        # since only the Daily builds one), but nothing is registered.
+        charms = len(pokedex_store.get_prestige(x_client_id)) if x_client_id else 0
+        shiny = roll_shiny(shiny_rolls_for(charms, 0))
+
+    return ValidatePickResponse(ok=res.ok, reason=res.reason, shiny=shiny, shiny_registered=shiny_registered)
 
 
 class PokedexEntry(BaseModel):
@@ -574,12 +656,34 @@ class PokedexEntry(BaseModel):
     board_seed: Optional[str] = None
     row_rule_label: Optional[str] = None
     col_rule_label: Optional[str] = None
+    shiny_first_seen: Optional[str] = None   # Shiny Dex date; survives a Pokédex restart
+
+
+class PrestigeRecord(BaseModel):
+    rank: int
+    sealed_at: str
+    caught_count: int
+
+
+class TrainerInfo(BaseModel):
+    charms: int                 # completed-and-restarted Pokédexes
+    max_charms: int
+    streak: int                 # consecutive Daily Boards played
+    streak_bonus: int           # extra rolls from the streak right now
+    next_streak_days: Optional[int] = None   # streak length that unlocks the next bonus
+    rolls: int                  # total rolls per correct Daily pick
+    odds: int                   # "1 in N" for a Daily pick
+    base_odds: int              # 4096, for comparison in the UI
+    shiny_count: int
+    complete: bool              # every entry caught this run: can prestige
+    history: List[PrestigeRecord] = []
 
 
 class PokedexResponse(BaseModel):
     caught_count: int
     total_count: int
     entries: List[PokedexEntry]
+    trainer: Optional[TrainerInfo] = None
 
 
 class ClaimPokedexRequest(BaseModel):
@@ -591,46 +695,95 @@ class ClaimPokedexResponse(BaseModel):
     merged_entries: int
 
 
+# The species list never changes while the server runs, so the per-row parsing
+# below happens once instead of on every Pokédex open (it was a full
+# DataFrame.iterrows() over ~1,300 rows per request).
+_POKEDEX_BASE: Optional[List[dict]] = None
+
+
+def _pokedex_base() -> List[dict]:
+    global _POKEDEX_BASE
+    if _POKEDEX_BASE is None:
+        base: List[dict] = []
+        for _, r0 in df_play.iterrows():
+            type1 = str(r0["type1"]) if "type1" in r0 and pd.notna(r0["type1"]) and str(r0["type1"]) else None
+            type2_raw = str(r0["type2"]).strip() if "type2" in r0 else ""
+            base.append({
+                "key": str(r0["key"]),
+                "display_name": str(r0["display_name"]),
+                "pokemon_id": int(r0["pokemon_id"]) if "pokemon_id" in r0 and pd.notna(r0["pokemon_id"]) else None,
+                "type1": type1,
+                "type2": type2_raw if type2_raw else None,
+                "gen": int(r0["gen"]) if "gen" in r0 and pd.notna(r0["gen"]) else None,
+                "evo_position": str(r0["evo_position"]) if "evo_position" in r0 and pd.notna(r0["evo_position"]) and str(r0["evo_position"]) else None,
+                "is_legendary": bool(r0["is_legendary"]) if "is_legendary" in r0 else False,
+                "is_mythical": bool(r0["is_mythical"]) if "is_mythical" in r0 else False,
+            })
+        _POKEDEX_BASE = base
+    return _POKEDEX_BASE
+
+
 @app.get("/pokedex", response_model=PokedexResponse)
 def get_pokedex(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
     if not x_client_id:
         raise HTTPException(status_code=400, detail="Missing X-Client-Id header")
 
     caught_details = pokedex_store.get_caught_details(x_client_id)
+    shiny_map = pokedex_store.get_shiny_map(x_client_id)
     entries: List[PokedexEntry] = []
-    for _, r0 in df_play.iterrows():
-        key = str(r0["key"])
-        pokemon_id = int(r0["pokemon_id"]) if "pokemon_id" in r0 and pd.notna(r0["pokemon_id"]) else None
-        gen = int(r0["gen"]) if "gen" in r0 and pd.notna(r0["gen"]) else None
-        type1 = str(r0["type1"]) if "type1" in r0 and pd.notna(r0["type1"]) and str(r0["type1"]) else None
-        type2_raw = str(r0["type2"]).strip() if "type2" in r0 else ""
-        type2 = type2_raw if type2_raw else None
-        evo_position = str(r0["evo_position"]) if "evo_position" in r0 and pd.notna(r0["evo_position"]) and str(r0["evo_position"]) else None
-
-        detail = caught_details.get(key)
+    for base in _pokedex_base():
+        detail = caught_details.get(base["key"])
+        shiny = shiny_map.get(base["key"])
         entries.append(PokedexEntry(
-            key=key,
-            display_name=str(r0["display_name"]),
-            pokemon_id=pokemon_id,
-            type1=type1,
-            type2=type2,
-            gen=gen,
-            evo_position=evo_position,
-            is_legendary=bool(r0["is_legendary"]) if "is_legendary" in r0 else False,
-            is_mythical=bool(r0["is_mythical"]) if "is_mythical" in r0 else False,
+            **base,
             caught=detail is not None,
-            is_shiny=detail["is_shiny"] if detail else False,
+            is_shiny=shiny is not None,
             first_caught=detail["first_caught"] if detail else None,
             board_seed=detail["board_seed"] if detail else None,
             row_rule_label=detail["row_rule_label"] if detail else None,
             col_rule_label=detail["col_rule_label"] if detail else None,
+            shiny_first_seen=shiny["first_seen"] if shiny else None,
         ))
 
     return PokedexResponse(
         caught_count=len(caught_details),
         total_count=len(df_play),
         entries=entries,
+        trainer=_trainer_info(x_client_id, len(caught_details), len(shiny_map)),
     )
+
+
+def _trainer_info(client_id: str, caught_count: int, shiny_count: int) -> TrainerInfo:
+    history = pokedex_store.get_prestige(client_id)
+    streak = pokedex_store.get_streak(client_id)
+    rolls = shiny_rolls_for(len(history), streak)
+    next_days = next((d for d, _ in reversed(STREAK_TIERS) if streak < d), None)
+    return TrainerInfo(
+        charms=len(history),
+        max_charms=MAX_CHARMS,
+        streak=streak,
+        streak_bonus=streak_bonus(streak),
+        next_streak_days=next_days,
+        rolls=rolls,
+        odds=shiny_odds(rolls),
+        base_odds=SHINY_BASE,
+        shiny_count=shiny_count,
+        complete=len(df_play) > 0 and caught_count >= len(df_play),
+        history=[PrestigeRecord(**h) for h in history],
+    )
+
+
+@app.post("/pokedex/prestige", response_model=TrainerInfo)
+def prestige_pokedex(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
+    """Complete Pokédex -> earn a Shiny Charm and start a fresh run.
+    Rejected unless every entry is caught. The Shiny Dex is untouched."""
+    if not x_client_id:
+        raise HTTPException(status_code=400, detail="Missing X-Client-Id header")
+    caught = len(pokedex_store.get_caught_details(x_client_id))
+    if caught < len(df_play):
+        raise HTTPException(status_code=400, detail=f"Pokédex isn't complete yet ({caught} / {len(df_play)})")
+    pokedex_store.prestige(x_client_id, caught)
+    return _trainer_info(x_client_id, 0, len(pokedex_store.get_shiny_map(x_client_id)))
 
 
 def _parse_abilities(raw) -> List[str]:
@@ -760,10 +913,15 @@ def get_pokedex_detail(key: str, x_client_id: str | None = Header(default=None, 
 
     caught_details = pokedex_store.get_caught_details(x_client_id)
     detail = caught_details.get(key)
-    if detail is None:
+    shiny = pokedex_store.get_shiny_map(x_client_id).get(key)
+    if detail is None and shiny is None:
         # Keep the silhouette mystery intact: don't leak name/details for
-        # something this client hasn't actually caught yet.
+        # something this client hasn't actually caught yet. A Shiny Dex
+        # entry counts as known even after a Pokédex restart.
         raise HTTPException(status_code=404, detail="Not caught yet")
+    if detail is None:
+        detail = {"first_caught": shiny["first_seen"], "board_seed": shiny["board_seed"],
+                  "row_rule_label": None, "col_rule_label": None}
 
     r0 = row.iloc[0]
     pokemon_id = int(r0["pokemon_id"]) if "pokemon_id" in r0 and pd.notna(r0["pokemon_id"]) else None
@@ -783,7 +941,7 @@ def get_pokedex_detail(key: str, x_client_id: str | None = Header(default=None, 
         pokemon_id=pokemon_id,
         type1=type1,
         type2=type2,
-        is_shiny=detail["is_shiny"],
+        is_shiny=shiny is not None,
         first_caught=detail["first_caught"],
         board_seed=detail["board_seed"],
         row_rule_label=detail["row_rule_label"],

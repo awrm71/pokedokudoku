@@ -85,7 +85,14 @@
         img.className = "rev-cell-sprite";
         img.alt = mon.display_name;
         img.title = mon.display_name;
-        setSpriteSafe(img, spriteFromPokemonId(mon.pokemon_id));
+        // Shiny sighting: a stable per-board roll (shiny.js). Just for fun,
+        // Reverse sightings aren't registered in the Shiny Dex.
+        const shiny = !!window.PDD_SHINY?.reverseSighting(b, i, j, mon);
+        if (shiny) {
+          cell.classList.add("shiny");
+          img.title = `Shiny ${mon.display_name}`;
+        }
+        setSpriteSafe(img, shiny ? window.PDD_SHINY.spriteUrl(mon.pokemon_id) : spriteFromPokemonId(mon.pokemon_id));
         const name = document.createElement("span");
         name.className = "rev-cell-name";
         name.textContent = mon.display_name;
@@ -97,6 +104,7 @@
 
     elWrap.appendChild(grid);
     updateProgress();
+    window.PDD_SHINY?.announceReverse(b);
   }
 
   function buildHeader(axis, index) {

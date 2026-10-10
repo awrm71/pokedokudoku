@@ -193,6 +193,10 @@
 
   // ══════════════════════════════════════════════════════════════════════════
   // Builder DOM
+  //   Desktop: categories on the left, a sticky "board card" on the right
+  //   (size, rules, Deal button) that stays in view while you browse.
+  //   Phones: one column, size → categories → rules, with the Deal button
+  //   pinned to the bottom of the screen.
   // ══════════════════════════════════════════════════════════════════════════
   const root = document.createElement("section");
   root.id = "draftBuilder";
@@ -201,59 +205,60 @@
   root.setAttribute("aria-labelledby", "dbTitle");
   root.innerHTML = `
     <header class="db-head">
-      <h2 id="dbTitle" class="db-title">Draft Board</h2>
-      <p class="db-lede">Pick a size and the categories you want in play. We'll deal a board built only from them.</p>
+      <div class="db-head-text">
+        <p class="db-kicker">Draft Board</p>
+        <h2 id="dbTitle" class="db-title">Build your own board</h2>
+      </div>
       <button type="button" class="db-resume" hidden></button>
     </header>
 
-    <section class="db-step" aria-labelledby="dbSizeH">
-      <div class="db-step-head">
-        <h3 id="dbSizeH">Board size</h3>
-        <span class="db-size-read" aria-live="polite"></span>
-      </div>
-      <div class="db-size">
-        <div class="db-size-grid" role="group" aria-label="Board size picker. Use arrow keys to change rows and columns."></div>
-        <div class="db-presets" role="group" aria-label="Size presets"></div>
-      </div>
-    </section>
+    <div class="db-cols">
+      <section class="db-main" aria-labelledby="dbCatH">
+        <div class="db-row-head">
+          <h3 id="dbCatH">Categories</h3>
+          <span class="db-cat-total" aria-live="polite"></span>
+        </div>
+        <div class="db-decks" role="group" aria-label="Quick picks"></div>
+        <div class="db-tabs" role="tablist" aria-label="Category groups"></div>
+        <div class="db-panel" role="tabpanel">
+          <p class="db-loading">Loading categories…</p>
+        </div>
+      </section>
 
-    <section class="db-step" aria-labelledby="dbCatH">
-      <div class="db-step-head">
-        <h3 id="dbCatH">Categories</h3>
-        <span class="db-cat-total"></span>
-      </div>
-      <div class="db-groups"><p class="db-loading">Loading categories…</p></div>
-    </section>
+      <aside class="db-side">
+        <section class="db-card db-size-card" aria-labelledby="dbSizeH">
+          <div class="db-row-head">
+            <h3 id="dbSizeH">Board size</h3>
+            <span class="db-size-read" aria-live="polite"></span>
+          </div>
+          <div class="db-size-grid" role="group" aria-label="Board size. Tap or drag to set rows and columns; arrow keys work too."></div>
+          <div class="db-presets" role="group" aria-label="Size presets"></div>
+        </section>
 
-    <section class="db-step" aria-labelledby="dbRulesH">
-      <div class="db-step-head"><h3 id="dbRulesH">Rules</h3></div>
-      <div class="db-switches">
-        <button type="button" class="db-switch" role="switch" data-key="allowSingle">
-          <span class="db-switch-track"><span class="db-switch-knob"></span></span>
-          <span class="db-switch-text">
-            <strong>Allow single-answer cells</strong>
-            <small>Some cells may have only one correct Pokémon. Turn off for a gentler board where every cell has at least two.</small>
-          </span>
-        </button>
-        <button type="button" class="db-switch" role="switch" data-key="solvable">
-          <span class="db-switch-track"><span class="db-switch-knob"></span></span>
-          <span class="db-switch-text">
-            <strong>Guaranteed solvable</strong>
-            <small>We check that a full solution exists before dealing. Turn off for stranger combinations that might not be completely fillable.</small>
-          </span>
-        </button>
-      </div>
-    </section>
+        <section class="db-card db-rules-card" aria-labelledby="dbRulesH">
+          <h3 id="dbRulesH">Rules</h3>
+          <button type="button" class="db-switch" role="switch" data-key="allowSingle">
+            <span class="db-switch-text"><strong>Single-answer cells</strong><small>Some cells may have just one right Pokémon</small></span>
+            <span class="db-switch-track"><span class="db-switch-knob"></span></span>
+          </button>
+          <button type="button" class="db-switch" role="switch" data-key="solvable">
+            <span class="db-switch-text"><strong>Guaranteed solvable</strong><small>Checked for a full solution before dealing</small></span>
+            <span class="db-switch-track"><span class="db-switch-knob"></span></span>
+          </button>
+        </section>
 
-    <p class="db-error" role="alert" hidden></p>
-
-    <div class="db-footer">
-      <p class="db-summary" aria-live="polite"></p>
-      <button type="button" class="db-go">Draft this board</button>
+        <div class="db-deal">
+          <p class="db-error" role="alert" hidden></p>
+          <p class="db-summary" aria-live="polite"></p>
+          <button type="button" class="db-go"><span class="db-go-icon" aria-hidden="true">🃏</span><span class="db-go-label">Deal my board</span></button>
+        </div>
+      </aside>
     </div>
   `;
 
-  const anchor = document.getElementById("gameHud") || boardWrap;
+  // Sits right above the board (the HUD lives inside the console panel,
+  // which is hidden while the builder is open).
+  const anchor = boardWrap;
   anchor.parentNode.insertBefore(root, anchor);
 
   const $ = (sel) => root.querySelector(sel);
@@ -261,13 +266,16 @@
   const elSizeGrid = $(".db-size-grid");
   const elPresets = $(".db-presets");
   const elSizeRead = $(".db-size-read");
-  const elGroups = $(".db-groups");
+  const elDecks = $(".db-decks");
+  const elTabs = $(".db-tabs");
+  const elGroups = $(".db-panel");          // name kept: loadCatalog writes errors here
   const elCatTotal = $(".db-cat-total");
   const elError = $(".db-error");
   const elSummary = $(".db-summary");
   const elGo = $(".db-go");
+  const elGoLabel = $(".db-go-label");
 
-  // ── Size picker: paint the board shape on a 9×9 grid ─────────────────────
+  // ── Size picker: tap or drag out the board shape ─────────────────────────
   const sizeCells = [];
   for (let r = 0; r < MAX; r += 1) {
     for (let c = 0; c < MAX; c += 1) {
@@ -277,13 +285,32 @@
       b.dataset.r = String(r);
       b.dataset.c = String(c);
       b.setAttribute("aria-label", `${r + 1} rows by ${c + 1} columns`);
-      b.addEventListener("click", () => setSize(r + 1, c + 1));
-      b.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") preview(r + 1, c + 1); });
       elSizeGrid.appendChild(b);
       sizeCells.push(b);
     }
   }
-  elSizeGrid.addEventListener("pointerleave", () => preview(0, 0));
+  let dragging = false;
+  const sqAt = (x, y) => document.elementFromPoint(x, y)?.closest?.(".db-sq");
+  elSizeGrid.addEventListener("pointerdown", (e) => {
+    const sq = e.target.closest(".db-sq");
+    if (!sq) return;
+    dragging = true;
+    elSizeGrid.setPointerCapture?.(e.pointerId);
+    setSize(+sq.dataset.r + 1, +sq.dataset.c + 1);
+  });
+  elSizeGrid.addEventListener("pointermove", (e) => {
+    if (dragging) {
+      const sq = sqAt(e.clientX, e.clientY);
+      if (sq) setSize(+sq.dataset.r + 1, +sq.dataset.c + 1);
+    } else if (e.pointerType === "mouse") {
+      const sq = e.target.closest(".db-sq");
+      preview(sq ? +sq.dataset.r + 1 : 0, sq ? +sq.dataset.c + 1 : 0);
+    }
+  });
+  const endDrag = () => { dragging = false; };
+  elSizeGrid.addEventListener("pointerup", endDrag);
+  elSizeGrid.addEventListener("pointercancel", endDrag);
+  elSizeGrid.addEventListener("pointerleave", () => { if (!dragging) preview(0, 0); });
   elSizeGrid.addEventListener("keydown", (e) => {
     const moves = { ArrowRight: [0, 1], ArrowLeft: [0, -1], ArrowDown: [1, 0], ArrowUp: [-1, 0] };
     const m = moves[e.key];
@@ -298,31 +325,33 @@
     b.type = "button";
     b.className = "db-preset";
     b.dataset.size = `${r}x${c}`;
-    b.textContent = `${r} × ${c}`;
+    b.textContent = `${r}×${c}`;
     b.addEventListener("click", () => setSize(r, c));
     elPresets.appendChild(b);
   });
 
   function setSize(r, c) {
-    B.rows = clamp(r);
-    B.cols = clamp(c);
+    r = clamp(r); c = clamp(c);
+    if (r === B.rows && c === B.cols) return;
+    B.rows = r;
+    B.cols = c;
     persist();
     renderSize();
     renderFooter();
   }
 
   function preview(r, c) {
-    sizeCells.forEach((b) => {
-      const inside = r > 0 && +b.dataset.r < r && +b.dataset.c < c;
-      b.classList.toggle("pv", inside);
-    });
+    sizeCells.forEach((b) => b.classList.toggle("pv", r > 0 && +b.dataset.r < r && +b.dataset.c < c));
     elSizeGrid.classList.toggle("previewing", r > 0);
   }
 
   function renderSize() {
     sizeCells.forEach((b) => {
       const r = +b.dataset.r, c = +b.dataset.c;
-      b.classList.toggle("on", r < B.rows && c < B.cols);
+      const on = r < B.rows && c < B.cols;
+      b.classList.toggle("on", on);
+      // Ripple outward from the top-left when the size grows.
+      b.style.setProperty("--d", `${(r + c) * 14}ms`);
       const corner = r === B.rows - 1 && c === B.cols - 1;
       b.classList.toggle("corner", corner);
       b.tabIndex = corner ? 0 : -1;
@@ -332,81 +361,130 @@
       b.setAttribute("aria-pressed", String(b.dataset.size === `${B.rows}x${B.cols}`));
     });
     const cells = B.rows * B.cols;
-    elSizeRead.textContent = `${B.rows} × ${B.cols}, ${cells} cell${cells === 1 ? "" : "s"}`;
+    elSizeRead.innerHTML = `<b>${B.rows} × ${B.cols}</b> · ${cells} cell${cells === 1 ? "" : "s"}`;
   }
 
-  // ── Category groups: accordion of chip sets ──────────────────────────────
-  function renderGroups() {
-    elGroups.replaceChildren();
-    GROUPS.forEach(([g, label]) => {
-      if (!entries(g).length) return;
-      const wrap = document.createElement("div");
-      wrap.className = "db-group";
-      wrap.dataset.group = g;
-      wrap.innerHTML = `
-        <button type="button" class="db-group-head" aria-expanded="false">
-          <span class="db-g-name">${label}</span>
-          <span class="db-g-count"></span>
-          <span class="db-g-meter" aria-hidden="true"><i></i></span>
-          <span class="db-g-caret" aria-hidden="true"></span>
-        </button>
-        <div class="db-group-body" hidden>
-          <div class="db-tools">
-            ${SEARCHABLE.has(g) ? `<input type="search" class="db-search" placeholder="Search ${label.toLowerCase()}" aria-label="Search ${label.toLowerCase()}">` : ""}
-            <button type="button" class="db-bulk" data-bulk="all">All on</button>
-            <button type="button" class="db-bulk" data-bulk="none">All off</button>
-          </div>
-          <div class="db-chips"></div>
-        </div>`;
-      wrap.querySelector(".db-group-head").addEventListener("click", () => toggleGroup(g));
-      wrap.querySelectorAll(".db-bulk").forEach((b) => b.addEventListener("click", () => bulk(g, b.dataset.bulk === "all")));
-      wrap.querySelector(".db-search")?.addEventListener("input", (e) => filterChips(g, e.target.value));
-      wrap.querySelector(".db-chips").addEventListener("click", (e) => {
-        const chip = e.target.closest(".db-chip");
-        if (!chip) return;
-        const id = chip.dataset.id;
-        if (B.off.has(id)) B.off.delete(id); else B.off.add(id);
-        chip.setAttribute("aria-pressed", String(!B.off.has(id)));
-        persist();
-        renderCounts();
-        renderFooter();
-      });
-      elGroups.appendChild(wrap);
+  // ── Quick picks ("decks") ────────────────────────────────────────────────
+  // Whole-group presets plus a random mix. A deck lights up when the current
+  // selection exactly matches it.
+  const DECKS = [
+    { id: "all", icon: "✨", label: "Everything", groups: GROUPS.map(([g]) => g) },
+    { id: "classic", icon: "🏆", label: "Classic", groups: ["type", "region", "evolution", "other"] },
+    { id: "battle", icon: "⚔️", label: "Battle", groups: ["type", "move", "ability"] },
+    { id: "random", icon: "🎲", label: "Surprise me" },
+  ];
+  DECKS.forEach((d) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "db-deck";
+    b.dataset.deck = d.id;
+    b.innerHTML = `<span aria-hidden="true">${d.icon}</span><span></span>`;
+    b.lastChild.textContent = d.label;
+    b.addEventListener("click", () => {
+      if (d.id === "random") surprise(); else applyGroups(d.groups);
+      b.classList.remove("pop");
+      void b.offsetWidth;
+      b.classList.add("pop");
     });
+    elDecks.appendChild(b);
+  });
+
+  function allIds(g) { return entries(g).map((e) => e.rule_id); }
+
+  function applyGroups(groups) {
+    const keep = new Set(groups);
+    GROUPS.forEach(([g]) => allIds(g).forEach((id) => (keep.has(g) ? B.off.delete(id) : B.off.add(id))));
+    afterSelection();
+  }
+
+  // Random mix that's always big enough to deal the chosen size.
+  function surprise() {
+    const ids = GROUPS.flatMap(([g]) => allIds(g));
+    const need = Math.max((B.rows + B.cols) * 2, 24);
+    B.off = new Set(ids);
+    // Keep a random share of every group so the mix feels varied, then top up.
+    const share = 0.2 + Math.random() * 0.35;
+    GROUPS.forEach(([g]) => {
+      const list = shuffle(allIds(g));
+      list.slice(0, Math.max(2, Math.round(list.length * share))).forEach((id) => B.off.delete(id));
+    });
+    const rest = shuffle(ids.filter((id) => B.off.has(id)));
+    while (ids.length - B.off.size < need && rest.length) B.off.delete(rest.pop());
+    afterSelection();
+  }
+
+  function deckMatch() {
+    if (!B.catalog) return null;
+    const onGroups = GROUPS.map(([g]) => g).filter((g) => entries(g).length);
+    const full = onGroups.filter((g) => onCount(g) === entries(g).length);
+    const empty = onGroups.filter((g) => onCount(g) === 0);
+    if (full.length + empty.length !== onGroups.length) return null;
+    const set = full.slice().sort().join();
+    return DECKS.find((d) => d.groups && d.groups.filter((g) => onGroups.includes(g)).sort().join() === set)?.id || null;
+  }
+
+  // ── Group tabs + chip panel ──────────────────────────────────────────────
+  function renderGroups() {
+    elTabs.replaceChildren();
+    const present = GROUPS.filter(([g]) => entries(g).length);
+    if (!present.some(([g]) => g === B.open)) B.open = present[0]?.[0] || null;
+    present.forEach(([g, label]) => {
+      const t = document.createElement("button");
+      t.type = "button";
+      t.className = "db-tab";
+      t.dataset.group = g;
+      t.setAttribute("role", "tab");
+      t.innerHTML = `<span class="db-tab-name"></span><span class="db-tab-count"></span><span class="db-tab-meter" aria-hidden="true"><i></i></span>`;
+      t.querySelector(".db-tab-name").textContent = label;
+      t.addEventListener("click", () => { B.open = g; renderTabs(); renderPanel(); });
+      elTabs.appendChild(t);
+    });
+    renderTabs();
+    renderPanel();
     renderCounts();
   }
 
-  function groupEl(g) { return elGroups.querySelector(`.db-group[data-group="${g}"]`); }
-
-  function toggleGroup(g) {
-    const next = B.open === g ? null : g;
-    if (B.open) {
-      const prev = groupEl(B.open);
-      prev.querySelector(".db-group-head").setAttribute("aria-expanded", "false");
-      prev.querySelector(".db-group-body").hidden = true;
-      prev.classList.remove("open");
-    }
-    B.open = next;
-    if (!next) return;
-    const el = groupEl(next);
-    el.classList.add("open");
-    el.querySelector(".db-group-head").setAttribute("aria-expanded", "true");
-    el.querySelector(".db-group-body").hidden = false;
-    renderChips(next);
-    // On phones the opened list can push the header off-screen.
-    el.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  function renderTabs() {
+    elTabs.querySelectorAll(".db-tab").forEach((t) => {
+      const g = t.dataset.group;
+      const n = onCount(g), m = entries(g).length;
+      t.setAttribute("aria-selected", String(g === B.open));
+      t.querySelector(".db-tab-count").textContent = `${n}/${m}`;
+      t.querySelector(".db-tab-meter i").style.width = `${m ? (n / m) * 100 : 0}%`;
+      t.classList.toggle("empty", n === 0);
+    });
   }
 
-  function renderChips(g) {
-    const box = groupEl(g).querySelector(".db-chips");
-    if (box.childElementCount) { syncChips(g); return; }
+  function renderPanel() {
+    const g = B.open;
+    if (!g) return;
+    const label = GROUPS.find(([k]) => k === g)?.[1] || "";
+    const isType = g === "type";
+    elGroups.replaceChildren();
+    elGroups.dataset.group = g;
+
+    const tools = document.createElement("div");
+    tools.className = "db-tools";
+    tools.innerHTML =
+      (SEARCHABLE.has(g) ? `<label class="db-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Search ${label.toLowerCase()}" aria-label="Search ${label.toLowerCase()}"></label>` : `<span class="db-tools-label"></span>`)
+      + `<span class="db-bulk-wrap"><button type="button" class="db-bulk" data-bulk="all">All on</button><button type="button" class="db-bulk" data-bulk="none">All off</button></span>`;
+    if (!SEARCHABLE.has(g)) tools.querySelector(".db-tools-label").textContent = `Tap to switch ${label.toLowerCase()} on or off`;
+    tools.querySelectorAll(".db-bulk").forEach((b) => b.addEventListener("click", () => bulk(g, b.dataset.bulk === "all")));
+    const input = tools.querySelector("input");
+    elGroups.appendChild(tools);
+
+    const box = document.createElement("div");
+    box.className = "db-chips" + (isType ? " db-chips-types" : "");
     const help = window.PDD_CATEGORY_HELP;
-    entries(g).forEach((e) => {
+    entries(g).forEach((e, i) => {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "db-chip";
       chip.dataset.id = e.rule_id;
+      chip.style.setProperty("--i", String(Math.min(i, 30)));
       const display = formatRuleLabel(e.label);
+      // Group name is already on the tab, so "Ability: Levitate" shows as "Levitate".
+      const short = display.replace(/^(Ability|Move|Learns|Type|Region|Evolved By)\s*:\s*/i, "");
       chip.dataset.search = normalizeName(display);
       const typeKey = e.rule_id.startsWith("type_") ? e.rule_id.slice(5) : null;
       const cfg = typeKey && TYPE_CONFIG[typeKey];
@@ -418,53 +496,62 @@
         chip.firstChild.textContent = cfg.icon;
         chip.lastChild.textContent = typeKey.charAt(0).toUpperCase() + typeKey.slice(1);
       } else {
-        chip.innerHTML = `<span class="db-chip-label"></span>`;
-        chip.firstChild.textContent = display;
+        chip.innerHTML = `<span class="db-chip-check" aria-hidden="true"></span><span class="db-chip-label"></span>`;
+        chip.lastChild.textContent = short;
       }
       const explain = help?.explain?.(display);
-      if (explain) chip.title = explain;
+      chip.title = explain || display;
       chip.setAttribute("aria-pressed", String(!B.off.has(e.rule_id)));
       box.appendChild(chip);
     });
-  }
-
-  function syncChips(g) {
-    groupEl(g).querySelectorAll(".db-chip").forEach((chip) => {
-      chip.setAttribute("aria-pressed", String(!B.off.has(chip.dataset.id)));
+    box.addEventListener("click", (ev) => {
+      const chip = ev.target.closest(".db-chip");
+      if (!chip) return;
+      const id = chip.dataset.id;
+      if (B.off.has(id)) B.off.delete(id); else B.off.add(id);
+      chip.setAttribute("aria-pressed", String(!B.off.has(id)));
+      chip.classList.remove("pop");
+      void chip.offsetWidth;
+      chip.classList.add("pop");
+      persist();
+      renderTabs();
+      renderCounts();
+      renderFooter();
     });
-  }
+    elGroups.appendChild(box);
 
-  function filterChips(g, q) {
-    const needle = normalizeName(q || "");
-    groupEl(g).querySelectorAll(".db-chip").forEach((chip) => {
-      chip.hidden = !!needle && !chip.dataset.search.includes(needle);
+    input?.addEventListener("input", () => {
+      const needle = normalizeName(input.value || "");
+      box.querySelectorAll(".db-chip").forEach((c) => { c.hidden = !!needle && !c.dataset.search.includes(needle); });
     });
   }
 
   function bulk(g, on) {
     // Only affects chips currently visible, so "search 'fire' → All off" works.
-    const el = groupEl(g);
-    const visible = Array.from(el.querySelectorAll(".db-chip:not([hidden])")).map((c) => c.dataset.id);
-    const ids = visible.length ? visible : entries(g).map((e) => e.rule_id);
+    const visible = Array.from(elGroups.querySelectorAll(".db-chip:not([hidden])")).map((c) => c.dataset.id);
+    const ids = visible.length ? visible : allIds(g);
     ids.forEach((id) => (on ? B.off.delete(id) : B.off.add(id)));
+    afterSelection(true);
+  }
+
+  function afterSelection(keepPanel) {
     persist();
-    syncChips(g);
+    if (keepPanel) {
+      elGroups.querySelectorAll(".db-chip").forEach((c) => c.setAttribute("aria-pressed", String(!B.off.has(c.dataset.id))));
+    } else {
+      renderPanel();
+    }
+    renderTabs();
     renderCounts();
     renderFooter();
   }
 
   function renderCounts() {
     let total = 0, all = 0;
-    GROUPS.forEach(([g]) => {
-      const el = groupEl(g);
-      if (!el) return;
-      const n = onCount(g), m = entries(g).length;
-      total += n; all += m;
-      el.querySelector(".db-g-count").textContent = `${n} of ${m}`;
-      el.querySelector(".db-g-meter i").style.width = `${m ? (n / m) * 100 : 0}%`;
-      el.classList.toggle("empty", n === 0);
-    });
-    elCatTotal.textContent = B.catalog ? `${total} of ${all} on` : "";
+    GROUPS.forEach(([g]) => { total += onCount(g); all += entries(g).length; });
+    elCatTotal.textContent = B.catalog ? `${total} of ${all} in play` : "";
+    const match = deckMatch();
+    elDecks.querySelectorAll(".db-deck").forEach((d) => d.setAttribute("aria-pressed", String(d.dataset.deck === match)));
   }
 
   // ── Rules switches ────────────────────────────────────────────────────────
@@ -478,7 +565,7 @@
     });
   });
 
-  // ── Footer ────────────────────────────────────────────────────────────────
+  // ── Deal button + summary ────────────────────────────────────────────────
   function renderFooter() {
     const n = B.catalog ? selectedIds().length : 0;
     // Every row and column needs its own category, so a board can't have
@@ -488,8 +575,8 @@
     elGo.disabled = B.busy || !B.catalog || short;
     elSummary.classList.toggle("warn", !!short);
     if (!B.catalog) elSummary.textContent = B.loadError ? "Categories unavailable" : "Loading categories…";
-    else if (short) elSummary.textContent = `Turn on at least ${need} categories for a ${B.rows} × ${B.cols} board (${n} on now).`;
-    else elSummary.textContent = `${B.rows} × ${B.cols} board from ${n} categories`;
+    else if (short) elSummary.textContent = `Turn on at least ${need} categories for a ${B.rows}×${B.cols} board (${n} on)`;
+    else elSummary.textContent = `${B.rows}×${B.cols} board · ${n} categories`;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -504,6 +591,7 @@
     elResume.hidden = !s;
     if (s) elResume.textContent = `Back to your ${s.board.n_rows} × ${s.board.n_cols} board`;
     renderSize();
+    renderCounts();
     renderFooter();
     root.scrollIntoView({ block: "start", behavior: "auto" });
     if (!B.catalog) await loadCatalog();
@@ -545,8 +633,9 @@
     if (B.busy) return;
     B.busy = true;
     elError.hidden = true;
-    const label = elGo.textContent;
-    elGo.textContent = "Dealing your board…";
+    const label = elGoLabel.textContent;
+    elGoLabel.textContent = "Dealing…";
+    root.classList.add("dealing");
     renderFooter();
     try {
       if (!B.catalog) await loadCatalog();
@@ -583,14 +672,21 @@
       }
     } finally {
       B.busy = false;
-      elGo.textContent = label;
+      elGoLabel.textContent = label;
+      root.classList.remove("dealing");
       renderFooter();
     }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function clamp(n) { return Math.max(1, Math.min(MAX, Number(n) || 1)); }
-  function prefersReducedMotion() { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
   function readSaved() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (_) { return {}; }
   }
