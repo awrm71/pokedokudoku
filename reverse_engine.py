@@ -308,6 +308,12 @@ def generate_reverse_board(
     """
     if n_cols is None:
         n_cols = n_rows
+    # A suppressed rule (e.g. "Not Legendary": no visible label, so it's not in
+    # the guess picker) must never be a line's intended answer, or that line
+    # can't be named at all. Answer sets already skip these; this keeps the
+    # forward-board generator from choosing one as a row/column rule.
+    allowed_rule_ids = (set(allowed_rule_ids) if allowed_rule_ids is not None
+                        else set(rule_masks.keys())) - SUPPRESSED_RULE_IDS
     if constraints is None:
         # Bounded per-candidate try budget. We generate several candidate boards
         # and keep the least ambiguous, so each individual generate_board call

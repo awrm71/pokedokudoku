@@ -1,0 +1,338 @@
+/* ============================================================================
+   stats.css — Daily Board answer stats (stats.js)
+   Load after shell.css. The % tag is deliberately small: it's a reward you
+   notice after answering, not something to read while playing.
+   ============================================================================ */
+
+#ctxStatsBtn[hidden] { display: none !important; }
+#ctxStatsBtn.confirm {
+  color: #fff;
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.6);
+  animation: cs-nudge 380ms ease;
+}
+@keyframes cs-nudge { 30% { transform: translateX(-2px); } 60% { transform: translateX(2px); } }
+
+/* ── The % tag ───────────────────────────────────────────────────────────── */
+.cs-pct {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  padding: 2px 5px 1px;
+  border-radius: 6px;
+  font-family: var(--pixel-font);
+  font-size: 0.5rem;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--ink);
+  background: rgba(8, 3, 15, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+.cs-pct.rare { color: #7ff3ff; box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.4); }
+.cs-pct.gold {
+  color: #2a1a00;
+  background: linear-gradient(135deg, #ffe27a, #f5b301);
+  box-shadow: 0 0 10px rgba(255, 207, 74, 0.55);
+}
+.cs-pct.pop { animation: cs-pop 420ms cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes cs-pop { from { opacity: 0; transform: translateY(-4px) scale(0.6); } }
+
+/* ── Crowd answers over each square (Most picked / Rarest) ─────────────── */
+.cs-alt {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.38rem;
+  border-radius: inherit;
+  background: #120819;          /* solid: the square's own text must not show through */
+  animation: cs-in 260ms ease both;
+}
+@keyframes cs-in { from { opacity: 0; } }
+.board-grid.sv-top .cs-alt.cs-top,
+.board-grid.sv-rare .cs-alt.cs-rare { display: flex; }
+/* Your own tag would sit under the overlay's; hide it in the crowd views. */
+.board-grid:is(.sv-top, .sv-rare) .cell > .cs-pct { display: none; }
+
+.cs-alt img {
+  width: min(70%, 84px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
+}
+.cs-name {
+  max-width: 100%;
+  font-family: var(--pixel-font);
+  font-size: clamp(0.5rem, 0.7vw, 0.72rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.cs-alt.cs-rare { background: linear-gradient(160deg, rgba(255, 207, 74, 0.1), transparent 60%), #120819; }
+.cs-alt.cs-top { background: linear-gradient(160deg, rgba(204, 34, 85, 0.13), transparent 60%), #120819; }
+.cs-alt.same { box-shadow: inset 0 0 0 1.5px rgba(16, 217, 138, 0.55); }
+.cs-you {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  padding: 2px 5px 1px;
+  border-radius: 6px;
+  font-family: var(--pixel-font);
+  font-size: 0.46rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #062018;
+  background: var(--ok, #10d98a);
+}
+.cs-alt.empty { background: #120819; }
+.cs-none {
+  font-family: var(--pixel-font);
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+/* A finished board is normally dimmed and frozen. With stats showing it's
+   the thing you're exploring, so it stays bright and tappable. */
+.board-wrap.board-locked.has-stats { opacity: 1; filter: none; pointer-events: auto; }
+.board-wrap.has-stats .cell { cursor: pointer; }
+
+/* ── Bar above the board ─────────────────────────────────────────────────── */
+.sb {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--shell-line, rgba(204, 34, 85, 0.22));
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(204, 34, 85, 0.14), transparent 55%),
+    var(--shell-panel, rgba(13, 6, 21, 0.86));
+  animation: cs-bar 360ms cubic-bezier(.2, 1.2, .4, 1) both;
+}
+.sb[hidden] { display: none; }
+@keyframes cs-bar { from { opacity: 0; transform: translateY(-6px); } }
+body.reverse-active .sb { display: none; }
+
+.sb-text { min-width: 0; }
+.sb-kicker {
+  margin: 0 0 0.25rem;
+  font-family: var(--pixel-font);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ff7aa8;
+}
+.sb-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.9rem;
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.sb-line b { font-weight: 600; color: var(--ink); }
+.sb-tip {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+
+.sb-seg {
+  display: flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+/* Undo styles.css's global pill buttons inside the segmented control. */
+.sb-seg button,
+.sb-seg button:hover {
+  padding: 0 0.85rem;
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  font-family: var(--pixel-font);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  background: transparent;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+.sb-seg button:hover { color: var(--ink); }
+.sb-seg button[aria-selected="true"] {
+  color: #fff;
+  background: var(--accent, #cc2255);
+  box-shadow: 0 0 12px rgba(204, 34, 85, 0.45);
+}
+.sb-seg button:focus-visible { outline: 2px solid #ff7aa8; outline-offset: 1px; }
+
+/* ── Square details ──────────────────────────────────────────────────────── */
+.sp {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(4, 2, 10, 0.6);
+  backdrop-filter: blur(3px);
+  animation: cs-in 160ms ease both;
+}
+.sp-card {
+  width: min(380px, 100%);
+  padding: 0.9rem 1rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--shell-line, rgba(204, 34, 85, 0.22));
+  background: #0f0719;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  animation: cs-card 260ms cubic-bezier(.2, 1.3, .4, 1) both;
+}
+@keyframes cs-card { from { opacity: 0; transform: translateY(10px) scale(0.97); } }
+.sp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8rem; margin-bottom: 0.75rem; }
+.sp-rules {
+  margin: 0 0 0.25rem;
+  font-family: var(--pixel-font);
+  font-size: 0.66rem;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.sp-sub { margin: 0; font-family: "IBM Plex Mono", monospace; font-size: 0.74rem; color: var(--ink-soft); }
+.sp-close,
+.sp-close:hover {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+.sp-close:hover { background: rgba(255, 255, 255, 0.12); }
+
+.sp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.sp-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.35rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  animation: cs-in 240ms ease both;
+}
+.sp-row:nth-child(2) { animation-delay: 40ms; }
+.sp-row:nth-child(3) { animation-delay: 80ms; }
+.sp-row:nth-child(4) { animation-delay: 120ms; }
+.sp-row:nth-child(5) { animation-delay: 160ms; }
+/* the bar behind each row is its share */
+.sp-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--w, 0%);
+  background: linear-gradient(90deg, rgba(204, 34, 85, 0.28), rgba(204, 34, 85, 0.1));
+  transform-origin: left;
+  animation: cs-grow 600ms cubic-bezier(.2, .9, .3, 1) both;
+}
+@keyframes cs-grow { from { transform: scaleX(0); } }
+.sp-row.mine { box-shadow: inset 0 0 0 1.5px rgba(16, 217, 138, 0.55); }
+.sp-row.mine::before { background: linear-gradient(90deg, rgba(16, 217, 138, 0.26), rgba(16, 217, 138, 0.08)); }
+.sp-row > * { position: relative; }
+.sp-row img { width: 40px; height: 40px; object-fit: contain; }
+.sp-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+  font-family: var(--pixel-font);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sp-name small { font-size: 0.48rem; color: var(--ok, #10d98a); }
+.sp-pct { font-family: var(--pixel-font); font-size: 0.64rem; color: var(--ink); }
+.sp-pct.rare { color: #7ff3ff; }
+.sp-pct.gold { color: #ffd34d; }
+.sp-row.no-img { grid-template-columns: minmax(0, 1fr) auto; padding: 0.55rem 0.7rem; }
+.sp-row.dim { opacity: 0.55; }
+.sp-row.dim::before { display: none; }
+.sp-badge { display: inline-flex; min-width: 0; pointer-events: none; }
+.sp-badge > * { max-width: 100%; }
+.sp-row.no-img .sp-name { white-space: normal; }
+.sp-note {
+  margin: 0.75rem 0 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.sp-note[hidden] { display: none; }
+/* Reverse headers carry the same % tag as squares. */
+.rev-head.rev-solved { position: relative; }
+.rev-head.rev-statable { cursor: pointer; }
+.rev-head .cs-pct { top: 3px; right: 3px; }
+.sp-gap { height: 1px; margin: 0.15rem 0.4rem; background: rgba(255, 255, 255, 0.08); }
+.sp-empty { padding: 0.8rem 0; text-align: center; font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: var(--ink-soft); }
+
+/* ── Phones ──────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .sb { grid-template-columns: 1fr; padding: 0.65rem 0.7rem; border-radius: 12px; margin-bottom: 0.6rem; }
+  .sb-seg { width: 100%; }
+  .sb-seg button { flex: 1 1 0; padding: 0 0.3rem; }
+  .sb-line { font-size: 0.74rem; gap: 0.1rem 0.75rem; }
+  .cs-pct { font-size: 0.46rem; top: 4px; right: 4px; }
+  .sp { align-items: end; padding: 0; }
+  .sp-card { width: 100%; border-radius: 18px 18px 0 0; padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+}
+/* Focus view on phones shows a few big squares: the tag can breathe. */
+@media (max-width: 767px) {
+  .m-focus .cs-pct { font-size: 0.56rem; top: 6px; right: 6px; }
+  .m-focus .cs-name { font-size: 0.62rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-pct, .cs-alt, .sb, .sp, .sp-card, .sp-row, .sp-row::before, #ctxStatsBtn.confirm { animation: none !important; }
+}

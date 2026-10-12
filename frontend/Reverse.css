@@ -18,52 +18,6 @@ body.reverse-active .status-row,
 body.reverse-active #winBanner,
 body.reverse-active #gameOverBanner { display: none; }
 
-.rev-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  margin: 0.4rem 0 0.8rem;
-}
-.rev-toolbar .rev-spacer { flex: 1 1 auto; }
-
-.rev-status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.6rem;
-}
-#revMeta { font-family: var(--mono, monospace); opacity: 0.85; font-size: 0.85rem; }
-#revMessage { font-size: 0.85rem; min-height: 1.2em; }
-
-.rev-progress {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.8rem;
-}
-#revProgressText {
-  font-family: var(--mono, monospace);
-  font-weight: 700;
-  white-space: nowrap;
-}
-.rev-progress-track {
-  flex: 1 1 auto;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-#revProgressBar {
-  height: 100%;
-  width: 0%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--ok, #35d07f), #6ee7b7);
-  transition: width 0.35s ease;
-}
-
 /* The filled grid reuses .board-grid; rev-specific cell look below. */
 .rev-cell {
   display: flex;
@@ -159,72 +113,6 @@ body.reverse-active #gameOverBanner { display: none; }
 }
 .rev-modal-close:hover { opacity: 1; }
 .rev-modal-body { padding: 0.8rem 1rem; overflow-y: auto; }
-
-.rev-guess-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem;
-  padding: 0.4rem;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  margin-bottom: 0.7rem;
-}
-.rev-line-sprite { width: 38px; height: 38px; object-fit: contain; }
-
-.rev-guess-search {
-  width: 100%;
-  padding: 0.55rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.25);
-  color: inherit;
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-}
-.rev-guess-groups {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-bottom: 0.6rem;
-}
-.rev-group-chip {
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: transparent;
-  color: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-.rev-group-chip.active {
-  background: var(--accent, #e84a7f);
-  border-color: var(--accent, #e84a7f);
-  color: #fff;
-}
-.rev-guess-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  max-height: 42vh;
-  overflow-y: auto;
-}
-.rev-guess-item {
-  display: flex;
-  align-items: center;
-  padding: 0.4rem 0.55rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s ease;
-}
-.rev-guess-item:hover { background: rgba(255, 255, 255, 0.09); }
-.rev-guess-empty { opacity: 0.6; font-size: 0.85rem; padding: 0.6rem; }
-.rev-guess-status { min-height: 1.2em; font-size: 0.82rem; margin-top: 0.5rem; }
-.rev-guess-status.ok { color: var(--ok, #35d07f); }
-.rev-guess-status.err { color: var(--err, #ff5a5a); }
 
 /* ── Category Index & Custom modals reuse .rev-modal ── */
 .rev-index-progress {
@@ -380,9 +268,6 @@ body.reverse-active #gameOverBanner { display: none; }
   text-align: right;
 }
 
-/* Reverse view no longer has its own toolbar; the context bar drives it. */
-.rev-toolbar, .rev-status-row, .rev-spacer { display: none !important; }
-
 /* Draft modal: give it more width and stop long category names (Abilities)
    from clipping inside the dropdown checklist. The card itself is already
    ~760px; the clipping is in the item rows, so let them wrap/breathe. */
@@ -474,5 +359,589 @@ body.reverse-active #gameOverBanner { display: none; }
   border-bottom-color: var(--accent, #cc2255);
 }
 
-/* Reverse-board guess items: keep the inline explainer but tighten it to match. */
-.rev-guess-item-help { font-family: "IBM Plex Mono", monospace; }
+/* ============================================================================
+   Guess picker (Reverse Board) — "what do these share?"
+   Cyan is Reverse's accent elsewhere in the UI, so the picker uses it too.
+   ============================================================================ */
+html.rg-lock, html.rg-lock body { overflow: hidden; }
+
+.rev-modal.rg {
+  --rg: #22c7de;
+  --rg-soft: #9fb6c4;
+  --rg-line: rgba(34, 199, 222, 0.22);
+  padding: 1rem;
+  background: rgba(4, 2, 10, 0.75);
+  backdrop-filter: blur(5px);
+}
+.rev-modal.rg.open { animation: rg-fade 180ms ease both; }
+@keyframes rg-fade { from { opacity: 0; } }
+
+/* Zero-specificity reset so the site-wide pink pill buttons don't leak in,
+   plus cancelling styles.css's global button:hover lift/glow. */
+:where(.rg) button { all: unset; box-sizing: border-box; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.rg button:where(:hover, :active) { transform: none; filter: none; box-shadow: none; }
+.rg button:focus-visible { outline: 2px solid var(--rg); outline-offset: 2px; }
+
+.rg-card {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 96vw);
+  max-height: min(860px, 90vh);
+  border-radius: 20px;
+  overflow: hidden;
+  color: var(--ink, #e8d0e4);
+  background:
+    radial-gradient(120% 50% at 50% 0%, rgba(34, 199, 222, 0.12), transparent 60%),
+    #0d0717;
+  border: 1px solid var(--rg-line);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+  animation: rg-pop 300ms cubic-bezier(.2, 1.3, .4, 1) both;
+}
+@keyframes rg-pop { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+
+.rg-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem 0.6rem;
+}
+.rg-kicker {
+  margin: 0 0 0.3rem;
+  font-family: var(--pixel-font);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rg);
+}
+.rg-head h2 {
+  margin: 0;
+  font-family: var(--pixel-font);
+  font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+  letter-spacing: 0.03em;
+  color: #fff;
+}
+.rg-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  font-size: 0.95rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.rg .rg-close:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* The line being guessed: one swipeable strip, never wrapping into a block. */
+.rg-line {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 1.1rem 0.75rem;
+  padding: 0.45rem;
+  overflow-x: auto;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  scrollbar-width: none;
+}
+.rg-line::-webkit-scrollbar { display: none; }
+.rg-mon {
+  position: relative;
+  flex: 1 0 58px;
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem 0.15rem 0.35rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  animation: rg-rise 260ms ease both;
+  animation-delay: calc(var(--n, 0) * 30ms);
+}
+@keyframes rg-rise { from { opacity: 0; transform: translateY(6px); } }
+.rg-mon img { width: 46px; height: 46px; object-fit: contain; }
+.rg-mon-name {
+  max-width: 64px;
+  font-family: var(--pixel-font);
+  font-size: 0.42rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--rg-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rg-mon.shiny { background: rgba(255, 217, 90, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 217, 90, 0.5); }
+
+/* Fixed parts of the sheet never shrink; only the list scrolls. */
+.rg-head, .rg-line, .rg-controls, .rg-status { flex: none; }
+.rg-controls { display: grid; gap: 0.55rem; padding: 0 1.1rem 0.7rem; }
+/* Search: the wrapper draws the one and only box + focus ring. The input
+   inside is stripped bare, because styles.css gives every input its own
+   border, padding, radius and focus outline (that was the double outline). */
+.rg-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 44px;
+  padding: 0 0.35rem 0 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--rg-line);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--rg-soft);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.rg-search:focus-within { border-color: var(--rg); box-shadow: 0 0 0 3px rgba(34, 199, 222, 0.16); }
+.rg-search-icon { flex: none; font-size: 1rem; line-height: 1; }
+.rg-search input,
+.rg-search input:focus,
+.rg-search input:focus-visible {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.88rem;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.rg-search input::placeholder { color: rgba(159, 182, 196, 0.65); }
+.rg-search-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 0.8rem;
+  color: var(--rg-soft);
+}
+.rg-search-clear[hidden] { display: none; }
+.rg .rg-search-clear:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+
+/* Tabs scroll sideways on phones. The padding gives the active tab's glow
+   room, otherwise the scroll box clips it into a hard dark edge. */
+.rg-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: -4px -4px 0;
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.rg-tabs::-webkit-scrollbar { display: none; }
+.rg-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 34px;
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  font-family: var(--pixel-font);
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rg-soft);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.rg-tab small { font-size: 0.5rem; opacity: 0.7; }
+.rg .rg-tab:hover { color: #fff; background: rgba(34, 199, 222, 0.08); }
+.rg-tab[aria-selected="true"] {
+  color: #04161a;
+  background: var(--rg);
+  border-color: var(--rg);
+  box-shadow: 0 0 10px rgba(34, 199, 222, 0.35);
+}
+
+/* Feedback sits above the list, so it's always in view. */
+.rg-status {
+  margin: 0 1.1rem 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  font-family: var(--pixel-font);
+  font-size: 0.56rem;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rg-soft);
+  background: rgba(255, 255, 255, 0.04);
+}
+.rg-status[hidden] { display: none; }
+.rg-status.err { color: #ffb3c1; background: rgba(244, 63, 94, 0.12); box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.4); }
+.rg-status.ok { color: #9ff5cf; background: rgba(16, 217, 138, 0.12); box-shadow: inset 0 0 0 1px rgba(16, 217, 138, 0.45); }
+.rg-status.flash { animation: rg-flash 360ms ease; }
+@keyframes rg-flash { 0% { transform: scale(0.97); opacity: 0.4; } }
+
+.rg-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1.1rem 1.1rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 199, 222, 0.35) transparent;
+}
+.rg-list::-webkit-scrollbar { width: 8px; }
+.rg-list::-webkit-scrollbar-track { background: transparent; }
+.rg-list::-webkit-scrollbar-thumb { background: rgba(34, 199, 222, 0.3); border-radius: 8px; }
+
+.rg-sec + .rg-sec { margin-top: 1rem; }
+.rg-sec-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 0.5rem;
+  padding: 0.45rem 0 0.35rem;
+  font-family: var(--pixel-font);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(#0d0717 80%, transparent);
+}
+.rg-sec-head small { font-size: 0.5rem; color: var(--rg-soft); letter-spacing: 0.06em; }
+
+/* Types: a compact colour grid */
+.rg-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 0.4rem; }
+.rg-type {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 40px;
+  padding: 0 0.5rem;
+  border-radius: 10px;
+  font-family: var(--pixel-font);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tf);
+  background: var(--tb);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+.rg .rg-type:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.12); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.4); }
+.rg-type-icon { font-size: 0.9rem; }
+
+/* Everything else: tiles with the category big and the explainer small */
+.rg-opt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.4rem; }
+.rg-opt {
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.rg .rg-opt:hover:not(:disabled) { background: rgba(34, 199, 222, 0.08); border-color: rgba(34, 199, 222, 0.5); transform: translateY(-1px); }
+.rg-opt-grid.compact { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.rg-opt-grid.compact .rg-opt { padding: 0.5rem 0.65rem; }
+.rg-opt-top { display: grid; gap: 0.15rem; min-width: 0; }
+.rg-opt-kicker {
+  font-family: var(--pixel-font);
+  font-size: 0.46rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rg);
+}
+.rg-opt-kicker:empty { display: none; }
+.rg-opt-main {
+  font-family: var(--pixel-font);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+.rg-opt-help {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--rg-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Guess states */
+.rg-opt.checking, .rg-type.checking { animation: rg-pulse 700ms ease-in-out infinite; }
+@keyframes rg-pulse { 50% { opacity: 0.55; } }
+.rg-opt.right, .rg-type.right { box-shadow: 0 0 0 2px #10d98a, 0 0 22px rgba(16, 217, 138, 0.55) !important; animation: rg-right 480ms cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes rg-right { 40% { transform: scale(1.06); } }
+.rg-opt.wrong, .rg-type.wrong { animation: rg-shake 420ms ease; box-shadow: 0 0 0 2px #f43f5e !important; }
+@keyframes rg-shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+.rg-opt.tried, .rg-type.tried { opacity: 0.32; cursor: not-allowed; filter: grayscale(0.7); }
+
+/* Picked, waiting for "Lock in": cyan ring + a check in the corner. */
+.rg-opt, .rg-type { position: relative; }
+.rg-opt.picked {
+  background: rgba(34, 199, 222, 0.14);
+  border-color: var(--rg);
+  box-shadow: 0 0 0 1px var(--rg), 0 0 18px rgba(34, 199, 222, 0.28);
+}
+.rg-type.picked {
+  box-shadow: 0 0 0 2px #0d0717, 0 0 0 4px var(--rg), 0 0 18px rgba(34, 199, 222, 0.45);
+  transform: translateY(-1px);
+}
+.rg-opt.picked::after, .rg-type.picked::after {
+  content: "✓";
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #04161a;
+  background: var(--rg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  animation: rg-check 220ms cubic-bezier(.2, 1.6, .4, 1);
+}
+@keyframes rg-check { from { transform: scale(0); } }
+/* the grids need a little room so the check badge isn't clipped */
+.rg-type-grid, .rg-opt-grid { padding-top: 6px; }
+.rg-opt.picked, .rg-type.picked { z-index: 1; }
+
+/* ── Footer: lives + hint, and the confirm step ─────────────────────────── */
+.rg-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 64px;
+  padding: 0.6rem 1.1rem;
+  border-top: 1px solid var(--rg-line);
+  background: rgba(8, 4, 16, 0.92);
+  transition: background 160ms ease;
+}
+.rg-foot[data-state="pick"] { background: linear-gradient(90deg, rgba(34, 199, 222, 0.14), rgba(8, 4, 16, 0.92) 70%); }
+.rg-foot[data-state="hint"] { background: linear-gradient(90deg, rgba(255, 207, 74, 0.13), rgba(8, 4, 16, 0.92) 70%); }
+.rg-lives { flex: none; display: flex; gap: 0.1rem; }
+.rg-life {
+  font-size: 1.05rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 5px rgba(244, 63, 94, 0.5));
+  transition: filter 250ms ease, opacity 250ms ease, transform 280ms cubic-bezier(.34, 1.56, .64, 1);
+}
+.rg-life.spent { filter: grayscale(1) brightness(0.35); opacity: 0.3; transform: scale(0.78); }
+.rg-foot-mid { flex: 1; min-width: 0; display: grid; gap: 0.15rem; }
+.rg-foot-kicker {
+  font-family: var(--pixel-font);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rg);
+}
+.rg-foot[data-state="hint"] .rg-foot-kicker { color: #ffcf4a; }
+.rg-foot-pick {
+  font-family: var(--pixel-font);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rg-foot[data-state="hint"] .rg-foot-pick {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: normal;
+  color: var(--rg-soft);
+}
+.rg-foot-tip { font-size: 0.74rem; color: var(--rg-soft); }
+.rg-foot-actions { flex: none; display: flex; gap: 0.4rem; }
+.rg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 1rem;
+  border-radius: 11px;
+  font-family: var(--pixel-font);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: filter 120ms ease, background 120ms ease;
+}
+.rg-btn.quiet { color: var(--rg-soft); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.rg .rg-btn.quiet:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+.rg-btn.go { color: #04161a; background: var(--rg); box-shadow: 0 0 16px rgba(34, 199, 222, 0.4); animation: rg-ready 260ms ease; }
+.rg .rg-btn.go:hover { filter: brightness(1.1); box-shadow: 0 0 22px rgba(34, 199, 222, 0.55); }
+@keyframes rg-ready { from { transform: scale(0.9); opacity: 0.4; } }
+.rg-btn.star { color: #2a1a00; background: #ffcf4a; box-shadow: 0 0 16px rgba(255, 207, 74, 0.4); }
+.rg .rg-btn.star:hover { filter: brightness(1.08); }
+.rg-btn.star-quiet { color: #ffdb7a; box-shadow: inset 0 0 0 1px rgba(255, 207, 74, 0.4); }
+.rg .rg-btn.star-quiet:hover:not(:disabled) { background: rgba(255, 207, 74, 0.1); }
+.rg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.rg-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(34, 199, 222, 0.25);
+  border-top-color: var(--rg);
+  animation: rg-spin 700ms linear infinite;
+}
+@keyframes rg-spin { to { transform: rotate(360deg); } }
+.rg-opt.tried .rg-opt-main, .rg-type.tried span:last-child { text-decoration: line-through; text-decoration-thickness: 2px; }
+
+.rg-empty {
+  margin: 1.5rem 0;
+  text-align: center;
+  font-family: var(--pixel-font);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rg-soft);
+}
+
+/* Phones: a bottom sheet that uses the whole screen height */
+@media (max-width: 767px) {
+  .rev-modal.rg { padding: 0; align-items: flex-end; }
+  .rg-card {
+    width: 100%;
+    max-height: 92dvh;
+    height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    border-bottom: 0;
+    animation: rg-up 300ms cubic-bezier(.2, 1, .3, 1) both;
+  }
+  @keyframes rg-up { from { transform: translateY(40px); opacity: 0; } }
+  .rg-card::before {
+    content: "";
+    align-self: center;
+    width: 40px;
+    height: 4px;
+    margin-top: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .rg-head { padding: 0.6rem 0.9rem 0.5rem; }
+  .rg-line { margin: 0 0.9rem 0.6rem; }
+  .rg-mon { flex-basis: 52px; }
+  .rg-mon img { width: 40px; height: 40px; }
+  .rg-controls { padding: 0 0.9rem 0.6rem; }
+  .rg-search input { font-size: 16px; }   /* stops iOS zooming into the field */
+  .rg-status { margin: 0 0.9rem 0.5rem; }
+  .rg-list { padding: 0 0.9rem 0.8rem; }
+  .rg-foot {
+    gap: 0.55rem;
+    padding: 0.55rem 0.9rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
+  }
+  .rg-foot-tip { display: none; }
+  .rg-foot[data-state="pick"] .rg-lives,
+  .rg-foot[data-state="hint"] .rg-lives { display: none; }
+  .rg-btn { padding: 0 0.8rem; min-height: 42px; }
+  .rg-type-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rg-type { font-size: 0.56rem; min-height: 40px; }
+  .rg-opt-grid, .rg-opt-grid.compact { grid-template-columns: 1fr 1fr; }
+  .rg-opt { padding: 0.55rem 0.6rem; }
+  .rg-opt-main { font-size: 0.6rem; }
+  .rg-opt-help { font-size: 0.68rem; }
+}
+@media (max-width: 380px) {
+  .rg-opt-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rg-card, .rg-mon, .rg-opt, .rg-type, .rg-status, .rg-btn, .rg-opt::after, .rg-type::after,
+  .rev-lives.hit, .rev-head.rev-solved { animation: none !important; transition: none !important; }
+}
+
+/* ============================================================================
+   Reverse HUD (lives | lines | hint) + end-of-board states
+   The HUD reuses the Daily HUD's .hud-strip layout, so it sits in the same
+   console with the same look. Its pips use their own classes: app.js drives
+   .pip-life / .pip-hint for the Daily board and would overwrite these.
+   ============================================================================ */
+body:not(.reverse-active) #revHud { display: none !important; }
+
+.rev-lives { display: flex; gap: 0.18rem; align-items: center; }
+.rev-life {
+  font-size: 1.3rem;
+  line-height: 1;
+  display: inline-block;
+  filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.55));
+  transition: filter 250ms ease, transform 280ms cubic-bezier(.34, 1.56, .64, 1), opacity 250ms ease;
+}
+.rev-life.spent { filter: grayscale(1) brightness(0.35); opacity: 0.25; transform: scale(0.75); }
+.rev-lives.hit { animation: rev-hit 420ms ease; }
+@keyframes rev-hit { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+
+#revHud .rev-hint {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-block;
+  padding: 0.1rem;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  filter: drop-shadow(0 0 5px rgba(255, 207, 74, 0.5));
+  transition: filter 200ms ease, transform 240ms cubic-bezier(.34, 1.56, .64, 1), opacity 200ms ease;
+}
+#revHud .rev-hint:hover:not(:disabled) { transform: scale(1.25) rotate(14deg); filter: drop-shadow(0 0 10px rgba(255, 207, 74, 0.75)); }
+#revHud .rev-hint:focus-visible { outline: 2px solid var(--mode-reverse, #22c7de); outline-offset: 2px; }
+#revHud .rev-hint:disabled { filter: grayscale(1) brightness(0.35); opacity: 0.25; transform: scale(0.75); cursor: not-allowed; }
+@media (max-width: 767px) {
+  .console .rev-life, #revHud .rev-hint { font-size: 1.1rem; }
+}
+
+#revBanner[hidden] { display: none !important; }
+#revBanner { margin-bottom: 0.7rem; }
+@media (max-width: 767px) {
+  /* Phones: text gets the full width, the button drops below it. */
+  #revBanner { flex-wrap: wrap; gap: 0.5rem 0.65rem; }
+  #revBanner .hud-alert-text { flex: 1 1 0; min-width: 0; font-size: 0.78rem; line-height: 1.45; }
+  #revBannerBtn { flex: 1 1 100%; }
+}
+
+/* Solved by the hint: a gold star in the corner. */
+.rev-head.rev-hinted { position: relative; box-shadow: inset 0 0 0 1px rgba(255, 207, 74, 0.55); }
+.rev-head.rev-hinted::after {
+  content: "⭐";
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.6rem;
+  line-height: 1;
+  pointer-events: none;
+}
+/* Lost board: the answers you missed, greyed with a red edge so they never
+   read as solved. */
+.rev-head.rev-revealed {
+  opacity: 0.6;
+  filter: grayscale(0.55);
+  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.55);
+  animation: none;
+}
+.rev-grid.rev-over .rev-cell { opacity: 0.75; }

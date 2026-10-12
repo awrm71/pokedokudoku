@@ -103,13 +103,23 @@
     info(B, axis, i, ui) {
       const head = axis === "row" ? B.rowHeads[i] : B.colHeads[i];
       const solved = isSolved(head);
+      const shown = isShown(head);     // solved, or revealed after losing
       ui.status.hidden = false;
-      ui.status.textContent = solved ? "Solved" : "Unsolved";
-      ui.status.classList.toggle("done", solved);
-      if (solved) {
+      const pct = head.querySelector(".cs-pct")?.textContent;
+      ui.status.textContent = head.classList.contains("rev-revealed") ? "Answer"
+        : head.classList.contains("rev-hinted") ? "Hint ⭐"
+        : solved ? (pct ? `Solved · ${pct}` : "Solved") : "Unsolved";
+      ui.status.classList.toggle("done", !!solved);
+      if (shown) {
         ui.rule.replaceChildren(...cloneHead(head));
         ui.setHelp(explain(headLabel(head)));
-        ui.guess.hidden = true;
+        // Daily: the header (hidden here) opens how everyone named the line.
+        const statable = head.classList.contains("rev-statable");
+        ui.guess.hidden = !statable;
+        if (statable) {
+          ui.guess.textContent = "How everyone named it";
+          ui.guess.onclick = () => head.click();
+        }
       } else {
         ui.rule.replaceChildren(qmark());
         ui.setHelp("");
@@ -389,7 +399,8 @@
   }
 
   function cloneHead(head) {
-    return Array.from(head.childNodes).map((n) => {
+    // The % tag stays on the real header; chips and the info panel skip it.
+    return Array.from(head.childNodes).filter((n) => !n.classList?.contains("cs-pct")).map((n) => {
       const copy = n.cloneNode(true);
       if (copy.nodeType === 1) {
         copy.classList.remove("has-cat-tip");
@@ -406,8 +417,10 @@
     return c;
   }
 
-  function isSolved(head) { return head.classList.contains("rev-solved") ? 1 : 0; }
-  function revChip(head) { return isSolved(head) ? cloneHead(head) : [qmark()]; }
+  // A revealed line (board lost) shows its label but doesn't count as solved.
+  function isShown(head) { return head.classList.contains("rev-solved"); }
+  function isSolved(head) { return isShown(head) && !head.classList.contains("rev-revealed") ? 1 : 0; }
+  function revChip(head) { return isShown(head) ? cloneHead(head) : [qmark()]; }
   function qmark() {
     const q = el("span", "rule-badge text rev-qmark");
     q.textContent = "?";
@@ -416,7 +429,9 @@
 
   function headLabel(head) {
     const type = head.querySelector(".type-badge-custom");
-    return type ? type.getAttribute("title") || "" : text(head);
+    // Ignore the % tag so the explainer looks up the category itself.
+    return type ? type.getAttribute("title") || ""
+      : cloneHead(head).map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim();
   }
 
   function explain(label) {

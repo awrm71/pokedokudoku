@@ -14,19 +14,25 @@ Same design philosophy as pokedex_store.py, deliberately so:
   - shares the SAME database file as pokedex_store, in its own table, so the
     two features can't collide and a single merge covers both.
 
+Lives and hints for the daily board live here too (reverse_daily_misses,
+reverse_daily_hints), so reloading the page can't reset them.
+
 What counts as "identified": the caller (api_main) decides, exactly like
 is_daily_seed() gates the Pokedex. Reverse Board only logs on full-size 9x9
 boards, so custom/shrunk boards are practice and don't pad the Index.
 """
 
+import os
 import sqlite3
 import threading
+import time
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-# Same file as the Pokedex store, so one DB holds both features.
-DB_PATH = Path(__file__).resolve().parent / "data" / "pokedex.db"
+# Same file as the Pokedex store, so one DB holds both features. PDD_DB_PATH
+# (the shiny test mode uses it) moves both stores to the same other file.
+DB_PATH = Path(os.environ.get("PDD_DB_PATH") or (Path(__file__).resolve().parent / "data" / "pokedex.db"))
 
 _lock = threading.Lock()
 
@@ -78,6 +84,38 @@ def init_db() -> None:
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_reverse_daily ON reverse_daily_progress (client_id, day_seed);"
+            )
+            # Wrong guesses on the daily board. Each row costs one life, so a
+            # refresh can't hand lives back. The same wrong guess on the same
+            # line is stored once and never charged twice.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reverse_daily_misses (
+                    client_id   TEXT NOT NULL,
+                    day_seed    TEXT NOT NULL,
+                    axis        TEXT NOT NULL,
+                    line_index  INTEGER NOT NULL,
+                    rule_id     TEXT NOT NULL,
+                    missed_at   TEXT NOT NULL,
+                    PRIMARY KEY (client_id, day_seed, axis, line_index, rule_id)
+                );
+                """
+            )
+            # The one hint per daily board. The primary key is the limit: a
+            # second hint on the same day can't be inserted.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reverse_daily_hints (
+                    client_id   TEXT NOT NULL,
+                    day_seed    TEXT NOT NULL,
+                    axis        TEXT NOT NULL,
+                    line_index  INTEGER NOT NULL,
+                    rule_id     TEXT NOT NULL,
+                    label       TEXT NOT NULL DEFAULT '',
+                    used_at     TEXT NOT NULL,
+                    PRIMARY KEY (client_id, day_seed)
+                );
+                """
             )
             conn.commit()
         finally:
@@ -234,6 +272,106 @@ def get_daily_progress(client_id: str, day_seed: str) -> Dict[str, dict]:
             conn.close()
 
 
+def record_daily_miss(
+    client_id: str,
+    day_seed: str,
+    axis: str,
+    line_index: int,
+    rule_id: str,
+) -> bool:
+    """Log a wrong guess on the daily board. Returns True if it's new (and so
+    costs a life), False if this exact guess on this line was already logged."""
+    if not client_id or not day_seed or axis not in ("row", "col") or not rule_id:
+        return False
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO reverse_daily_misses
+                    (client_id, day_seed, axis, line_index, rule_id, missed_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (client_id, day_seed, axis, line_index, rule_id,
+                 datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
+
+def get_daily_misses(client_id: str, day_seed: str) -> List[dict]:
+    """Every wrong guess this client made on this daily board, oldest first."""
+    if not client_id or not day_seed:
+        return []
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT axis, line_index, rule_id FROM reverse_daily_misses
+                WHERE client_id = ? AND day_seed = ?
+                ORDER BY missed_at ASC
+                """,
+                (client_id, day_seed),
+            ).fetchall()
+            return [{"axis": a, "line_index": i, "rule_id": r} for a, i, r in rows]
+        finally:
+            conn.close()
+
+
+def record_daily_hint(
+    client_id: str,
+    day_seed: str,
+    axis: str,
+    line_index: int,
+    rule_id: str,
+    label: str = "",
+) -> bool:
+    """Spend the daily board's hint on one line. Returns False if the hint
+    was already used today (nothing is written in that case)."""
+    if not client_id or not day_seed or axis not in ("row", "col"):
+        return False
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO reverse_daily_hints
+                    (client_id, day_seed, axis, line_index, rule_id, label, used_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (client_id, day_seed, axis, line_index, rule_id, label,
+                 datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
+
+def get_daily_hint(client_id: str, day_seed: str) -> Optional[dict]:
+    """The line this client used today's hint on, or None."""
+    if not client_id or not day_seed:
+        return None
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                """
+                SELECT axis, line_index, rule_id, label FROM reverse_daily_hints
+                WHERE client_id = ? AND day_seed = ?
+                """,
+                (client_id, day_seed),
+            ).fetchone()
+            if not row:
+                return None
+            return {"axis": row[0], "line_index": row[1], "rule_id": row[2], "label": row[3]}
+        finally:
+            conn.close()
+
+
 def merge_client(from_client_id: str, to_client_id: str) -> int:
     """Fold guest Category Index progress into an account. Rules the target
     already named are kept (with their earlier timestamp) and the source's
@@ -288,7 +426,95 @@ def merge_client(from_client_id: str, to_client_id: str) -> int:
             )
             conn.execute("DELETE FROM reverse_daily_progress WHERE client_id = ?", (from_client_id,))
 
+            # Lives and hints follow the same rule: the account keeps its own
+            # record for a day it already played; otherwise the guest's moves over.
+            conn.execute(
+                """
+                UPDATE reverse_daily_misses
+                SET client_id = ?
+                WHERE client_id = ?
+                  AND day_seed NOT IN (
+                      SELECT day_seed FROM reverse_daily_misses WHERE client_id = ?
+                  )
+                """,
+                (to_client_id, from_client_id, to_client_id),
+            )
+            conn.execute("DELETE FROM reverse_daily_misses WHERE client_id = ?", (from_client_id,))
+            conn.execute(
+                """
+                UPDATE reverse_daily_hints
+                SET client_id = ?
+                WHERE client_id = ?
+                  AND day_seed NOT IN (
+                      SELECT day_seed FROM reverse_daily_hints WHERE client_id = ?
+                  )
+                """,
+                (to_client_id, from_client_id, to_client_id),
+            )
+            conn.execute("DELETE FROM reverse_daily_hints WHERE client_id = ?", (from_client_id,))
+
             conn.commit()
             return moved
         finally:
             conn.close()
+
+
+# ── Daily line stats ─────────────────────────────────────────────────────────
+# How players named each line of the daily board. A line usually accepts more
+# than one category, so this is a spread, not a single answer. Lines solved
+# with the hint don't count. Board-wide counts are cached briefly; the single
+# line share shown right after a solve is always live.
+_STATS_TTL = 20.0
+_line_cache: Dict[str, tuple] = {}
+
+_COUNTED = """
+    FROM reverse_daily_progress p
+    LEFT JOIN reverse_daily_hints h
+      ON h.client_id = p.client_id AND h.day_seed = p.day_seed
+     AND h.axis = p.axis AND h.line_index = p.line_index
+    WHERE p.day_seed = ? AND h.client_id IS NULL
+"""
+
+
+def line_share(day_seed: str, axis: str, line_index: int, rule_id: str) -> tuple:
+    """(players who named rule_id for this line, players who named this line)."""
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT SUM(CASE WHEN p.named_rule_id = ? THEN 1 ELSE 0 END), COUNT(*)"
+                + _COUNTED + " AND p.axis = ? AND p.line_index = ?",
+                (rule_id, day_seed, axis, line_index),
+            ).fetchone()
+            return int(row[0] or 0), int(row[1] or 0)
+        finally:
+            conn.close()
+
+
+def line_counts(day_seed: str, fresh: bool = False) -> dict:
+    """{"lines": {("row", 3): {rule_id: count}}, "players": n} for one day."""
+    now = time.monotonic()
+    hit = _line_cache.get(day_seed)
+    if hit and not fresh and now - hit[0] < _STATS_TTL:
+        return hit[1]
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                "SELECT p.axis, p.line_index, p.named_rule_id, COUNT(*)" + _COUNTED
+                + " GROUP BY p.axis, p.line_index, p.named_rule_id",
+                (day_seed,),
+            ).fetchall()
+            players = conn.execute(
+                "SELECT COUNT(DISTINCT p.client_id)" + _COUNTED, (day_seed,),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+    lines: Dict[tuple, Dict[str, int]] = {}
+    for axis, idx, rid, n in rows:
+        lines.setdefault((axis, idx), {})[rid] = n
+    data = {"lines": lines, "players": int(players or 0)}
+    _line_cache[day_seed] = (now, data)
+    if len(_line_cache) > 4:
+        _line_cache.pop(next(iter(_line_cache)), None)
+    return data

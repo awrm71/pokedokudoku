@@ -221,37 +221,41 @@
         letter-spacing: 0;
         transition: color 150ms ease, font-size 150ms ease;
       }
-      /* Hover: grow + brighten + glow — makes interaction obvious */
+      /* Hover: brighten + glow. No font growth: the square itself already
+         zooms in, and growing the text too pushed long pairs ("Learns Earth
+         Power × Ability: Sheer Force") out of the bottom of the square. */
       .cell:hover .q-row,
       .cell:focus-within .q-row {
-        font-size: 0.88rem;
         color: rgba(255, 210, 235, 1);
         text-shadow: 0 0 10px rgba(220, 80, 140, 0.55);
       }
       .cell:hover .q-col,
       .cell:focus-within .q-col {
-        font-size: 0.80rem;
         color: rgba(240, 185, 215, 0.95);
         text-shadow: 0 0 8px rgba(200, 70, 120, 0.40);
       }
       .cell:hover .q-sep,
       .cell:focus-within .q-sep {
-        font-size: 0.72rem;
         color: rgba(240, 90, 150, 0.80);
       }
+      /* Long pairs (app.js adds .q-long): a size down so both always fit. */
+      .qual-combo { min-height: 0; overflow: hidden; }
+      .qual-combo.q-long .q-row { font-size: 0.6rem; }
+      .qual-combo.q-long .q-col { font-size: 0.58rem; }
+      .qual-combo.q-long { gap: 0.12rem; }
       /* ── Mobile: keep qual-combo sizes readable but not huge ─── */
       @media (max-width: 767px) {
         .q-row           { font-size: 0.66rem; }
         .q-col           { font-size: 0.60rem; }
         .q-sep           { font-size: 0.52rem; }
         .qual-combo      { gap: 0.14rem; }
-        /* Hover still shows size increase but capped at readable levels */
         .cell:hover .q-row,
-        .cell:focus-within .q-row { font-size: 0.76rem; text-shadow: 0 0 8px rgba(220,80,140,0.4); }
-        .cell:hover .q-col,
-        .cell:focus-within .q-col { font-size: 0.70rem; }
-        .cell:hover .q-sep,
-        .cell:focus-within .q-sep { font-size: 0.60rem; }
+        .cell:focus-within .q-row { text-shadow: 0 0 8px rgba(220,80,140,0.4); }
+        /* styles.css grows these on hover with !important; keep them put. */
+        .cell:hover .qual-combo .q-row, .cell:focus-within .qual-combo .q-row { font-size: 0.64rem !important; }
+        .cell:hover .qual-combo .q-col, .cell:focus-within .qual-combo .q-col { font-size: 0.58rem !important; }
+        .cell .qual-combo.q-long .q-row { font-size: 0.56rem !important; }
+        .cell .qual-combo.q-long .q-col { font-size: 0.52rem !important; }
       }
       /* Shrink labels when cell is filled — sprite takes over */
       .cell.ok .q-row, .cell.ok .q-col,
@@ -664,6 +668,7 @@
     <link rel="stylesheet" href="./shell.css" />
     <link rel="stylesheet" href="./pokedex.css" />
     <link rel="stylesheet" href="./shiny.css" />
+    <link rel="stylesheet" href="./stats.css" />
   </head>
   <body>
     <div class="bg-orb orb-a" aria-hidden="true"></div>
@@ -712,6 +717,7 @@
       <div class="mode-context" id="modeContext">
         <div class="ctx-panel" data-ctx="daily">
           <button type="button" class="ctx-btn" id="ctxShuffleBtn" title="Deal a fresh random board">🔀 Shuffle</button>
+          <button type="button" class="ctx-btn" id="ctxStatsBtn" title="See how everyone answered today's board" hidden>📊 Stats</button>
           <span class="ctx-meta" id="boardMeta">Loading board…</span>
           <span class="ctx-msg message" id="message"></span>
         </div>
@@ -763,6 +769,29 @@
         </div>
 
       </div>
+
+      <!-- ── Reverse HUD (only while Reverse is active): lives | lines | hint ── -->
+      <div class="hud-strip rev-hud" id="revHud" role="status" aria-label="Reverse Board status">
+        <div class="hud-section" aria-label="Lives remaining">
+          <div id="revLives" class="rev-lives">
+            <span class="rev-life" aria-label="Life 1">❤️</span>
+            <span class="rev-life" aria-label="Life 2">❤️</span>
+            <span class="rev-life" aria-label="Life 3">❤️</span>
+          </div>
+          <span class="hud-tag">Lives</span>
+        </div>
+        <div class="hud-section hud-mid" aria-label="Lines solved">
+          <span id="revProgressText" class="hud-score">0 / 18</span>
+          <div class="hud-bar" role="progressbar" aria-valuemin="0" aria-valuemax="18" aria-valuenow="0" id="revProgressWrap">
+            <div class="hud-fill" id="revProgressBar"></div>
+          </div>
+          <span class="hud-tag">Lines</span>
+        </div>
+        <div class="hud-section" aria-label="Hint">
+          <span class="hud-tag">Hint</span>
+          <button type="button" class="rev-hint" id="revHintBtn" title="Open a row or column, then tap ⭐ Hint">⭐</button>
+        </div>
+      </div>
       </section>
 
       <!-- Alerts (hidden by default) -->
@@ -796,9 +825,11 @@
 
       <!-- Reverse Board view + modals. Hidden until the Reverse tab is active. -->
       <section id="reverseView" aria-label="Reverse Board">
-        <div class="rev-progress">
-          <span id="revProgressText">0 / 18</span>
-          <div class="rev-progress-track"><div id="revProgressBar"></div></div>
+        <!-- Shown when the board is solved or out of lives (Reverse.js fills it) -->
+        <div class="hud-alert" id="revBanner" role="alert" hidden>
+          <span class="hud-alert-icon" aria-hidden="true">🏆</span>
+          <span class="hud-alert-text"></span>
+          <button type="button" id="revBannerBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem" hidden>New board</button>
         </div>
 
         <div id="revBoardWrap" class="board-wrap" role="region" aria-label="Reverse Board grid"></div>
@@ -806,19 +837,28 @@
       </section>
 
       <!-- Guess modal: pick the hidden category for a row or column -->
-      <div id="revGuessModal" class="rev-modal" role="dialog" aria-modal="true" aria-labelledby="revGuessTitle">
-        <div class="rev-modal-card">
-          <div class="rev-modal-head">
-            <h2 id="revGuessTitle">What do these share?</h2>
-            <button type="button" id="revGuessClose" class="rev-modal-close" aria-label="Close">✕</button>
+      <div id="revGuessModal" class="rev-modal rg" role="dialog" aria-modal="true" aria-labelledby="revGuessTitle">
+        <div class="rg-card">
+          <header class="rg-head">
+            <div>
+              <p class="rg-kicker" id="revGuessKicker">Row 1</p>
+              <h2 id="revGuessTitle">What do these share?</h2>
+            </div>
+            <button type="button" id="revGuessClose" class="rg-close" aria-label="Close">✕</button>
+          </header>
+          <div id="revGuessLine" class="rg-line" aria-label="Pokémon in this line"></div>
+          <div class="rg-controls">
+            <div class="rg-search">
+              <span class="rg-search-icon" aria-hidden="true">⌕</span>
+              <input type="text" inputmode="search" enterkeyhint="search" id="revGuessSearch" placeholder="Search categories" autocomplete="off" spellcheck="false" aria-label="Search categories">
+              <button type="button" id="revGuessClear" class="rg-search-clear" aria-label="Clear search" hidden>✕</button>
+            </div>
+            <div id="revGuessGroups" class="rg-tabs" role="tablist" aria-label="Category groups"></div>
           </div>
-          <div class="rev-modal-body">
-            <div id="revGuessLine" class="rev-guess-line" aria-label="Pokémon in this line"></div>
-            <input type="text" id="revGuessSearch" class="rev-guess-search" placeholder="Search categories… (type, move, region…)" autocomplete="off">
-            <div id="revGuessGroups" class="rev-guess-groups"></div>
-            <div id="revGuessList" class="rev-guess-list"></div>
-            <p id="revGuessStatus" class="rev-guess-status"></p>
-          </div>
+          <p id="revGuessStatus" class="rg-status" role="status" hidden></p>
+          <div id="revGuessList" class="rg-list"></div>
+          <!-- Lives, hint and the "Lock in" confirm step (Reverse.js renders it) -->
+          <footer id="revGuessFoot" class="rg-foot" data-state="idle"></footer>
         </div>
       </div>
 
@@ -1089,6 +1129,7 @@
     <script src="./category_help.js"></script>
     <script src="./app.js"></script>
     <script src="./shiny.js"></script>
+    <script src="./stats.js"></script>
     <script src="./draft.js"></script>
     <script src="./pokedex.js"></script>
     <script src="./reverse.js"></script>

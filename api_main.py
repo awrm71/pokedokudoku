@@ -13,6 +13,7 @@ from datetime import date
 
 import engine
 import pokedex_store
+import daily_store
 
 app = FastAPI()
 
@@ -49,6 +50,10 @@ class ValidatePickResponse(BaseModel):
     # Draft and Shuffle boards it's a sighting that isn't kept.
     shiny: bool = False
     shiny_registered: bool = False
+    # Daily Board only (None elsewhere):
+    lives_left: Optional[int] = None    # the server's count, so a refresh can't reset it
+    pct: Optional[float] = None         # share of players who answered this square with this Pokemon
+    finished: bool = False              # the board just ended (filled, or out of lives)
 
 
 # ── Shiny odds ──────────────────────────────────────────────────────────────
@@ -239,6 +244,12 @@ rule_masks = engine.compute_rule_masks(df_play, rules)
 name_index = engine.build_name_index(df_play)
 
 pokedex_store.init_db()
+daily_store.init_db()
+
+# The Daily Board keeps its lives and hints on the server (daily_store), so the
+# numbers here are the source of truth; app.js starts from the same values.
+DAILY_LIVES = 3
+DAILY_HINTS = 3
 
 def is_daily_seed(seed: str) -> bool:
     """A board only counts toward the Pokedex if its seed is today's canonical
@@ -340,7 +351,10 @@ async def get_board(seed: str | None = None, n: int = 9, n_rows: int | None = No
         raise HTTPException(status_code=503, detail="Board generation timed out — try shuffling")
     if board is None:
         raise HTTPException(status_code=500, detail="Could not generate board")
-    return serialize_board(board)
+    out = serialize_board(board)
+    # Only today's board is saved and has answer stats; app.js keys off this.
+    out["is_daily"] = is_daily_seed(board_seed)
+    return out
 
 
 # ── Draft Board: user-customized category selection ─────────────────────
@@ -580,6 +594,23 @@ def validate_pick_api(
     if payload.col_j < 0 or payload.col_j >= len(board.col_rule_ids):
         raise HTTPException(status_code=400, detail=f"col_j {payload.col_j} out of range")
 
+    # Daily Board: the saved run decides what's allowed. A finished board (won,
+    # out of lives, or ended to see the stats) takes no more answers, a square
+    # keeps its first answer, and every saved answer counts as "used" even if
+    # this browser lost track of it.
+    used_keys = set(payload.used_keys)
+    daily = bool(x_client_id) and is_daily_seed(payload.seed)
+    run = None
+    if daily:
+        run = daily_store.get_run(x_client_id, payload.seed)
+        lives_left = max(0, DAILY_LIVES - run["misses"])
+        if run["finished"] or lives_left <= 0:
+            return ValidatePickResponse(ok=False, reason="board_locked", lives_left=lives_left, finished=True)
+        saved = {(p["row_i"], p["col_j"]): p["pokemon_key"] for p in run["picks"]}
+        if (payload.row_i, payload.col_j) in saved:
+            return ValidatePickResponse(ok=False, reason="already_filled", lives_left=lives_left)
+        used_keys |= set(saved.values())
+
     res = engine.validate_pick(
         df=df_play,
         rule_masks=rule_masks,
@@ -587,8 +618,19 @@ def validate_pick_api(
         row_i=payload.row_i,
         col_j=payload.col_j,
         pokemon_key=payload.pokemon_key,
-        used_keys=set(payload.used_keys),
+        used_keys=used_keys,
     )
+
+    if daily and not res.ok:
+        if res.reason in ("does_not_match", "duplicate"):
+            misses = daily_store.add_miss(x_client_id, payload.seed)
+            lives_left = max(0, DAILY_LIVES - misses)
+            if lives_left <= 0:
+                daily_store.finish(x_client_id, payload.seed)
+            return ValidatePickResponse(ok=False, reason=res.reason, lives_left=lives_left,
+                                        finished=lives_left <= 0)
+        return ValidatePickResponse(ok=False, reason=res.reason,
+                                    lives_left=max(0, DAILY_LIVES - run["misses"]))
 
     # Pokedex tracking: only correct picks, only on today's daily board, only
     # when the client sent an id. Shuffle boards (random-int seeds) never
@@ -630,6 +672,23 @@ def validate_pick_api(
         # confirmed categories every time you reuse it on a later board.
         pokedex_store.record_rule_use(x_client_id, payload.pokemon_key, row_label)
         pokedex_store.record_rule_use(x_client_id, payload.pokemon_key, col_label)
+
+        # Save the answer (first one per square wins), then report how many
+        # players picked the same Pokemon in this exact square.
+        daily_store.record_pick(
+            x_client_id, payload.seed, payload.row_i, payload.col_j,
+            row_rule_id, col_rule_id, payload.pokemon_key, hinted=False, shiny=shiny,
+        )
+        same, total = daily_store.cell_share(payload.seed, payload.row_i, payload.col_j, payload.pokemon_key)
+        filled = len(run["picks"]) + 1
+        done = filled >= payload.n_rows * payload.n_cols
+        if done:
+            daily_store.finish(x_client_id, payload.seed)
+        return ValidatePickResponse(
+            ok=True, reason=res.reason, shiny=shiny, shiny_registered=shiny_registered,
+            lives_left=max(0, DAILY_LIVES - run["misses"]),
+            pct=_pct(same, total), finished=done,
+        )
 
     elif res.ok:
         # Draft and Shuffle boards: same odds (charms count; streaks don't,
@@ -958,11 +1017,14 @@ def claim_pokedex(payload: ClaimPokedexRequest):
     Pokedex progress onto a real account id. Safe to call even if the
     anonymous id has no entries (returns merged_entries=0)."""
     moved = pokedex_store.merge_client(payload.anonymous_client_id, payload.account_id)
+    daily_store.merge_client(payload.anonymous_client_id, payload.account_id)
     return ClaimPokedexResponse(merged_entries=moved)
 
 
 @app.get("/hint")
-def get_hint(seed: str, n: int = 9, n_rows: int | None = None, n_cols: int | None = None, row_i: int = 0, col_j: int = 0, used_keys: str = ""):
+def get_hint(seed: str, n: int = 9, n_rows: int | None = None, n_cols: int | None = None,
+             row_i: int = 0, col_j: int = 0, used_keys: str = "",
+             x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
     row_count = n_rows if n_rows is not None else n
     col_count = n_cols if n_cols is not None else n
     board = _get_or_generate_board(seed, row_count, col_count)
@@ -975,6 +1037,23 @@ def get_hint(seed: str, n: int = 9, n_rows: int | None = None, n_cols: int | Non
         raise HTTPException(status_code=400, detail="col_j out of range")
 
     used = set(k for k in used_keys.split(",") if k) if used_keys else set()
+
+    # Daily Board: hints are counted on the server like lives, and a hinted
+    # square is saved so it comes back after a refresh (it never counts
+    # toward the answer stats).
+    daily = bool(x_client_id) and is_daily_seed(seed)
+    run = None
+    if daily:
+        run = daily_store.get_run(x_client_id, seed)
+        if run["finished"] or run["misses"] >= DAILY_LIVES:
+            raise HTTPException(status_code=409, detail="Today's board is finished.")
+        if run["hints_used"] >= DAILY_HINTS:
+            raise HTTPException(status_code=409, detail="No hints left today.")
+        saved = {(p["row_i"], p["col_j"]): p["pokemon_key"] for p in run["picks"]}
+        if (row_i, col_j) in saved:
+            raise HTTPException(status_code=409, detail="That square is already filled.")
+        used |= set(saved.values())
+
     rr = board.row_rule_ids[row_i]
     cc = board.col_rule_ids[col_j]
     candidates = engine.candidates_for_cell(df_play, rule_masks, rr, cc)
@@ -988,11 +1067,177 @@ def get_hint(seed: str, n: int = 9, n_rows: int | None = None, n_cols: int | Non
     if "pokemon_id" in row.index and pd.notna(row["pokemon_id"]):
         pokemon_id = int(row["pokemon_id"])
 
-    return {
+    out = {
         "key": str(row["key"]),
         "display_name": str(row["display_name"]),
         "pokemon_id": pokemon_id,
     }
+    if daily:
+        daily_store.record_pick(x_client_id, seed, row_i, col_j, rr, cc, out["key"], hinted=True)
+        filled = len(run["picks"]) + 1
+        if filled >= row_count * col_count:
+            daily_store.finish(x_client_id, seed)
+        out["hints_left"] = max(0, DAILY_HINTS - run["hints_used"] - 1)
+        out["finished"] = filled >= row_count * col_count
+    return out
+
+# ── Daily Board: saved progress + answer stats ──────────────────────────
+# GET  /daily/state   the player's saved Daily (picks, lives, hints) to restore
+# POST /daily/finish  end the board early to see the stats
+# GET  /daily/stats   per-square answer stats; only once the player's board is
+#                     finished, so the most-picked answers can't be used to
+#                     solve squares that are still open.
+#
+# A square's % = players who answered that Pokemon in that square divided by
+# players who filled that square. Hinted squares never count.
+
+def _pct(count: int, total: int) -> Optional[float]:
+    return round(100.0 * count / total, 1) if total else None
+
+
+_mon_info_cache: dict = {}
+
+def _mon_info(key: str) -> dict:
+    if not _mon_info_cache:
+        for r in df_play[["key", "display_name", "pokemon_id"]].itertuples(index=False):
+            _mon_info_cache[str(r.key)] = {
+                "display_name": str(r.display_name),
+                "pokemon_id": int(r.pokemon_id) if pd.notna(r.pokemon_id) else None,
+            }
+    return _mon_info_cache.get(key, {"display_name": key, "pokemon_id": None})
+
+
+class DailyPick(BaseModel):
+    row_i: int                      # canonical (server) indices, like /validate
+    col_j: int
+    key: str
+    display_name: str
+    pokemon_id: Optional[int] = None
+    hinted: bool = False
+    shiny: bool = False
+    pct: Optional[float] = None
+
+
+class DailyStateResponse(BaseModel):
+    seed: str
+    lives_left: int
+    hints_left: int
+    finished: bool
+    picks: List[DailyPick]
+
+
+class StatPick(BaseModel):
+    key: str
+    display_name: str
+    pokemon_id: Optional[int] = None
+    count: int
+    pct: float
+
+
+class CellStats(BaseModel):
+    row_i: int
+    col_j: int
+    total: int                      # players who filled this square (hints excluded)
+    top: List[StatPick]             # most picked first, up to 5
+    rarest: Optional[StatPick] = None
+    mine: Optional[DailyPick] = None
+
+
+class DailyStatsResponse(BaseModel):
+    seed: str
+    players: int                    # players with at least one counted answer today
+    avg_pct: Optional[float] = None # the player's average % over their counted squares
+    counted: int = 0
+    cells: List[CellStats]
+
+
+def _stat_pick(key: str, count: int, total: int) -> StatPick:
+    info = _mon_info(key)
+    return StatPick(key=key, display_name=info["display_name"], pokemon_id=info["pokemon_id"],
+                    count=count, pct=_pct(count, total) or 0.0)
+
+
+def _counts_with_mine(seed: str, picks: List[dict]) -> dict:
+    """Board counts from the short cache, refreshed if they don't yet include
+    this player's own answers (so nobody ever sees 0% on their own pick)."""
+    counts = daily_store.board_counts(seed)
+    for p in picks:
+        if not p["hinted"] and counts["cells"].get((p["row_i"], p["col_j"]), {}).get(p["pokemon_key"], 0) == 0:
+            return daily_store.board_counts(seed, fresh=True)
+    return counts
+
+
+def _daily_pick_out(p: dict, counts: dict) -> DailyPick:
+    info = _mon_info(p["pokemon_key"])
+    pct = None
+    if not p["hinted"]:
+        cell = counts["cells"].get((p["row_i"], p["col_j"]), {})
+        pct = _pct(cell.get(p["pokemon_key"], 0), sum(cell.values()))
+    return DailyPick(row_i=p["row_i"], col_j=p["col_j"], key=p["pokemon_key"],
+                     display_name=info["display_name"], pokemon_id=info["pokemon_id"],
+                     hinted=p["hinted"], shiny=p["shiny"], pct=pct)
+
+
+@app.get("/daily/state", response_model=DailyStateResponse)
+def daily_state(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
+    seed = str(date.today())
+    run = daily_store.get_run(x_client_id, seed)
+    counts = _counts_with_mine(seed, run["picks"]) if run["picks"] else {"cells": {}}
+    lives_left = max(0, DAILY_LIVES - run["misses"])
+    return DailyStateResponse(
+        seed=seed,
+        lives_left=lives_left,
+        hints_left=max(0, DAILY_HINTS - run["hints_used"]),
+        finished=run["finished"] or lives_left <= 0,
+        picks=[_daily_pick_out(p, counts) for p in run["picks"]],
+    )
+
+
+def _daily_stats(client_id: str, seed: str) -> DailyStatsResponse:
+    run = daily_store.get_run(client_id, seed)
+    counts = _counts_with_mine(seed, run["picks"])
+    mine = {(p["row_i"], p["col_j"]): p for p in run["picks"]}
+    cells_out: List[CellStats] = []
+    my_pcts: List[float] = []
+    for i in range(N):
+        for j in range(N):
+            cell = counts["cells"].get((i, j), {})
+            total = sum(cell.values())
+            ranked = sorted(cell.items(), key=lambda kv: (-kv[1], _mon_info(kv[0])["display_name"]))
+            rare = min(cell.items(), key=lambda kv: (kv[1], _mon_info(kv[0])["display_name"])) if cell else None
+            my = _daily_pick_out(mine[(i, j)], counts) if (i, j) in mine else None
+            if my and my.pct is not None:
+                my_pcts.append(my.pct)
+            cells_out.append(CellStats(
+                row_i=i, col_j=j, total=total,
+                top=[_stat_pick(k, n, total) for k, n in ranked[:5]],
+                rarest=_stat_pick(rare[0], rare[1], total) if rare else None,
+                mine=my,
+            ))
+    return DailyStatsResponse(
+        seed=seed, players=counts["players"],
+        avg_pct=round(sum(my_pcts) / len(my_pcts), 1) if my_pcts else None,
+        counted=len(my_pcts), cells=cells_out,
+    )
+
+
+@app.get("/daily/stats", response_model=DailyStatsResponse)
+def daily_stats(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
+    seed = str(date.today())
+    run = daily_store.get_run(x_client_id, seed)
+    if not (run["finished"] or run["misses"] >= DAILY_LIVES):
+        raise HTTPException(status_code=403, detail="Finish today's board to see everyone's answers.")
+    return _daily_stats(x_client_id, seed)
+
+
+@app.post("/daily/finish", response_model=DailyStatsResponse)
+def daily_finish(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
+    if not x_client_id:
+        raise HTTPException(status_code=400, detail="Missing client id.")
+    seed = str(date.today())
+    daily_store.finish(x_client_id, seed)
+    return _daily_stats(x_client_id, seed)
+
 
 @app.get("/search-test")
 def search_test(q: str = "piccachu"):

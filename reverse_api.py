@@ -14,11 +14,22 @@ duplicated. Everything Reverse-Board-specific lives here.
 Endpoints:
   POST /board/reverse            generate a filled board with hidden labels
   POST /reverse/validate         check one row/col guess, log on success
+  POST /reverse/hint             spend the board's hint: reveal one line
+  GET  /reverse/stats            daily only: how everyone named each line
   GET  /reverse/index            the caller's Category Index progress
   GET  /reverse/presets          difficulty preset definitions for the UI
 
 The answer key (which rules each line accepts) NEVER leaves the server. The
 client only gets the filled grid and the board id; guesses are checked here.
+The only exceptions are deliberate: the hint reveals one line, and running
+out of lives reveals the lines that were left.
+
+Lives and hints (same idea as the forward board, scaled to 18 lines):
+  MAX_LIVES wrong guesses end the board; MAX_HINTS hint(s) per board.
+  Daily: kept in the database per player and day (reverse_store), so a
+  reload can't reset them. Custom: kept with the board in memory.
+  A hinted line is solved but does NOT register to the Category Index or the
+  Pokedex, since the player didn't deduce it.
 """
 
 from __future__ import annotations
@@ -59,6 +70,9 @@ DEFAULT_PRESET = "medium"
 _REVERSE_TIMEOUT_SECONDS = 30.0
 _STORE_MAX = 40
 
+MAX_LIVES = 3
+MAX_HINTS = 1
+
 
 class _Ctx:
     """Everything reverse_api borrows from api_main, passed in at attach time."""
@@ -95,7 +109,11 @@ def _remember(board_id: str, rb: reverse_engine.ReverseBoard, is_qualifying: boo
             _boards.pop(oldest, None)
             _boards_meta.pop(oldest, None)
         _boards[board_id] = rb
-        _boards_meta[board_id] = {"is_qualifying": is_qualifying, "day_seed": day_seed}
+        old = _boards_meta.get(board_id) or {}
+        _boards_meta[board_id] = {"is_qualifying": is_qualifying, "day_seed": day_seed,
+                                  # Custom boards keep lives/hint state here;
+                                  # re-remembering a board must not reset it.
+                                  "play": old.get("play") or {"solved": {}, "misses": set(), "hint": None}}
 
 
 # ── Request/response models ───────────────────────────────────────────────────
@@ -125,8 +143,16 @@ class ReverseBoardResponse(BaseModel):
     note: Optional[str] = None
     # Daily-only fields (None/empty for custom boards):
     day_seed: Optional[str] = None
-    solved_lines: List[dict] = []      # [{axis, index, label, rule_id}] to restore a locked daily board
+    solved_lines: List[dict] = []      # [{axis, index, label, rule_id, hinted}] to restore a locked daily board
     total_lines: Optional[int] = None  # n_rows + n_cols
+    # Lives and hints (restored for the daily board, fresh for custom):
+    max_lives: int = MAX_LIVES
+    max_hints: int = MAX_HINTS
+    lives_left: int = MAX_LIVES
+    hints_left: int = MAX_HINTS
+    missed: List[dict] = []            # [{axis, index, rule_id}] wrong guesses so far
+    game_over: bool = False            # out of lives: the board is locked
+    reveal: List[dict] = []            # only when game_over: the lines left unsolved
     # NOTE: no rule ids or labels for UNSOLVED lines — that's the whole puzzle.
 
 
@@ -139,10 +165,57 @@ class ReverseValidateRequest(BaseModel):
 
 class ReverseValidateResponse(BaseModel):
     ok: bool
-    reason: str                       # "ok" | "wrong" | "unknown_axis" | "unknown_board"
+    # "ok" | "wrong" | "repeat" (same wrong guess again, no life lost) |
+    # "already_solved" | "out_of_lives" | "unknown_axis" | "unknown_board"
+    reason: str
     canonical_rule_id: str = ""
     canonical_label: str = ""
     newly_indexed: bool = False       # advanced the Category Index (first-ever + qualifying board)
+    lives_left: int = MAX_LIVES
+    hints_left: int = MAX_HINTS
+    game_over: bool = False
+    reveal: List[dict] = []           # filled only when this guess ended the board
+    pct: Optional[float] = None       # daily only: share of players who named this line the same way
+
+
+class ReverseHintRequest(BaseModel):
+    board_id: str
+    axis: str          # "row" | "col"
+    index: int
+
+
+class ReverseHintResponse(BaseModel):
+    ok: bool
+    # "ok" | "no_hints" | "already_solved" | "out_of_lives" | "unknown_axis" | "unknown_board"
+    reason: str
+    rule_id: str = ""
+    label: str = ""
+    lives_left: int = MAX_LIVES
+    hints_left: int = MAX_HINTS
+
+
+class LineAnswer(BaseModel):
+    rule_id: str
+    label: str
+    count: int
+    pct: float
+
+
+class LineStats(BaseModel):
+    axis: str
+    index: int
+    open: bool                     # False = still unsolved for you; nothing else is sent
+    total: int = 0                 # players who named this line (hints excluded)
+    answers: List[LineAnswer] = [] # EVERY category that fits, most named first (0 = nobody yet)
+    mine: Optional[str] = None     # the rule_id you named
+    hinted: bool = False
+
+
+class ReverseStatsResponse(BaseModel):
+    day_seed: str
+    players: int
+    avg_pct: Optional[float] = None
+    lines: List[LineStats]
 
 
 class CategoryIndexEntry(BaseModel):
@@ -209,6 +282,78 @@ def attach(app, ctx: _Ctx) -> None:
             grid_out.append(row_cells)
         return grid_out
 
+    # ── Lives / hints ─────────────────────────────────────────────────────────
+    def _label(rule_id: str) -> str:
+        rule = ctx.rules.get(rule_id)
+        if rule is None:
+            return rule_id
+        return ctx.compact_rule_label(rule.label) or str(rule.label)
+
+    def _play(meta: dict, client_id: Optional[str]):
+        """(solved, misses, hint) for this player on this board.
+
+        solved: {"row:3": {axis, line_index, named_rule_id, named_label}}
+        misses: {(axis, index, rule_id)}
+        hint:   (axis, index) or None
+
+        Daily: read from the database (per player + day). Custom: the board's
+        own in-memory record. A daily request without a client id gets a
+        throwaway record, so anonymous calls never share one set of lives."""
+        day = meta.get("day_seed")
+        if meta.get("is_qualifying") and day:
+            if not client_id:
+                return {}, set(), None
+            solved = reverse_store.get_daily_progress(client_id, day)
+            misses = {(m["axis"], m["line_index"], m["rule_id"])
+                      for m in reverse_store.get_daily_misses(client_id, day)}
+            h = reverse_store.get_daily_hint(client_id, day)
+            return solved, misses, ((h["axis"], h["line_index"]) if h else None)
+        play = meta.setdefault("play", {"solved": {}, "misses": set(), "hint": None})
+        return play["solved"], play["misses"], play["hint"]
+
+    def _lives_left(misses) -> int:
+        return max(0, MAX_LIVES - len(misses))
+
+    def _hints_left(hint) -> int:
+        return max(0, MAX_HINTS - (1 if hint else 0))
+
+    def _line_ok(rb, axis: str, index: int) -> bool:
+        if axis == "row":
+            return 0 <= index < rb.n_rows
+        if axis == "col":
+            return 0 <= index < rb.n_cols
+        return False
+
+    def _reveal(rb, solved) -> List[dict]:
+        """The intended category of every line still unsolved. Only sent once
+        the board is lost, so the player can see what they missed."""
+        out: List[dict] = []
+        for axis, count, ids in (("row", rb.n_rows, rb.row_rule_ids), ("col", rb.n_cols, rb.col_rule_ids)):
+            for i in range(count):
+                if f"{axis}:{i}" in solved:
+                    continue
+                out.append({"axis": axis, "index": i, "rule_id": ids[i], "label": _label(ids[i])})
+        return out
+
+    # ── Daily line stats ──────────────────────────────────────────────────────
+    def _pct(count: int, total: int) -> Optional[float]:
+        return round(100.0 * count / total, 1) if total else None
+
+    def _counts_with_mine(day_seed: str, solved: dict, hint) -> dict:
+        """Cached counts, refreshed if they don't include this player's own
+        lines yet (so nobody sees 0% on their own answer)."""
+        counts = reverse_store.line_counts(day_seed)
+        for v in solved.values():
+            if hint == (v["axis"], v["line_index"]):
+                continue
+            if counts["lines"].get((v["axis"], v["line_index"]), {}).get(v["named_rule_id"], 0) == 0:
+                return reverse_store.line_counts(day_seed, fresh=True)
+        return counts
+
+    def _mine_pct(counts: dict, axis: str, index: int, rule_id: str) -> Optional[float]:
+        line = counts["lines"].get((axis, index), {})
+        return _pct(line.get(rule_id, 0), sum(line.values()))
+
     def _generate_daily(day_seed: str):
         """Deterministic Hard board for the given day. Same seed -> same board,
         so every client shares today's puzzle and it can register progress."""
@@ -261,13 +406,23 @@ def attach(app, ctx: _Ctx) -> None:
                     pass
             _remember(board_id, rb, is_qualifying=True, day_seed=day_seed)
 
-        # Restore already-solved lines so the board stays locked for the day.
-        solved = reverse_store.get_daily_progress(x_client_id, day_seed) if x_client_id else {}
-        solved_out = [
-            {"axis": v["axis"], "index": v["line_index"],
-             "label": v["named_label"], "rule_id": v["named_rule_id"]}
-            for v in solved.values()
-        ]
+        # Restore solved lines, wrong guesses, lives and the hint, so the
+        # board picks up exactly where the player left it today.
+        with _boards_lock:
+            meta = dict(_boards_meta.get(board_id, {}))
+        solved, misses, hint = _play(meta, x_client_id)
+        counts = _counts_with_mine(day_seed, solved, hint) if solved else {"lines": {}}
+        solved_out = []
+        for v in solved.values():
+            hinted = hint == (v["axis"], v["line_index"])
+            solved_out.append({
+                "axis": v["axis"], "index": v["line_index"],
+                "label": v["named_label"], "rule_id": v["named_rule_id"],
+                "hinted": hinted,
+                "pct": None if hinted else _mine_pct(counts, v["axis"], v["line_index"], v["named_rule_id"]),
+            })
+        lives_left = _lives_left(misses)
+        game_over = lives_left <= 0
 
         return ReverseBoardResponse(
             board_id=board_id,
@@ -280,6 +435,11 @@ def attach(app, ctx: _Ctx) -> None:
             day_seed=day_seed,
             solved_lines=solved_out,
             total_lines=rb.n_rows + rb.n_cols,
+            lives_left=lives_left,
+            hints_left=_hints_left(hint),
+            missed=[{"axis": a, "index": i, "rule_id": r} for a, i, r in sorted(misses)],
+            game_over=game_over,
+            reveal=_reveal(rb, solved) if game_over else [],
         )
 
     @app.post("/board/reverse", response_model=ReverseBoardResponse)
@@ -324,6 +484,7 @@ def attach(app, ctx: _Ctx) -> None:
             is_qualifying=False,
             grid=grid_out,
             note=note,
+            total_lines=rb.n_rows + rb.n_cols,
         )
 
     @app.post("/reverse/validate", response_model=ReverseValidateResponse)
@@ -334,13 +495,49 @@ def attach(app, ctx: _Ctx) -> None:
         if rb is None:
             # Board evicted from the server cache (restart, or too many since).
             return ReverseValidateResponse(ok=False, reason="unknown_board")
+        if not _line_ok(rb, payload.axis, payload.index):
+            return ReverseValidateResponse(ok=False, reason="unknown_axis")
 
+        solved, misses, hint = _play(meta, x_client_id)
+        key = f"{payload.axis}:{payload.index}"
+        lives_left = _lives_left(misses)
+        status = dict(lives_left=lives_left, hints_left=_hints_left(hint))
+
+        # A solved line stays solved; guessing it again changes nothing.
+        if key in solved:
+            done = solved[key]
+            return ReverseValidateResponse(ok=True, reason="already_solved",
+                                           canonical_rule_id=done["named_rule_id"],
+                                           canonical_label=done["named_label"], **status)
+        # Out of lives: the board is locked.
+        if lives_left <= 0:
+            return ReverseValidateResponse(ok=False, reason="out_of_lives", game_over=True,
+                                           reveal=_reveal(rb, solved), **status)
+        # Not a real category (the UI can't send one): wrong, but no charge.
         if payload.guessed_rule_id not in ctx.rules:
-            return ReverseValidateResponse(ok=False, reason="wrong")
+            return ReverseValidateResponse(ok=False, reason="wrong", **status)
 
         result = reverse_engine.check_line_guess(rb, payload.axis, payload.index, payload.guessed_rule_id)
         if not result.ok:
-            return ReverseValidateResponse(ok=False, reason=result.reason)
+            if result.reason != "wrong":
+                return ReverseValidateResponse(ok=False, reason=result.reason, **status)
+            miss = (payload.axis, payload.index, payload.guessed_rule_id)
+            if miss in misses:
+                # Same wrong guess twice (double tap, two tabs): never charge twice.
+                return ReverseValidateResponse(ok=False, reason="repeat", **status)
+            day_seed = meta.get("day_seed")
+            if meta.get("is_qualifying") and day_seed:
+                if x_client_id:
+                    reverse_store.record_daily_miss(x_client_id, day_seed, *miss)
+            else:
+                with _boards_lock:
+                    misses.add(miss)
+            lives_left = max(0, lives_left - 1)
+            game_over = lives_left <= 0
+            return ReverseValidateResponse(
+                ok=False, reason="wrong", lives_left=lives_left, hints_left=status["hints_left"],
+                game_over=game_over, reveal=_reveal(rb, solved) if game_over else [],
+            )
 
         named_id = result.canonical_rule_id
         label = ctx.compact_rule_label(ctx.rules[named_id].label)
@@ -370,12 +567,132 @@ def attach(app, ctx: _Ctx) -> None:
                 except Exception:
                     # Enrichment is best-effort; never fail a correct guess over it.
                     pass
+        elif not meta.get("is_qualifying"):
+            with _boards_lock:
+                solved[key] = {"axis": payload.axis, "line_index": payload.index,
+                               "named_rule_id": named_id, "named_label": label}
+
+        # Daily: how many players named this line the same way.
+        pct = None
+        if meta.get("is_qualifying") and day_seed and x_client_id:
+            same, total = reverse_store.line_share(day_seed, payload.axis, payload.index, named_id)
+            pct = _pct(same, total)
 
         return ReverseValidateResponse(
             ok=True, reason="ok",
             canonical_rule_id=named_id,
             canonical_label=label,
             newly_indexed=newly,
+            pct=pct,
+            **status,
+        )
+
+    @app.post("/reverse/hint", response_model=ReverseHintResponse)
+    def reverse_hint(payload: ReverseHintRequest, x_client_id: Optional[str] = Header(default=None)):
+        """Spend the board's hint: reveal the intended category of one line.
+        The line counts as solved, but it never registers to the Category
+        Index or the Pokedex."""
+        with _boards_lock:
+            rb = _boards.get(payload.board_id)
+            meta = _boards_meta.get(payload.board_id, {})
+        if rb is None:
+            return ReverseHintResponse(ok=False, reason="unknown_board")
+        if not _line_ok(rb, payload.axis, payload.index):
+            return ReverseHintResponse(ok=False, reason="unknown_axis")
+
+        solved, misses, hint = _play(meta, x_client_id)
+        status = dict(lives_left=_lives_left(misses), hints_left=_hints_left(hint))
+        if f"{payload.axis}:{payload.index}" in solved:
+            return ReverseHintResponse(ok=False, reason="already_solved", **status)
+        if status["lives_left"] <= 0:
+            return ReverseHintResponse(ok=False, reason="out_of_lives", **status)
+        if status["hints_left"] <= 0:
+            return ReverseHintResponse(ok=False, reason="no_hints", **status)
+
+        ids = rb.row_rule_ids if payload.axis == "row" else rb.col_rule_ids
+        rule_id = ids[payload.index]
+        label = _label(rule_id)
+
+        day_seed = meta.get("day_seed")
+        if meta.get("is_qualifying") and day_seed:
+            if not x_client_id:
+                return ReverseHintResponse(ok=False, reason="no_hints", **status)
+            # The table's key allows one hint per player per day; if another
+            # tab got there first, this insert is refused.
+            if not reverse_store.record_daily_hint(x_client_id, day_seed, payload.axis,
+                                                   payload.index, rule_id, label):
+                return ReverseHintResponse(ok=False, reason="no_hints",
+                                           lives_left=status["lives_left"], hints_left=0)
+            reverse_store.record_daily_line(x_client_id, day_seed, payload.axis,
+                                            payload.index, rule_id, label)
+        else:
+            with _boards_lock:
+                play = meta.setdefault("play", {"solved": {}, "misses": set(), "hint": None})
+                if play["hint"]:
+                    return ReverseHintResponse(ok=False, reason="no_hints",
+                                               lives_left=status["lives_left"], hints_left=0)
+                play["hint"] = (payload.axis, payload.index)
+                play["solved"][f"{payload.axis}:{payload.index}"] = {
+                    "axis": payload.axis, "line_index": payload.index,
+                    "named_rule_id": rule_id, "named_label": label}
+
+        return ReverseHintResponse(ok=True, reason="ok", rule_id=rule_id, label=label,
+                                   lives_left=status["lives_left"],
+                                   hints_left=max(0, status["hints_left"] - 1))
+
+    @app.get("/reverse/stats", response_model=ReverseStatsResponse)
+    def reverse_stats(x_client_id: Optional[str] = Header(default=None)):
+        """How everyone named each line of today's board, with every category
+        that would have fit (including ones nobody found). A line's breakdown
+        is only sent once you've solved it, or once your board is over, so it
+        can't be used to solve lines that are still open."""
+        day_seed = ctx.today_seed()
+        with _daily_lock:
+            cached = _daily_cache.get(day_seed)
+        if cached is None:
+            raise HTTPException(status_code=404, detail="Load today's Reverse Board first.")
+        board_id, rb = cached
+        with _boards_lock:
+            meta = dict(_boards_meta.get(board_id) or {"is_qualifying": True, "day_seed": day_seed})
+        solved, misses, hint = _play(meta, x_client_id)
+        over = _lives_left(misses) <= 0 or len(solved) >= rb.n_rows + rb.n_cols
+        counts = _counts_with_mine(day_seed, solved, hint)
+
+        lines_out: List[LineStats] = []
+        my_pcts: List[float] = []
+        for axis, count, sets in (("row", rb.n_rows, rb.row_answer_sets), ("col", rb.n_cols, rb.col_answer_sets)):
+            for i in range(count):
+                key = f"{axis}:{i}"
+                mine = solved.get(key)
+                hinted = hint == (axis, i)
+                if not (mine or over):
+                    lines_out.append(LineStats(axis=axis, index=i, open=False))
+                    continue
+                named = counts["lines"].get((axis, i), {})
+                total = sum(named.values())
+                # Every category that fits the line, so players can see what
+                # else would have worked. Hidden rules (no visible label) skip.
+                fits = [rid for rid in sets[i] if rid in ctx.rules and ctx.compact_rule_label(ctx.rules[rid].label)]
+                for rid in named:
+                    if rid not in fits:
+                        fits.append(rid)
+                answers = sorted(
+                    (LineAnswer(rule_id=rid, label=_label(rid), count=named.get(rid, 0),
+                                pct=_pct(named.get(rid, 0), total) or 0.0) for rid in fits),
+                    key=lambda a: (-a.count, a.label.lower()),
+                )
+                if mine and not hinted:
+                    p = _mine_pct(counts, axis, i, mine["named_rule_id"])
+                    if p is not None:
+                        my_pcts.append(p)
+                lines_out.append(LineStats(
+                    axis=axis, index=i, open=True, total=total, answers=answers,
+                    mine=mine["named_rule_id"] if mine else None, hinted=hinted,
+                ))
+        return ReverseStatsResponse(
+            day_seed=day_seed, players=counts["players"],
+            avg_pct=round(sum(my_pcts) / len(my_pcts), 1) if my_pcts else None,
+            lines=lines_out,
         )
 
     @app.get("/reverse/index", response_model=CategoryIndexResponse)

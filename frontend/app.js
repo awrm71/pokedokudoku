@@ -568,6 +568,8 @@ function updateHUD() {
   // Keep modal hint stars and lives in sync
   syncModalHints();
   syncModalLives();
+  // Daily answer stats follow whichever board is on screen (stats.js).
+  window.PDD_STATS?.sync();
 
   // Trigger game over / win
   if (state.lives <= 0 && !state.gameOver) {
@@ -584,6 +586,7 @@ function triggerGameOver() {
   if (banner) banner.classList.add("visible");
   document.querySelectorAll(".pip-hint").forEach((pip) => { pip.disabled = true; });
   setMessage("💀 No lives remaining — board locked.", "var(--err)");
+  window.PDD_STATS?.boardEnded();
 }
 
 function triggerWin(correct, total) {
@@ -591,6 +594,7 @@ function triggerWin(correct, total) {
   const banner = document.getElementById("winBanner");
   if (banner) banner.classList.add("visible");
   setMessage(`🏆 Board complete! ${correct}/${total} correct!`, "var(--ok)");
+  window.PDD_STATS?.boardEnded();
 }
 
 async function useHint() {
@@ -639,8 +643,10 @@ async function useHint() {
     });
     const result = await fetchJson(`${state.apiBase}/hint?${params.toString()}`);
     applyHintToCell(cellId, cell, result);
-  } catch {
-    setMessage("Couldn't find a hint for this cell — try another!", "var(--warn)");
+    syncDailyHints(result);
+  } catch (err) {
+    setMessage(err?.message?.startsWith("Request failed") || !err?.message
+      ? "Couldn't find a hint for this cell — try another!" : err.message, "var(--warn)");
   }
 }
 
@@ -667,6 +673,14 @@ function applyHintToCell(cellId, cell, result) {
   state.hints = Math.max(0, state.hints - 1);
   updateHUD();
   setMessage(`Hint revealed! ${state.hints} hint${state.hints !== 1 ? "s" : ""} remaining.`, "var(--ok)");
+}
+
+// On the Daily the server counts hints, so its number wins over ours.
+function syncDailyHints(result) {
+  if (typeof result?.hints_left === "number" && result.hints_left !== state.hints) {
+    state.hints = result.hints_left;
+    updateHUD();
+  }
 }
 
 function getUsedKeysExcept(cellId) {
@@ -734,6 +748,8 @@ function bindCellEvents(cellEl, row, col, rowLabel, colLabel) {
       `<span class="q-row">${rowDisplay}</span>` +
       `<span class="q-sep">×</span>` +
       `<span class="q-col">${colDisplay}</span>`;
+    // Two long labels can't both fit at full size; drop a size for those.
+    comboQual.classList.toggle("q-long", (rowDisplay + colDisplay).length > 30);
   }
 
   setCellSprites(cellEl, PLACEHOLDER, false);
@@ -892,9 +908,11 @@ async function useHintFromModal() {
     });
     const result = await fetchJson(`${state.apiBase}/hint?${params.toString()}`);
     applyHintToCell(cellId, cell, result);
+    syncDailyHints(result);
     closeCellModal();
-  } catch {
-    setModalStatus("Couldn't find a hint — try another cell!", "warn");
+  } catch (err) {
+    setModalStatus(err?.message?.startsWith("Request failed") || !err?.message
+      ? "Couldn't find a hint — try another cell!" : err.message, "warn");
     syncModalHints();
   }
 }
@@ -988,6 +1006,7 @@ async function loadBoard(seed = "") {
   try {
     const board = await fetchJson(`${state.apiBase}/board?${query.toString()}`);
     applyLoadedBoard(board, "api", "Board loaded");
+    if (board.is_daily && state.board === board) await restoreDaily(board);
   } catch (err) {
     if (state.mode === "auto") {
       const board = buildMockBoard(seed || String(Date.now()), 9);
@@ -996,6 +1015,57 @@ async function loadBoard(seed = "") {
     }
     setMessage(`Unable to load board: ${err.message || err}`, "var(--err)");
   }
+}
+
+// ── Daily Board: saved progress ─────────────────────────────────────────────
+// Today's answers, lives and hints live on the server, so the Daily comes
+// back exactly as you left it after a refresh (and lives can't be reset).
+async function restoreDaily(board) {
+  let saved;
+  try {
+    saved = await fetchJson(`${state.apiBase}/daily/state`);
+  } catch (err) {
+    console.warn("[daily] couldn't restore progress", err);
+    return;
+  }
+  // The player may have switched boards while this was loading.
+  if (state.board !== board || saved.seed !== board.seed) return;
+
+  (saved.picks || []).forEach((p) => {
+    const i = board.rowPerm ? board.rowPerm.indexOf(p.row_i) : p.row_i;
+    const j = board.colPerm ? board.colPerm.indexOf(p.col_j) : p.col_j;
+    const cellId = getCellId(i, j);
+    const cell = state.cells.get(cellId);
+    if (!cell) return;
+    Object.assign(cell, {
+      locked: true, key: p.key, displayName: p.display_name, pokemonId: p.pokemon_id,
+      isHint: p.hinted, shiny: p.shiny, pct: p.pct, wrongAttempt: false, typed: "",
+    });
+    const cellEl = boardWrap.querySelector(`.cell[data-cell-id="${cellId}"]`);
+    if (!cellEl) return;
+    const shiny = p.shiny && window.PDD_SHINY;
+    setCellSprites(cellEl, shiny ? window.PDD_SHINY.spriteUrl(p.pokemon_id) : spriteFromPokemonId(p.pokemon_id), true);
+    setPickedName(cellEl, p.display_name);
+    setResultMark(cellEl, "ok");
+    cellEl.classList.add("locked", "ok");
+    cellEl.classList.toggle("hint-cell", !!p.hinted);
+    cellEl.classList.toggle("shiny", !!p.shiny);
+    if (!p.hinted) window.PDD_STATS?.paintPct(cellEl, p.pct);
+  });
+
+  state.lives = saved.lives_left;
+  state.hints = saved.hints_left;
+  const filled = (saved.picks || []).length;
+  const total = board.n_rows * board.n_cols;
+  if (saved.finished && saved.lives_left > 0 && filled < total) {
+    // Ended early to see the stats: locked, but no win/lose banner.
+    state.gameOver = true;
+    boardWrap.classList.add("board-locked");
+    board.__finished = true;
+  }
+  updateHUD();                     // shows the win / out-of-lives banner when due
+  if (saved.finished) window.PDD_STATS?.boardEnded();
+  else if (filled) setMessage(`Welcome back — ${filled} of ${total} squares filled today.`, "var(--ok)");
 }
 
 function randomSeed() {
@@ -1163,6 +1233,7 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
       cell.typed = "";
       // Shiny is rolled on the server (shiny.js has the details).
       cell.shiny = !!verdict.shiny;
+      cell.pct = verdict.pct ?? null;
       state.cells.set(cellId, cell);
 
       const shinySprite = cell.shiny && window.PDD_SHINY;
@@ -1172,15 +1243,28 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
         setResultMark(cellEl, "ok");
         cellEl.classList.add("locked", "ok");
         cellEl.classList.remove("err", "warn", "drafted");
+        // Daily only: how many players picked the same Pokémon here.
+        window.PDD_STATS?.paintPct(cellEl, cell.pct);
       }
+      if (typeof verdict.lives_left === "number") state.lives = verdict.lives_left;
       setMessage(cell.shiny ? `✨ Shiny ${_modalPicked.display_name}!` : "Pick accepted ✓", "var(--ok)");
+      // Capture the pick BEFORE closing: closeCellModal() clears _modalPicked.
+      const found = shinySprite
+        ? { cellEl, name: _modalPicked.display_name, pokemonId: _modalPicked.pokemon_id, registered: !!verdict.shiny_registered }
+        : null;
       updateHUD();
       closeCellModal();
-      if (shinySprite) {
-        const found = { cellEl, name: _modalPicked.display_name, pokemonId: _modalPicked.pokemon_id, registered: !!verdict.shiny_registered };
+      if (found) {
         // Let the modal finish closing so the cell is visible for the burst.
         setTimeout(() => window.PDD_SHINY.celebrate(found), 260);
       }
+    } else if (verdict.reason === "board_locked" || verdict.reason === "already_filled") {
+      // The saved Daily disagrees with this page (another tab, or the board
+      // already ended): reload it from the server.
+      closeCellModal();
+      setMessage(verdict.reason === "board_locked"
+        ? "Today's board is already finished." : "That square was already filled — syncing.", "var(--warn)");
+      loadBoard();
     } else {
       const reasonMap = {
         duplicate:       "Already used elsewhere — costs a life",
@@ -1201,7 +1285,8 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
           cell.typed = _modalPicked.display_name;
           state.cells.set(cellId, cell);
         }
-        state.lives = Math.max(0, state.lives - 1);
+        state.lives = typeof verdict.lives_left === "number"
+          ? verdict.lives_left : Math.max(0, state.lives - 1);
         updateHUD();
         if (state.lives <= 0) setTimeout(closeCellModal, 800);
       }
