@@ -17,15 +17,15 @@
 (function () {
   "use strict";
 
-  const SHINY_CDN = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny";
+  // Pixel shinies, loaded straight from PokeAPI (see CDN_BASE in app.js).
+  const SHINY_CDN = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny";
   const TRAINER_KEY = "pdd.trainer";
   const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
 
   // ── Sprites ───────────────────────────────────────────────────────────────
   function spriteUrl(pokemonId) {
     if (!pokemonId) return typeof PLACEHOLDER !== "undefined" ? PLACEHOLDER : "";
-    if (typeof state !== "undefined" && state.runtimeMode === "mock") return `${SHINY_CDN}/${pokemonId}.png`;
-    return `${(typeof state !== "undefined" && state.apiBase) || ""}/sprite/shiny/${pokemonId}.png`;
+    return `${SHINY_CDN}/${pokemonId}.png`;
   }
 
   // ── Trainer info (charms/odds), cached by pokedex.js ─────────────────────

@@ -166,8 +166,10 @@ class ReverseValidateRequest(BaseModel):
 class ReverseValidateResponse(BaseModel):
     ok: bool
     # "ok" | "wrong" | "repeat" (same wrong guess again, no life lost) |
+    # "already_used" (category named on another line, no life lost) |
     # "already_solved" | "out_of_lives" | "unknown_axis" | "unknown_board"
     reason: str
+    used_on: Optional[str] = None     # "row:2" when reason == "already_used"
     canonical_rule_id: str = ""
     canonical_label: str = ""
     newly_indexed: bool = False       # advanced the Category Index (first-ever + qualifying board)
@@ -516,6 +518,22 @@ def attach(app, ctx: _Ctx) -> None:
         # Not a real category (the UI can't send one): wrong, but no charge.
         if payload.guessed_rule_id not in ctx.rules:
             return ReverseValidateResponse(ok=False, reason="wrong", **status)
+
+        # Each category names one line per board. A category already used on
+        # another line is turned away (no life lost) — unless it's the only
+        # answer this line has left, so a line can never become unsolvable
+        # because an alternative answer was spent elsewhere. Whether it fits
+        # isn't revealed either way.
+        used_key = next((k for k, v in solved.items()
+                         if v["named_rule_id"] == payload.guessed_rule_id and k != key), None)
+        if used_key:
+            sets = rb.row_answer_sets if payload.axis == "row" else rb.col_answer_sets
+            answers = set(sets[payload.index])
+            used_ids = {v["named_rule_id"] for v in solved.values()}
+            others_left = any(r not in used_ids and r in ctx.rules and ctx.compact_rule_label(ctx.rules[r].label)
+                              for r in answers)
+            if not (payload.guessed_rule_id in answers and not others_left):
+                return ReverseValidateResponse(ok=False, reason="already_used", used_on=used_key, **status)
 
         result = reverse_engine.check_line_guess(rb, payload.axis, payload.index, payload.guessed_rule_id)
         if not result.ok:

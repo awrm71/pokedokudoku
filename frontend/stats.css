@@ -336,3 +336,22 @@ body.reverse-active .sb { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .cs-pct, .cs-alt, .sb, .sp, .sp-card, .sp-row, .sp-row::before, #ctxStatsBtn.confirm { animation: none !important; }
 }
+/* Every Pokémon sprite on the site is pixel art: keep the pixels sharp when
+   it's scaled up instead of letting the browser blur them. */
+img[src*="PokeAPI/sprites"] { image-rendering: pixelated; }
+
+/* Daily search: a Pokémon already on the board, crossed out with a tag. */
+.modal-suggestion-btn.used { opacity: 0.5; cursor: not-allowed; }
+.modal-suggestion-btn.used span { text-decoration: line-through; text-decoration-thickness: 2px; }
+.modal-suggestion-btn.used:hover { transform: none; filter: none; }
+.modal-sug-used {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-family: var(--pixel-font);
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffb3c1;
+  background: rgba(244, 63, 94, 0.16);
+}

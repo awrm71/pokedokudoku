@@ -437,8 +437,22 @@
     return rev.tried[key];
   }
 
+  // The line a category was already named on ("Row 2"), or "". Each
+  // category names one line per board; the server turns reuse away.
+  function usedOn(ruleId) {
+    const here = rev.activeLine && lineKey(rev.activeLine.axis, rev.activeLine.index);
+    for (const [k, v] of Object.entries(rev.solved)) {
+      if (k !== here && v.rule_id === ruleId) {
+        const [axis, idx] = k.split(":");
+        return lineName(axis, Number(idx));
+      }
+    }
+    return "";
+  }
+
   function makeOption(e) {
     const tried = triedSet().has(e.rule_id);
+    const used = usedOn(e.rule_id);
     const btn = document.createElement("button");
     btn.type = "button";
     btn.dataset.rule = e.rule_id;
@@ -465,6 +479,16 @@
         ? "" : (window.PDD_CATEGORY_HELP?.explain(e.label) || "");
       btn.querySelector(".rg-opt-help").textContent = explain;
       if (!explain) btn.querySelector(".rg-opt-help").remove();
+    }
+    if (used && !tried) {
+      // Dimmed with where it went. Still tappable: if it's genuinely the
+      // only answer left for this line, the server accepts it.
+      btn.classList.add("used");
+      btn.title = `Already named on ${used}`;
+      const tag = document.createElement("span");
+      tag.className = "rg-used";
+      tag.textContent = used.replace("Column", "Col");
+      btn.appendChild(tag);
     }
     if (tried) {
       btn.classList.add("tried");
@@ -665,6 +689,15 @@
       if (res.reason === "unknown_board") {
         setGuessStatus("This practice board expired (the server restarted). Start a new one from Custom.", "err");
         rev.foot = "idle";
+        return;
+      }
+      if (res.reason === "already_used") {
+        const [ax, ix] = String(res.used_on || "").split(":");
+        const where = ax ? lineName(ax, Number(ix)) : "another line";
+        setGuessStatus(`You already named ${splitLabel(entry.label).main} on ${where}. Each category counts once — no life lost.`, "err");
+        rev.pick = null;
+        rev.foot = "idle";
+        btn?.classList.remove("picked");
         return;
       }
       if (res.reason === "out_of_lives") {

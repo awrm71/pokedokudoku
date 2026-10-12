@@ -36,9 +36,14 @@ html.dex-lock, html.dex-lock body { overflow: hidden; }
   display: none;
   place-items: center;
   padding: 2vh 2vw;
-  background: rgba(4, 1, 8, 0.78);
-  backdrop-filter: blur(6px);
+  /* A plain dark backdrop, no blur: blurring the whole page behind the
+     Pokédex had to be redone on every repaint and made scrolling heavy. */
+  background: rgba(4, 1, 8, 0.86);
 }
+/* While scrolling (pokedex.js), decorative loops pause; see the scroll handler. */
+.dex-overlay.dx-scrolling *,
+.dex-overlay.dx-scrolling *::before,
+.dex-overlay.dx-scrolling *::after { animation-play-state: paused !important; }
 .dex-overlay.open { display: grid; animation: dex-fade 200ms ease both; }
 @keyframes dex-fade { from { opacity: 0; } }
 
@@ -105,11 +110,20 @@ html.dex-lock, html.dex-lock body { overflow: hidden; }
   border-radius: 50%;
   background: radial-gradient(circle at 35% 32%, #e8fcff 0 8%, #5fe3f5 22%, #1a9fbc 58%, #0b4f66 100%);
   box-shadow: 0 0 0 4px #f4e8ef, 0 0 0 6px rgba(0, 0, 0, 0.35), 0 0 22px rgba(95, 227, 245, 0.7);
+}
+/* The breathing glow is a separate layer that only fades in and out
+   (opacity is cheap; animating box-shadow repainted the header every frame). */
+.dex-lens-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 34px rgba(95, 227, 245, 1);
+  opacity: 0;
   animation: lens-breathe 3.2s ease-in-out infinite;
+  pointer-events: none;
 }
-@keyframes lens-breathe {
-  50% { box-shadow: 0 0 0 4px #f4e8ef, 0 0 0 6px rgba(0, 0, 0, 0.35), 0 0 34px rgba(95, 227, 245, 1); }
-}
+@keyframes lens-breathe { 50% { opacity: 1; } }
 .dex-led {
   width: 11px;
   height: 11px;
@@ -468,20 +482,35 @@ html.dex-lock, html.dex-lock body { overflow: hidden; }
 }
 
 /* ── Dex grid ───────────────────────────────────────────────────────────── */
-/* Virtual grid: pokedex.js sets --cols, the total height and padding-top,
-   and only puts the visible rows in the page. Card height is fixed so rows
-   line up with that math. */
+/* Virtual grid: pokedex.js sets --cols/--cw and the total height, and only
+   puts the visible rows in the page. Card height is fixed so rows line up
+   with that math. */
 .dx-grid {
   --card-min: 112px;
   --card-h: 142px;
   --gap: 9px;
   box-sizing: border-box;
+  position: relative;
+  display: block;
+  /* What happens inside the grid never re-lays-out the page around it. */
+  contain: layout style;
+}
+/* Each card sits at its own slot (pokedex.js sets left/top/width), so
+   cards entering or leaving the screen never move the others. */
+.dx-grid > .dx-card {
+  position: absolute;
+  width: var(--cw, 120px);
+  height: var(--card-h);
+  contain: layout paint style;
+}
+/* Loading skeleton: a plain grid until the real cards arrive. */
+.dx-grid.is-skel {
   display: grid;
-  grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
   grid-auto-rows: var(--card-h);
-  align-content: start;
   gap: var(--gap);
 }
+.dx-grid.is-skel > .dx-card { position: relative; width: auto; }
 .dx-grid[hidden] { display: none; }
 
 .dx-card {
@@ -580,11 +609,21 @@ html.dex-lock, html.dex-lock body { overflow: hidden; }
   color: #ffd23f;
   text-shadow: 0 0 6px rgba(255, 210, 63, 0.8);
 }
-.dx-card.shiny { animation: shiny 3s linear infinite; }
-@keyframes shiny {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
-  50% { box-shadow: 0 0 16px rgba(255, 240, 180, 0.45); }
+/* Shiny shimmer: a warm glow behind the sprite that fades in and out
+   (opacity only, so scrolling past shinies stays cheap). */
+.dx-card.shiny .dx-art { position: relative; }
+.dx-card.shiny .dx-art::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 240, 180, 0.55), rgba(255, 240, 180, 0) 68%);
+  opacity: 0.25;
+  animation: shiny 3s ease-in-out infinite;
+  pointer-events: none;
 }
+.dx-card.shiny .dx-art img { position: relative; }
+@keyframes shiny { 50% { opacity: 1; } }
 
 /* Reveal: a just-registered entry flips from silhouette to full colour */
 .dx-card.reveal { animation: reveal-card 900ms cubic-bezier(.2, 1.2, .4, 1) both; }

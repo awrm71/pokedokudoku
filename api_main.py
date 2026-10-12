@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional
@@ -33,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Compress API responses and the frontend files (the Pokédex alone is ~1,300
+# entries of JSON); a big speed-up on a hosted server, free locally.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 N = 9
 
@@ -540,7 +544,8 @@ def get_shiny_sprite(pokemon_id: int):
     local = SPRITES_REPO_DIR / "shiny" / f"{pokemon_id}.png"
     if local.exists():
         return FileResponse(local, media_type="image/png")
-    return RedirectResponse(url=f"{SPRITES_CDN_BASE}/shiny/{pokemon_id}.png")
+    return RedirectResponse(url=f"{SPRITES_CDN_BASE}/shiny/{pokemon_id}.png", status_code=301,
+                            headers={"Cache-Control": "public, max-age=604800"})
 
 
 @app.get("/sprite/{pokemon_id}.png")
@@ -550,7 +555,11 @@ def get_sprite(pokemon_id: int):
     if local.exists():
         return FileResponse(local, media_type="image/png")
 
-    return RedirectResponse(url=f"{SPRITES_CDN_BASE}/{pokemon_id}.png")
+    # Permanent + cacheable, so a browser only ever asks once per sprite.
+    # (The frontend now loads sprites from the CDN directly; this route is
+    # kept for anything that still links here.)
+    return RedirectResponse(url=f"{SPRITES_CDN_BASE}/{pokemon_id}.png", status_code=301,
+                            headers={"Cache-Control": "public, max-age=604800"})
 
 
 @app.get("/pokemon/resolve", response_model=PokemonLookupResponse)

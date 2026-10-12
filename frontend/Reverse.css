@@ -370,8 +370,9 @@ html.rg-lock, html.rg-lock body { overflow: hidden; }
   --rg-soft: #9fb6c4;
   --rg-line: rgba(34, 199, 222, 0.22);
   padding: 1rem;
-  background: rgba(4, 2, 10, 0.75);
-  backdrop-filter: blur(5px);
+  /* Plain dark backdrop (no blur): blurring the whole board behind the
+     sheet made opening and scrolling it heavier than it needs to be. */
+  background: rgba(4, 2, 10, 0.86);
 }
 .rev-modal.rg.open { animation: rg-fade 180ms ease both; }
 @keyframes rg-fade { from { opacity: 0; } }
@@ -945,3 +946,21 @@ body:not(.reverse-active) #revHud { display: none !important; }
   animation: none;
 }
 .rev-grid.rev-over .rev-cell { opacity: 0.75; }
+
+/* Already named on another line: dimmed, tagged with where it went. */
+.rg-opt.used, .rg-type.used { opacity: 0.45; filter: grayscale(0.6); }
+.rg-opt.used.picked, .rg-type.used.picked { opacity: 0.85; filter: none; }
+.rg-used {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-family: var(--pixel-font);
+  font-size: 0.42rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(8, 3, 15, 0.8);
+  pointer-events: none;
+}

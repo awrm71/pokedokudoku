@@ -1,4 +1,7 @@
-const CDN_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
+// Pixel sprites, straight from PokeAPI's sprite repo (the same images as the
+// local sprites_repo copy). Loading them directly instead of through our own
+// /sprite/ route saves a round trip to the server for every single image.
+const CDN_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
 const PLACEHOLDER =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -455,11 +458,6 @@ function attachCategoryTooltip(el, title, body) {
 
 function spriteFromPokemonId(pokemonId) {
   if (!pokemonId) return PLACEHOLDER;
-  // In API mode, prefer local sprites served by the backend (with CDN redirect fallback).
-  if (state.runtimeMode !== "mock") {
-    return `${state.apiBase}/sprite/${pokemonId}.png`;
-  }
-  // In mock mode, keep everything self-contained.
   return `${CDN_BASE}/${pokemonId}.png`;
 }
 
@@ -681,6 +679,21 @@ function syncDailyHints(result) {
     state.hints = result.hints_left;
     updateHUD();
   }
+}
+
+// Where a Pokémon is already on the board ("Ghost × Kanto"), or "" if it
+// isn't. The search marks these, and confirming one is stopped before it
+// reaches the server, so a forgotten earlier pick never costs a life.
+function usedOnBoard(key, exceptCellId) {
+  if (!key) return "";
+  for (const [id, cell] of state.cells.entries()) {
+    if (id === exceptCellId || cell.key !== key || !cell.locked) continue;
+    const [i, j] = id.split(":").map(Number);
+    const r = formatRuleLabel(state.board?.row_rule_labels?.[i] || "");
+    const c = formatRuleLabel(state.board?.col_rule_labels?.[j] || "");
+    return [r, c].filter((x) => x && x.trim()).join(" × ") || "another square";
+  }
+  return "";
 }
 
 function getUsedKeysExcept(cellId) {
@@ -1167,7 +1180,20 @@ modalInput?.addEventListener("input", async () => {
       const span = document.createElement("span");
       span.textContent = p.display_name;
       btn.appendChild(span);
+      const usedAt = usedOnBoard(p.key, _modalCtx?.cellId);
+      if (usedAt) {
+        btn.classList.add("used");
+        btn.title = `Already on your board: ${usedAt}`;
+        const tag = document.createElement("small");
+        tag.className = "modal-sug-used";
+        tag.textContent = "Used";
+        btn.appendChild(tag);
+      }
       btn.addEventListener("click", () => {
+        if (usedAt) {
+          setModalStatus(`${p.display_name} is already on your board (${usedAt}).`, "warn");
+          return;
+        }
         _modalPicked = p;
         modalInput.value = p.display_name;
         suggBox.innerHTML = "";
@@ -1189,7 +1215,8 @@ modalInput?.addEventListener("input", async () => {
     setSpriteSafe(sprite, spriteFromPokemonId(resolved.pokemon_id));
     sprite.classList.remove("hidden");
     nameEl.textContent = resolved.display_name;
-    setModalStatus("", "");
+    const usedAt = usedOnBoard(resolved.key, _modalCtx?.cellId);
+    setModalStatus(usedAt ? `${resolved.display_name} is already on your board (${usedAt}).` : "", usedAt ? "warn" : "");
   } catch {
     if (reqId !== _modalReqId) return;
     sprite.classList.add("hidden");
@@ -1207,6 +1234,11 @@ modalInput?.addEventListener("keydown", (e) => {
 document.getElementById("modalOk")?.addEventListener("click", async () => {
   if (!_modalCtx) return;
   if (!_modalPicked) { setModalStatus("Type and select a Pokémon first.", "warn"); return; }
+  const usedAt = usedOnBoard(_modalPicked.key, _modalCtx.cellId);
+  if (usedAt) {
+    setModalStatus(`${_modalPicked.display_name} is already on your board (${usedAt}). Pick another — no life lost.`, "warn");
+    return;
+  }
 
   const { cellId, row, col } = _modalCtx;
   const okBtn = document.getElementById("modalOk");

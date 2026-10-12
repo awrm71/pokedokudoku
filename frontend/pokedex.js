@@ -183,7 +183,7 @@
       render();
       celebrate();
     } catch (err) {
-      el.grid.replaceChildren();
+      clearGrid();
       showEmpty("Couldn't load your Pokédex. Make sure the API is running, then try again.");
     }
   }
@@ -322,6 +322,8 @@
   }
 
   // ── Cards ───────────────────────────────────────────────────────────────
+  const mounted = new Map();   // key -> card currently in the virtual grid
+
   function showSkeleton() {
     const frag = document.createDocumentFragment();
     for (let i = 0; i < 24; i += 1) {
@@ -330,17 +332,28 @@
       s.style.setProperty("--i", String(i));
       frag.appendChild(s);
     }
-    el.grid.style.paddingTop = "0px";
+    clearGrid();
     el.grid.style.height = "";
+    el.grid.classList.add("is-skel");     // skeleton uses a plain CSS grid
     el.grid.replaceChildren(frag);
     hideEmpty();
   }
 
+  // Empty the grid and forget which cards were mounted.
+  function clearGrid() {
+    el.grid.replaceChildren();
+    el.grid.classList.remove("is-skel");
+    mounted.clear();
+    V.r0 = -1; V.r1 = -1;
+  }
+
   // ── Virtual grid ──────────────────────────────────────────────────────
   // Only the rows on screen (plus a few either side) are in the page. Cards
-  // are created the first time they're needed and reused after that, so
-  // filtering and scrolling touch a few dozen elements, not ~1,300.
-  const V = { list: [], cols: 1, rowH: 1, cardH: 1, gap: 0, r0: -1, r1: -1, ver: 0, drawn: -1 };
+  // are created the first time they're needed and reused after that.
+  // Each card is absolutely positioned at its slot, so scrolling one row only
+  // adds the cards coming into view and removes the ones leaving; the cards
+  // in between are never touched (no re-layout of the whole grid).
+  const V = { list: [], cols: 1, rowH: 1, cardH: 1, gap: 0, colW: 1, r0: -1, r1: -1, ver: 0, drawn: -1 };
   let firstPaint = true;
 
   function getCard(e) {
@@ -360,7 +373,9 @@
     const w = el.grid.clientWidth;
     V.cols = Math.max(1, Math.floor((w + V.gap) / (min + V.gap)));
     V.rowH = V.cardH + V.gap;
+    V.colW = (w - V.gap * (V.cols - 1)) / V.cols;
     el.grid.style.setProperty("--cols", String(V.cols));
+    el.grid.style.setProperty("--cw", `${V.colW}px`);
   }
 
   function gridTop() {
@@ -370,16 +385,40 @@
 
   function draw(force) {
     if (S.view !== "dex" || el.grid.hidden || !el.grid.clientWidth) return;
-    const rows = Math.ceil(V.list.length / V.cols);
-    el.grid.style.height = rows ? `${rows * V.rowH - V.gap}px` : "0px";
+    // Read layout first, then write, so the browser never has to re-run
+    // layout in the middle of a scroll frame.
     const top = el.body.scrollTop - gridTop();
+    const viewH = el.body.clientHeight;
+    const rows = Math.ceil(V.list.length / V.cols);
     const r0 = Math.max(0, Math.floor(top / V.rowH) - 3);
-    const r1 = Math.min(rows, Math.ceil((top + el.body.clientHeight) / V.rowH) + 3);
+    const r1 = Math.min(rows, Math.ceil((top + viewH) / V.rowH) + 3);
     if (!force && r0 === V.r0 && r1 === V.r1 && V.drawn === V.ver) return;
     V.r0 = r0; V.r1 = r1; V.drawn = V.ver;
-    const slice = V.list.slice(r0 * V.cols, r1 * V.cols);
-    el.grid.style.paddingTop = `${r0 * V.rowH}px`;
-    el.grid.replaceChildren(...slice.map(getCard));
+    el.grid.style.height = rows ? `${rows * V.rowH - V.gap}px` : "0px";
+
+    const from = r0 * V.cols;
+    const to = Math.min(V.list.length, r1 * V.cols);
+    const want = new Set();
+    for (let i = from; i < to; i += 1) want.add(V.list[i].key);
+    mounted.forEach((card, key) => {
+      if (!want.has(key)) { card.remove(); mounted.delete(key); }
+    });
+    const add = document.createDocumentFragment();
+    for (let i = from; i < to; i += 1) {
+      const e = V.list[i];
+      const card = getCard(e);
+      // Slot position; only rewritten when it actually changes (a filter
+      // or a resize), never for cards that just stay on screen.
+      const x = (i % V.cols) * (V.colW + V.gap);
+      const y = Math.floor(i / V.cols) * V.rowH;
+      if (card.__x !== x || card.__y !== y) {
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        card.__x = x; card.__y = y;
+      }
+      if (!mounted.has(e.key)) { mounted.set(e.key, card); add.appendChild(card); }
+    }
+    if (add.childNodes.length) el.grid.appendChild(add);
     firstPaint = false;
   }
 
@@ -401,8 +440,16 @@
     idle(step);
   }
 
+  // While scrolling, the always-on decorative animations (glows, shimmer,
+  // the floating hero) pause: repainting them every frame was most of the
+  // scroll cost. They pick up again a moment after you stop.
   let scrollRaf = 0;
+  let scrollIdle = 0;
   el.body.addEventListener("scroll", () => {
+    const root = document.getElementById("pokedexModal");
+    root?.classList.add("dx-scrolling");
+    clearTimeout(scrollIdle);
+    scrollIdle = setTimeout(() => root?.classList.remove("dx-scrolling"), 160);
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; draw(false); });
   }, { passive: true });
@@ -496,7 +543,7 @@
     if (!S.entries.length) return;
     V.list = S.entries.filter((e) => matches(e, false));
     V.ver += 1;
-    if (el.grid.querySelector(".dx-skel")) el.grid.replaceChildren();
+    if (el.grid.classList.contains("is-skel")) clearGrid();
     measure();
     draw(true);
     warmCards();
