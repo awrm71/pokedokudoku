@@ -703,6 +703,10 @@ function paintCellStatus(cellEl, statusText, tone = "warn") {
 function setPickedName(cellEl, text) {
   const picked = cellEl.querySelector(".picked-name");
   picked.textContent = text;
+  // Longest single word drives a font step-down in index.html's styles, so
+  // names like "Crabominable" fit on one line instead of breaking mid-word.
+  const longest = Math.max(0, ...String(text || "").split(/\s+/).map((w) => w.length));
+  picked.style.setProperty("--name-len", String(Math.max(9, longest)));
 }
 
 function setResultMark(cellEl, markType) {

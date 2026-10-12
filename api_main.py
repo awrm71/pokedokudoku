@@ -20,7 +20,10 @@ app = FastAPI()
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_ROOT / "data"
 SPRITES_REPO_DIR = PROJECT_ROOT / "sprites_repo" / "sprites" / "pokemon"
-SPRITES_CDN_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork"
+# Fallback when sprites_repo isn't on disk (e.g. on Railway). This is the same
+# folder sprites_repo is a copy of, so the pixel sprites look identical
+# everywhere. (other/official-artwork is the big painted art — not this.)
+SPRITES_CDN_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
 
 # Dev-friendly CORS so a static frontend served from another local port can call the API.
 app.add_middleware(

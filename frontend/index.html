@@ -13,7 +13,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./reverse.css" />
+    <link rel="stylesheet" href="./Reverse.css" />
 
     <!-- HUD + game UI styles — embedded to guarantee application -->
     <style>
@@ -181,6 +181,15 @@
         display: block;
       }
 
+      /* Picked Pokémon name: small enough that 8-10 letter names (Garchomp,
+         Kangaskhan) stay on one line next to the check mark on wide
+         screens, and only break mid-word as a last resort. */
+      .cell .picked-name {
+        font-size: calc(clamp(0.56rem, 0.6vw, 0.7rem) * 9 / var(--name-len, 9));
+        letter-spacing: 0.01em;
+        word-break: normal;
+        overflow-wrap: anywhere;
+      }
       /* ── Qual-combo two-line rule labels ──────────────────── */
       .qual-combo {
         display: flex;
@@ -1132,7 +1141,7 @@
     <script src="./stats.js"></script>
     <script src="./draft.js"></script>
     <script src="./pokedex.js"></script>
-    <script src="./reverse.js"></script>
+    <script src="./Reverse.js"></script>
     <script src="./mobile.js"></script>
     <script src="./shell.js"></script>
   </body>
