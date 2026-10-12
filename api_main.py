@@ -1250,6 +1250,10 @@ def search_test(q: str = "piccachu"):
     }
 
 from fastapi.staticfiles import StaticFiles
-# Serve sprites_repo BEFORE the catch-all frontend mount so type badge paths resolve.
-app.mount("/sprites_repo", StaticFiles(directory="sprites_repo"), name="sprites_repo")
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+# sprites_repo is a local-only download (it isn't in git), so only mount it
+# when it exists; otherwise the server would crash on a fresh deploy. Sprites
+# fall back to the CDN either way (see /sprite/{id}.png). Must come before
+# the catch-all frontend mount.
+if (PROJECT_ROOT / "sprites_repo").is_dir():
+    app.mount("/sprites_repo", StaticFiles(directory=str(PROJECT_ROOT / "sprites_repo")), name="sprites_repo")
+app.mount("/", StaticFiles(directory=str(PROJECT_ROOT / "frontend"), html=True), name="frontend")
