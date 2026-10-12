@@ -38,6 +38,11 @@ app.add_middleware(
 # entries of JSON); a big speed-up on a hosted server, free locally.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Accounts: Sign in with Google + sessions. Its middleware swaps a signed-in
+# player's browser id for their account id on every request (see auth_api.py).
+import auth_api
+auth_api.attach(app)
+
 N = 9
 
 class ValidatePickRequest(BaseModel):
@@ -1025,12 +1030,11 @@ def get_pokedex_detail(key: str, x_client_id: str | None = Header(default=None, 
 
 @app.post("/pokedex/claim", response_model=ClaimPokedexResponse)
 def claim_pokedex(payload: ClaimPokedexRequest):
-    """Call this once, at signup/login time, to move an anonymous device's
-    Pokedex progress onto a real account id. Safe to call even if the
-    anonymous id has no entries (returns merged_entries=0)."""
-    moved = pokedex_store.merge_client(payload.anonymous_client_id, payload.account_id)
-    daily_store.merge_client(payload.anonymous_client_id, payload.account_id)
-    return ClaimPokedexResponse(merged_entries=moved)
+    """Retired. It merged any id into any other id with no sign-in check,
+    which would let someone move a real account's progress into theirs.
+    Signing in (POST /auth/google) now does the merge, for the caller's own
+    device only."""
+    raise HTTPException(status_code=410, detail="Sign in with Google to save your progress.")
 
 
 @app.get("/hint")
