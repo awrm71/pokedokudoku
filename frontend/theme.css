@@ -344,3 +344,6 @@ dialog.howto::backdrop { background: rgba(8, 8, 11, 0.82) !important; }
 
 /* Text fields already show focus with their border; keep the outline tight. */
 input:focus-visible { outline-offset: 0 !important; }
+
+/* Pokémon suggestions: the one picked with the arrow keys. */
+.modal-suggestion-btn.active { border-color: var(--focus) !important; background: var(--card-hover) !important; }

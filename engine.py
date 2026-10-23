@@ -40,125 +40,220 @@ def normalize_name(s: str) -> str:
     return "".join(ch for ch in s if ch.isalnum())
 
 
+# ── Pokémon names: official spellings, forgiving search ──────────────────────
+#
+# The dataset's display names come from PokeAPI keys, which drop punctuation
+# ("Ho Oh", "Kommo O", "Farfetchd", "Nidoran F") and tag the default form of
+# some species ("Mimikyu Disguised"). official_display_names() fixes both.
+#
+# Search matches what players actually type:
+#   exact      "ho-oh", "hooh", "ho oh", "mimikyu", "nidoran f"  -> one Pokémon
+#   prefix     "char"            -> Charmander, Charmeleon, Charizard …
+#   word       "koko", "tusk"    -> Tapu Koko, Great Tusk
+#   words      "alolan vulpix", "mega charizard", "gmax snorlax"
+#   typos      "picachu", "feraligator", "gyrados"   (4+ letters)
+#   sound      "kamoo", "garados", "sharizard"       (4+ letters)
+# Suggestions never look at the board, so they can't give an answer away.
+
+import unicodedata as _ud
+import re as _re
+
+# Prefix rewrites on the dataset's display names (forms keep their suffix:
+# "Mr Mime (Galar)" -> "Mr. Mime (Galar)").
+_NAME_FIXES = [
+    ("Ho Oh", "Ho-Oh"), ("Kommo O", "Kommo-o"), ("Jangmo O", "Jangmo-o"), ("Hakamo O", "Hakamo-o"),
+    ("Mr Mime", "Mr. Mime"), ("Mr Rime", "Mr. Rime"), ("Mime Jr", "Mime Jr."),
+    ("Farfetchd", "Farfetch'd"), ("Sirfetchd", "Sirfetch'd"),
+    ("Nidoran F", "Nidoran♀"), ("Nidoran M", "Nidoran♂"),
+    ("Flabebe", "Flabébé"), ("Type Null", "Type: Null"), ("Porygon Z", "Porygon-Z"),
+    ("Chi Yu", "Chi-Yu"), ("Ting Lu", "Ting-Lu"), ("Wo Chien", "Wo-Chien"), ("Chien Pao", "Chien-Pao"),
+]
+
+# Extra words people use for forms.
+_FORM_WORDS = {
+    "alola": ["alolan"], "galar": ["galarian"], "hisui": ["hisuian"], "paldea": ["paldean"],
+    "gmax": ["gigantamax", "g max"], "mega": [], "f": ["female"], "m": ["male"], "mr": ["mister"],
+}
+
+
+def fold(s: str) -> str:
+    """Lowercase ASCII letters/digits only: accents dropped (é -> e), ♀/♂ -> f/m,
+    everything else removed. "Flabébé" -> "flabebe", "Ho-Oh" -> "hooh"."""
+    s = (s or "").replace("♀", " f").replace("♂", " m")
+    s = _ud.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii").lower()
+    return "".join(ch for ch in s if ch.isalnum())
+
+
+def _words(s: str) -> List[str]:
+    s = (s or "").replace("♀", " f").replace("♂", " m")
+    s = _ud.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii").lower()
+    s = s.replace("'", "").replace(".", " ")
+    return [w for w in _re.split(r"[^a-z0-9]+", s) if w]
+
+
+def _sound(s: str) -> str:
+    """A rough 'sounds like' key: similar consonants merged, every vowel the
+    same, doubles collapsed. "kommoo" and "kamoo" both become "kama"."""
+    s = fold(s)
+    for a, b in (("ph", "f"), ("ck", "k"), ("ch", "s"), ("sh", "s"), ("qu", "k"),
+                 ("c", "k"), ("q", "k"), ("x", "ks"), ("z", "s"), ("y", "i")):
+        s = s.replace(a, b)
+    s = _re.sub(r"[aeiou]", "a", s)
+    s = _re.sub(r"(.)\1+", r"\1", s)
+    return s
+
+
+def _dl_distance(a: str, b: str, cap: int) -> int:
+    """Damerau-Levenshtein (adjacent swaps count as one) with an early exit."""
+    if abs(len(a) - len(b)) > cap:
+        return cap + 1
+    if a == b:
+        return 0
+    prev2 = None
+    prev = list(range(len(b) + 1))
+    for i in range(1, len(a) + 1):
+        cur = [i] + [0] * len(b)
+        for j in range(1, len(b) + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            if prev2 is not None and i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                cur[j] = min(cur[j], prev2[j - 2] + 1)
+        if min(cur) > cap:
+            return cap + 1
+        prev2, prev = prev, cur
+    return prev[len(b)]
+
+
+# Kept for older callers.
+def _edit_distance(a: str, b: str, cap: int) -> int:
+    return _dl_distance(a, b, cap)
+
+
+def official_display_names(df: pd.DataFrame) -> pd.Series:
+    """Display names with official punctuation, and the default form of a
+    species shown as just the species ("Mimikyu", not "Mimikyu Disguised")."""
+    names = df["display_name"].astype(str).copy()
+
+    def fix(n: str) -> str:
+        for old, new in _NAME_FIXES:
+            if n == old or n.startswith(old + " "):
+                return new + n[len(old):]
+        return n
+
+    names = names.map(fix)
+    if "species_key" in df.columns and "is_default" in df.columns:
+        for i in df.index[(df["is_default"] == True) & (df["key"] != df["species_key"])]:
+            base = str(df.at[i, "species_key"]).replace("-", " ").title()
+            base = fix(base)
+            # Only when the name is "<species> <form>" (not a regional form).
+            if names.at[i].lower().startswith(base.lower() + " ") and "(" not in names.at[i]:
+                names.at[i] = base
+    return names
+
+
 def build_name_index(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Returns: columns [key, display_name, norm]
+    Returns: columns [key, display_name, norm, aliases, tokens, sounds, is_default]
+    norm     folded display name ("hooh")
+    aliases  every folded spelling that should resolve exactly
+    tokens   words for word/multi-word matching, incl. "alolan", "gigantamax"
+    sounds   _sound() of each alias
     """
     idx = df[["key", "display_name"]].copy()
-    idx["norm"] = idx["display_name"].astype(str).map(normalize_name)
+    idx["is_default"] = df["is_default"].astype(bool) if "is_default" in df.columns else True
+    idx["norm"] = idx["display_name"].astype(str).map(fold)
+    aliases_col, tokens_col, sounds_col = [], [], []
+    for _, row in df.iterrows():
+        disp = str(row["display_name"])
+        key = str(row["key"])
+        words = _words(disp) + _words(key.replace("-", " "))
+        extra = []
+        for w in list(words):
+            extra += _FORM_WORDS.get(w, [])
+        toks = list(dict.fromkeys(words + [x for e in extra for x in e.split()]))
+        aliases = {fold(disp), fold(key)}
+        # Regional forms also answer to "alolan vulpix" / "vulpix alolan".
+        if "(" in disp:
+            base = fold(disp.split("(")[0])
+            region = fold(disp.split("(")[1].split(")")[0])
+            for adj in [region] + _FORM_WORDS.get(region, []):
+                aliases.add(fold(adj) + base)
+                aliases.add(base + fold(adj))
+        # ♀/♂ also spelled out.
+        if "♀" in disp or "♂" in disp:
+            aliases.add(fold(disp.replace("♀", " female").replace("♂", " male")))
+        aliases.discard("")
+        aliases_col.append(sorted(aliases, key=len))
+        tokens_col.append(toks)
+        sounds_col.append(sorted({_sound(a) for a in aliases}, key=len))
+    idx["aliases"] = aliases_col
+    idx["tokens"] = tokens_col
+    idx["sounds"] = sounds_col
     return idx
 
 
 def resolve_input_to_key(user_text: str, name_index: pd.DataFrame) -> Optional[str]:
     """
-    Resolves free-text input to a pokemon key if there is an exact normalized match.
+    Resolves free text to a Pokémon key when it names exactly one: any spelling
+    in that Pokémon's aliases ("Ho-Oh", "hooh", "ho oh", "Mimikyu", "alolan
+    vulpix"). The species name picks its default form. Typos never resolve
+    here; they only show up as suggestions to tap.
     """
-    t = normalize_name(user_text)
+    t = fold(user_text)
     if not t:
         return None
-    matches = name_index[name_index["norm"] == t]
-    if matches.empty:
+    hits = [(not r.is_default, len(r.display_name), r.key)
+            for r in name_index.itertuples() if t in r.aliases]
+    if not hits:
         return None
-    # if collisions ever exist, just take first
-    return str(matches.iloc[0]["key"])
+    return str(sorted(hits)[0][2])
 
 
-def _edit_distance(a: str, b: str, cap: int) -> int:
-    """Levenshtein distance with early exit once cap is exceeded."""
-    if abs(len(a) - len(b)) > cap:
-        return cap + 1
-    if a == b:
-        return 0
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a):
-        curr = [i + 1] + [0] * len(b)
-        for j, cb in enumerate(b):
-            curr[j + 1] = min(prev[j + 1] + 1, curr[j] + 1, prev[j] + (ca != cb))
-        prev = curr
-        if min(prev) > cap:
-            return cap + 1
-    return prev[len(b)]
+def _fuzzy_cap(n: int) -> int:
+    return 1 if n <= 5 else 2 if n <= 9 else 3
 
 
 def suggest_names_global(prefix: str, name_index: pd.DataFrame, limit: int = 10) -> List[Tuple[str, str]]:
     """
-    Five-pass tiered search:
-      1. Prefix on display name       "char"         → Charmander …
-      2. Substring in display name    "saur"         → Venusaur …
-      3. Substring in key_norm        "hisui"        → Growlithe (Hisui) …
-      4. Fuzzy edit-distance ≤ 2      "picachu"      → Pikachu
-      5. Multi-word AND               "mega charizard" → Mega Charizard X/Y
+    Ranked suggestions for what's been typed so far (2+ letters):
+      0 exact spelling     1 start of the name     2 start of a word / every word
+      3 inside the name    4 typo or sounds alike (4+ letters)
+    Ties go to the default form, then the shorter name.
     """
-    import re as _re
-    p = normalize_name(prefix)
-    if len(p) < 2:
+    q = fold(prefix)
+    if len(q) < 2:
         return []
-    seen: set = set()
-    results: List[Tuple[str, str]] = []
+    qwords = [w for w in _words(prefix) if w]
+    qsound = _sound(q)
+    fuzzy = len(q) >= 4
+    cap = _fuzzy_cap(len(q))
 
-    def _add(rows: pd.DataFrame) -> None:
-        for _, row in rows.iterrows():
-            k = str(row["key"])
-            if k not in seen:
-                seen.add(k)
-                results.append((k, str(row["display_name"])))
-                if len(results) >= limit:
-                    return
+    scored = []
+    for r in name_index.itertuples():
+        best = None
+        if q in r.aliases:
+            best = 0.0
+        elif any(a.startswith(q) for a in r.aliases):
+            best = 1.0
+        elif any(t.startswith(q) for t in r.tokens) or (
+                len(qwords) > 1 and all(any(t.startswith(w) for t in r.tokens) for w in qwords)):
+            best = 2.0
+        elif len(q) >= 3 and any(q in a for a in r.aliases):
+            best = 3.0
+        elif fuzzy:
+            d = min(min(_dl_distance(q, a[:len(q)], cap), _dl_distance(q, a, cap)) for a in r.aliases)
+            # Sounds alike: same "sound key" start ("kamoo" ~ "kommoo"). Ranked
+            # between a one-letter typo and a two-letter one.
+            sounds = len(qsound) >= 3 and any(x.startswith(qsound) for x in r.sounds)
+            if d <= cap:
+                best = 4.0 + d / 10
+            if sounds:
+                best = min(best if best is not None else 9.0, 4.15)
+        if best is not None:
+            scored.append((best, not r.is_default, len(r.display_name), str(r.display_name), str(r.key)))
 
-    # Pass 1: prefix match on normalized display name
-    _add(name_index[name_index["norm"].str.startswith(p, na=False)])
-    if len(results) >= limit:
-        return results
-
-    # Pass 2: substring in normalized display name
-    remaining = name_index[~name_index["key"].isin(seen)]
-    _add(remaining[remaining["norm"].str.contains(p, na=False)])
-    if len(results) >= limit:
-        return results
-
-    # Pass 3: substring in key_norm (catches "hisui", "primal", suffix forms)
-    if "key_norm" in name_index.columns:
-        remaining = name_index[~name_index["key"].isin(seen)]
-        _add(remaining[remaining["key_norm"].str.contains(p, na=False)])
-        if len(results) >= limit:
-            return results
-
-    # Pass 4: fuzzy edit-distance ≤ 2 for typos
-    if len(p) >= 4:
-        cap = 1 if len(p) <= 5 else 2
-        remaining = name_index[~name_index["key"].isin(seen)]
-        fuzzy_rows = []
-        for _, row in remaining.iterrows():
-            norm_name = str(row["norm"])
-            window = norm_name[:len(p) + 1]
-            dist = _edit_distance(p, window[:len(p)], cap)
-            if dist <= cap:
-                fuzzy_rows.append((dist, row))
-        for _, row in sorted(fuzzy_rows, key=lambda x: x[0]):
-            k = str(row["key"])
-            if k not in seen:
-                seen.add(k)
-                results.append((k, str(row["display_name"])))
-                if len(results) >= limit:
-                    break
-
-    # Pass 5: multi-word AND search — handles "mega charizard", "alolan vulpix", "gmax snorlax"
-    # Split raw prefix into words, strip junk, require ALL words present in normalized name
-    if len(results) < limit:
-        raw_words = prefix.lower().split()
-        norm_words = [_re.sub(r"[^a-z0-9]", "", w) for w in raw_words]
-        norm_words = [w for w in norm_words if len(w) >= 3]
-        if len(norm_words) >= 2:
-            mask = pd.Series(True, index=name_index.index)
-            for word in norm_words:
-                word_mask = name_index["norm"].str.contains(word, na=False)
-                if "key_norm" in name_index.columns:
-                    word_mask = word_mask | name_index["key_norm"].str.contains(word, na=False)
-                mask = mask & word_mask
-            remaining = name_index[~name_index["key"].isin(seen)]
-            _add(remaining[mask.reindex(remaining.index, fill_value=False)])
-
-    return results
+    scored.sort()
+    return [(k, d) for _, _, _, d, k in scored[:limit]]
 
 
 def apply_answer_policy(df: pd.DataFrame, policy: str = "species_only") -> pd.DataFrame:

@@ -258,6 +258,8 @@ def load_data() -> pd.DataFrame:
     return df
 
 df = load_data()
+# Official spellings: "Ho-Oh", "Farfetch'd", "Nidoran♀", "Mimikyu" (not "Mimikyu Disguised").
+df["display_name"] = engine.official_display_names(df)
 df_play = engine.apply_answer_policy(df, policy="species_only")
 rules = engine.build_default_rules(df_play)
 rule_masks = engine.compute_rule_masks(df_play, rules)

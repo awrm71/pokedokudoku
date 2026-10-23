@@ -161,8 +161,13 @@ const MOCK_RULES = [
   "Dragon",
 ];
 
+// Same folding as the server (engine.fold): accents dropped, ♀/♂ -> f/m,
+// letters and digits only. "Flabébé" -> "flabebe", "Ho-Oh" -> "hooh".
 function normalizeName(s) {
-  return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(s || "")
+    .replace(/\u2640/g, "f").replace(/\u2642/g, "m")
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function hashString(s) {
@@ -260,28 +265,8 @@ async function suggestPokemon(prefix) {
     return MOCK_POKEMON.filter((p) => normalizeName(p.display_name).startsWith(pfx)).slice(0, 6);
   }
 
-  // Multi-word handling: "mega charizard", "gmax snorlax", "alolan vulpix"
-  // Dataset stores names as "Charizard Mega X" so prefix-searching "mega charizard" fails.
-  // Fix: search using the LONGEST word (most specific), then AND-filter by all others.
-  const rawWords = prefix.trim().toLowerCase().split(/\s+/).filter(w => w.length >= 2);
-  if (rawWords.length >= 2) {
-    const normWord = w => w.replace(/[^a-z0-9]/g, "");
-    const normedWords = rawWords.map(normWord).filter(w => w.length >= 2);
-    // Pick the longest word as the search term (most distinctive)
-    const searchTerm = normedWords.reduce((a, b) => a.length >= b.length ? a : b);
-    const otherTerms = normedWords.filter(w => w !== searchTerm);
-    // Fetch more results so filters have enough to work with
-    const data = await fetchJson(
-      `${state.apiBase}/pokemon/suggest?prefix=${encodeURIComponent(searchTerm)}&limit=50`
-    );
-    if (!Array.isArray(data)) return [];
-    // Keep only results whose normalized name contains ALL other terms
-    return data.filter(item => {
-      const normName = normWord((item.display_name || item.key || "").toLowerCase());
-      return otherTerms.every(term => normName.includes(term));
-    }).slice(0, 6);
-  }
-
+  // The server ranks exact, prefix, word ("koko", "alolan vulpix"),
+  // typo ("picachu") and sound-alike ("kamoo") matches.
   return fetchJson(
     `${state.apiBase}/pokemon/suggest?prefix=${encodeURIComponent(prefix)}&limit=6`
   );
@@ -1166,10 +1151,36 @@ document.getElementById("newAfterWinBtn")?.addEventListener("click", () => loadB
 // ── Modal event listeners ─────────────────────────────────
 const modalInput = document.getElementById("modalInput");
 
-modalInput?.addEventListener("input", async () => {
+// Typing waits a beat before asking the server, and only the newest answer
+// is drawn (a slow reply for "pik" can't replace the list for "pikachu").
+let _sugTimer = 0;
+let _sugActive = -1;   // highlighted suggestion (arrow keys)
+
+function suggestionButtons() {
+  return Array.from(document.querySelectorAll("#modalSuggestions .modal-suggestion-btn"));
+}
+function highlightSuggestion(i) {
+  const btns = suggestionButtons();
+  if (!btns.length) { _sugActive = -1; return; }
+  _sugActive = (i + btns.length) % btns.length;
+  btns.forEach((b, k) => b.classList.toggle("active", k === _sugActive));
+  btns[_sugActive].scrollIntoView({ block: "nearest" });
+}
+
+modalInput?.addEventListener("input", () => {
+  clearTimeout(_sugTimer);
+  _modalPicked = null;
+  const typed = modalInput.value.trim();
+  if (typed.length < 2) { onModalInput(); return; }
+  _sugTimer = setTimeout(onModalInput, 140);
+});
+
+async function onModalInput() {
   if (!_modalCtx) return;
   const typed = modalInput.value.trim();
   _modalPicked = null;
+  _sugActive = -1;
+  const reqId = ++_modalReqId;
 
   // Save typed text in cell state + clear wrongAttempt if user is trying a new name
   const cell = state.cells.get(_modalCtx.cellId);
@@ -1202,6 +1213,7 @@ modalInput?.addEventListener("input", async () => {
   // Suggestions list
   try {
     const data = await suggestPokemon(typed);
+    if (reqId !== _modalReqId) return;
     suggBox.innerHTML = "";
     data.slice(0, 6).forEach((p) => {
       const btn = document.createElement("button");
@@ -1242,8 +1254,7 @@ modalInput?.addEventListener("input", async () => {
     });
   } catch { suggBox.innerHTML = ""; }
 
-  // Live sprite preview
-  const reqId = ++_modalReqId;
+  // Live sprite preview (only for an exact name; typos have to be tapped)
   try {
     const resolved = await resolvePokemon(typed);
     if (reqId !== _modalReqId) return;
@@ -1258,11 +1269,24 @@ modalInput?.addEventListener("input", async () => {
     sprite.classList.add("hidden");
     nameEl.textContent = "";
   }
-});
+}
 
+// ↑/↓ move through suggestions. Enter picks the highlighted one (or the top
+// one when nothing matches exactly yet); Enter again confirms. A misspelling
+// is never submitted on its own: it has to become a real name first.
 modalInput?.addEventListener("keydown", (e) => {
+  const btns = suggestionButtons();
+  if (e.key === "ArrowDown" && btns.length) { e.preventDefault(); highlightSuggestion(_sugActive + 1); return; }
+  if (e.key === "ArrowUp" && btns.length) { e.preventDefault(); highlightSuggestion(_sugActive - 1); return; }
+  if (e.key === "Escape" && btns.length) { e.preventDefault(); document.getElementById("modalSuggestions").innerHTML = ""; _sugActive = -1; return; }
   if (e.key === "Enter") {
     e.preventDefault();
+    if (_sugActive >= 0 && btns[_sugActive]) { btns[_sugActive].click(); _sugActive = -1; return; }
+    if (!_modalPicked && btns.length) {
+      const first = btns.find((b) => !b.classList.contains("used")) || btns[0];
+      first.click();
+      return;
+    }
     document.getElementById("modalOk")?.click();
   }
 });
