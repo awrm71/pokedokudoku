@@ -684,6 +684,7 @@ function applyHintToCell(cellId, cell, result) {
     setPickedName(cellEl, result.display_name);
     setResultMark(cellEl, "ok");
     paintCellStatus(cellEl, "Hint used", "ok");
+    window.PDD_MOTION?.celebrate(cellEl);
     cellEl.classList.add("locked", "hint-cell");
     cellEl.classList.remove("drafted", "err");
   }
@@ -1341,6 +1342,8 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
         cellEl.classList.remove("err", "warn", "drafted");
         // Daily only: how many players picked the same Pokémon here.
         window.PDD_STATS?.paintPct(cellEl, cell.pct);
+        // It moves for a moment when it lands (motion.js).
+        window.PDD_MOTION?.celebrate(cellEl);
       }
       if (typeof verdict.lives_left === "number") state.lives = verdict.lives_left;
       setMessage(cell.shiny ? `★ Shiny ${_modalPicked.display_name}!` : "Pick accepted ✓", "var(--ok)");

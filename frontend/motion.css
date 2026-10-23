@@ -1,0 +1,64 @@
+/* ============================================================================
+   motion.css — animated Pokémon (motion.js). Loads after theme.css.
+   ============================================================================ */
+
+/* The animation layer over a still sprite. */
+.px-anim {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+.px-hidden { visibility: hidden !important; }
+
+/* Pokémon without an animation yet: a small two-step hop. */
+.px-hop { animation: px-hop 600ms steps(2, jump-none) 1 !important; }
+@keyframes px-hop {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-10%); }
+  60% { transform: translateY(0); }
+  80% { transform: translateY(-4%); }
+}
+
+/* ── Pokédex detail: the battle platform and entrance ──────────────────── */
+.dx-stage { width: 200px !important; height: 180px !important; }
+.dx-stage-ring {
+  bottom: 12px !important;
+  width: 168px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  animation: none !important;
+  background: color-mix(in srgb, var(--t1) 22%, #24222b) !important;
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.35), 0 0 0 2px color-mix(in srgb, var(--t1) 40%, #3a3745) !important;
+}
+.dx-hero-img {
+  z-index: 1;
+  align-self: end;
+  margin-bottom: 14px;
+  filter: none !important;
+  animation: none !important;
+}
+/* The animated sprite is sized from its own frame, so it sits on the platform. */
+.dx-hero-img.px-live { object-fit: contain; max-width: 190px; max-height: 170px; }
+/* Still sprites (no animation yet) breathe slowly, in two steps like the games. */
+.dx-hero-img.px-idle { animation: px-breathe 1.6s steps(1, end) infinite !important; transform-origin: 50% 100%; }
+@keyframes px-breathe { 50% { transform: scaleY(0.97); } }
+
+/* Entrance: slides in, a white flash, lands on the platform. */
+.dx-stage.px-enter .dx-hero-img { animation: px-slide 520ms cubic-bezier(.2, .7, .3, 1) both !important; }
+.dx-stage.px-enter .dx-hero-img.px-idle { animation: px-slide 520ms cubic-bezier(.2, .7, .3, 1) both, px-breathe 1.6s steps(1, end) 520ms infinite !important; }
+.dx-stage.px-enter .dx-stage-ring { animation: px-ring 420ms ease-out both !important; }
+@keyframes px-slide {
+  0% { opacity: 0; transform: translateX(70px); filter: brightness(0) invert(1); }
+  55% { opacity: 1; transform: translateX(0); filter: brightness(0) invert(1); }
+  100% { transform: translateX(0); filter: none; }
+}
+@keyframes px-ring { from { transform: scaleX(0.4); opacity: 0; } }
+
+/* Unknown (not yet caught) Pokémon stay a still silhouette. */
+.dx-hero.mystery .dx-hero-img { animation: none !important; filter: brightness(0) opacity(0.55) !important; }
+.dx-hero.mystery .dx-stage.px-enter .dx-hero-img { animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .px-hop, .dx-hero-img.px-idle, .dx-stage.px-enter .dx-hero-img, .dx-stage.px-enter .dx-stage-ring { animation: none !important; }
+}

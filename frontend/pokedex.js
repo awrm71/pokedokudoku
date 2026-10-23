@@ -833,6 +833,9 @@
     const img = wrap.querySelector(".dx-hero-img");
     setSpriteSafe(img, sprite(e, e.is_shiny));
     img.alt = e.is_shiny ? `Shiny ${e.display_name}` : e.display_name;
+    // Battle-style entrance, then its animation loops (motion.js). The grid
+    // behind stays still; only the Pokémon you open moves.
+    requestAnimationFrame(() => window.PDD_MOTION?.hero(img, e.pokemon_id, !!e.is_shiny));
     if (e.is_shiny) {
       // Flip between the shiny and normal colours.
       const flip = document.createElement("button");
@@ -850,6 +853,7 @@
         void img.offsetWidth;
         img.classList.add("swap");
         setSpriteSafe(img, sprite(e, on));
+        window.PDD_MOTION?.hero(img, e.pokemon_id, on);
       });
       wrap.querySelector(".dx-stage").appendChild(flip);
     }

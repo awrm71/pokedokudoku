@@ -115,6 +115,9 @@
           img.title = `Shiny ${mon.display_name}`;
         }
         setSpriteSafe(img, shiny ? window.PDD_SHINY.spriteUrl(mon.pokemon_id) : spriteFromPokemonId(mon.pokemon_id));
+        // motion.js animates it on hover / tap.
+        img.dataset.pid = String(mon.pokemon_id || "");
+        img.dataset.shiny = shiny ? "1" : "0";
         const name = document.createElement("span");
         name.className = "rev-cell-name";
         name.textContent = mon.display_name;
