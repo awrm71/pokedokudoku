@@ -267,6 +267,8 @@ name_index = engine.build_name_index(df_play)
 
 pokedex_store.init_db()
 daily_store.init_db()
+# Boards shipped with this release (see daily_store.seed_pins).
+daily_store.seed_pins(DATA_DIR / "board_pins.json")
 
 # The Daily Board keeps its lives and hints on the server (daily_store), so the
 # numbers here are the source of truth; app.js starts from the same values.
@@ -289,6 +291,15 @@ def _daily_status(run: dict):
         return lives, False, False
     can = ads_api.revive_enabled() and revives < ads_api.REVIVES_PER_BOARD
     return 0, not can, can
+
+def _is_dated_seed(seed: str) -> bool:
+    """A real day's seed ("2026-10-23"), today or earlier. Future dates
+    aren't saved, so a data fix still reaches every day not yet played."""
+    try:
+        return date.fromisoformat(seed) <= date.today()
+    except ValueError:
+        return False
+
 
 def is_daily_seed(seed: str) -> bool:
     """A board only counts toward the Pokedex if its seed is today's canonical
@@ -370,10 +381,24 @@ def _get_or_generate_board(seed: str, n_rows: int, n_cols: int):
             allowed_rule_ids=draft_cfg["allowed_rule_ids"],
         )
     else:
-        board = engine.generate_board(
-            df=df_play, rules=rules, rule_masks=rule_masks,
-            seed=seed, n_rows=n_rows, n_cols=n_cols, constraints=DEFAULT_CONSTRAINTS,
-        )
+        board = None
+        # A dated board (today's Daily, or an earlier day's) is saved the first
+        # time it's made, so later data fixes don't reshuffle it.
+        pin_key = f"daily:{seed}:{n_rows}x{n_cols}" if _is_dated_seed(seed) else None
+        if pin_key:
+            pin = daily_store.get_pin(pin_key)
+            if pin and all(r in rules for r in pin["rows"] + pin["cols"]):
+                board = engine.Board(n_rows=n_rows, n_cols=n_cols, seed=seed,
+                                     row_rule_ids=list(pin["rows"]), col_rule_ids=list(pin["cols"]))
+        if board is None:
+            board = engine.generate_board(
+                df=df_play, rules=rules, rule_masks=rule_masks,
+                seed=seed, n_rows=n_rows, n_cols=n_cols, constraints=DEFAULT_CONSTRAINTS,
+            )
+            if pin_key:
+                kept = daily_store.save_pin(pin_key, {"rows": board.row_rule_ids, "cols": board.col_rule_ids})
+                board = engine.Board(n_rows=n_rows, n_cols=n_cols, seed=seed,
+                                     row_rule_ids=list(kept["rows"]), col_rule_ids=list(kept["cols"]))
     with _cache_lock:
         if len(_board_cache) >= _CACHE_MAX:
             del _board_cache[next(iter(_board_cache))]

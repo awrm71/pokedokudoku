@@ -381,7 +381,25 @@ def attach(app, ctx: _Ctx) -> None:
 
     def _generate_daily(day_seed: str):
         """Deterministic Hard board for the given day. Same seed -> same board,
-        so every client shares today's puzzle and it can register progress."""
+        so every client shares today's puzzle and it can register progress.
+        Saved the first time it's made (daily_store pins), so a data fix
+        deployed mid-day can't change a board people are already playing."""
+        import dataclasses
+        import daily_store
+        pin_key = f"reverse:{day_seed}"
+        pin = daily_store.get_pin(pin_key)
+        if pin:
+            try:
+                return reverse_engine.ReverseBoard(**pin)
+            except TypeError:
+                pass
+        rb = _generate_daily_fresh(day_seed)
+        if rb is None:
+            return None
+        kept = daily_store.save_pin(pin_key, dataclasses.asdict(rb))
+        return reverse_engine.ReverseBoard(**kept)
+
+    def _generate_daily_fresh(day_seed: str):
         preset = PRESETS["hard"]
         return reverse_engine.generate_reverse_board(
             df=ctx.df_play, rules=ctx.rules, rule_masks=ctx.rule_masks,

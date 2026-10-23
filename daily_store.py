@@ -24,6 +24,7 @@ an opaque client_id (the browser id today, an account id later — see
 merge_client), and the same database file.
 """
 
+import json
 import os
 import sqlite3
 import threading
@@ -93,6 +94,18 @@ def init_db() -> None:
             cols = {r[1] for r in conn.execute("PRAGMA table_info(daily_runs)")}
             if "revives" not in cols:
                 conn.execute("ALTER TABLE daily_runs ADD COLUMN revives INTEGER NOT NULL DEFAULT 0")
+            # Each day's boards, saved the first time they're made. A server
+            # restart after a data fix must not reshuffle a board people are
+            # already playing (picks are saved by row/column).
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS board_pins (
+                    pin_key     TEXT PRIMARY KEY,
+                    payload     TEXT NOT NULL,
+                    created_at  TEXT NOT NULL
+                );
+                """
+            )
             # Serves both the per-square % and the board-wide GROUP BY.
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_daily_picks_cell "
@@ -302,6 +315,56 @@ def forget_cache(day_seed: Optional[str] = None) -> None:
 
 
 # ── Accounts (later) ──────────────────────────────────────────────────────────
+
+# ── Pinned boards ─────────────────────────────────────────────────────────────
+
+def get_pin(pin_key: str) -> Optional[dict]:
+    """The saved board for this key ("daily:2026-10-23:9x9"), or None."""
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute("SELECT payload FROM board_pins WHERE pin_key = ?", (pin_key,)).fetchone()
+        finally:
+            conn.close()
+    if not row:
+        return None
+    try:
+        return json.loads(row[0])
+    except ValueError:
+        return None
+
+
+def save_pin(pin_key: str, payload: dict) -> dict:
+    """Save a board unless one is already saved; returns whichever is kept
+    (so two workers generating at once still agree)."""
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO board_pins (pin_key, payload, created_at) VALUES (?, ?, ?)",
+                (pin_key, json.dumps(payload), _now()),
+            )
+            conn.commit()
+            row = conn.execute("SELECT payload FROM board_pins WHERE pin_key = ?", (pin_key,)).fetchone()
+        finally:
+            conn.close()
+    return json.loads(row[0]) if row else payload
+
+
+def seed_pins(path) -> int:
+    """Load boards shipped with a release (data/board_pins.json) so a data
+    fix deployed mid-day keeps that day's boards. Never overwrites."""
+    try:
+        pins = json.loads(open(path, encoding="utf-8").read())
+    except (OSError, ValueError):
+        return 0
+    n = 0
+    for key, payload in pins.items():
+        if get_pin(key) is None:
+            save_pin(key, payload)
+            n += 1
+    return n
+
 
 def merge_client(from_client_id: str, to_client_id: str) -> int:
     """Move a guest's Daily runs onto an account. For a day both of them
