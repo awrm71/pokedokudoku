@@ -663,7 +663,7 @@
         r.innerHTML = `<img alt="" loading="lazy" decoding="async"><span class="dx-logmain">`
           + `<span class="dx-logname"></span><span class="dx-logrules"></span></span>`;
         setSpriteSafe(r.querySelector("img"), sprite(e, e.is_shiny));
-        r.querySelector(".dx-logname").textContent = e.display_name + (e.is_legendary || e.is_mythical ? " ✦" : "");
+        r.querySelector(".dx-logname").textContent = e.display_name + (e.is_legendary || e.is_mythical ? " ★" : "");
         const rules = r.querySelector(".dx-logrules");
         if (e.row_rule_label || e.col_rule_label) {
           rules.textContent = `${e.row_rule_label || "?"} × ${e.col_rule_label || "?"}`;
@@ -707,7 +707,7 @@
       shinyCardHtml()
       + `<section class="dx-pcard"><h3>Rarities</h3>`
       + bar("Legendary", lc, lt, "#f59e0b") + bar("Mythical", mc, mt, "#c084fc")
-      + (shinies ? `<p class="dx-shiny-note">✨ ${shinies} shiny catch${shinies === 1 ? "" : "es"}</p>` : "")
+      + (shinies ? `<p class="dx-shiny-note">★ ${shinies} shiny catch${shinies === 1 ? "" : "es"}</p>` : "")
       + `</section>`
       + `<section class="dx-pcard"><h3>By generation</h3>${genHtml}</section>`
       + `<section class="dx-pcard dx-pcard-wide"><h3>By type</h3><div class="dx-bar-cols">${typeHtml}</div></section>`;
@@ -839,12 +839,12 @@
       flip.type = "button";
       flip.className = "dx-shiny-flip on";
       flip.setAttribute("aria-pressed", "true");
-      flip.textContent = "✨ Shiny";
+      flip.textContent = "★ Shiny";
       flip.addEventListener("click", () => {
         const on = flip.getAttribute("aria-pressed") !== "true";
         flip.setAttribute("aria-pressed", String(on));
         flip.classList.toggle("on", on);
-        flip.textContent = on ? "✨ Shiny" : "Normal";
+        flip.textContent = on ? "★ Shiny" : "Normal";
         wrap.classList.toggle("shiny", on);
         img.classList.remove("swap");
         void img.offsetWidth;
@@ -865,9 +865,9 @@
       tags.appendChild(s);
     });
     if (e.gen != null) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag">Gen ${e.gen}</span>`);
-    if (e.is_legendary) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag gold">✦ Legendary</span>`);
-    if (e.is_mythical) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag myth">✦ Mythical</span>`);
-    if (e.is_shiny) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag shiny">✨ Shiny Dex</span>`);
+    if (e.is_legendary) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag gold">Legendary</span>`);
+    if (e.is_mythical) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag myth">Mythical</span>`);
+    if (e.is_shiny) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag shiny">★ Shiny Dex</span>`);
 
     const caught = wrap.querySelector(".dx-hero-caught");
     if (!e.caught && e.is_shiny) {
@@ -939,7 +939,7 @@
       // Real label keeps the width honest but is blurred past legibility,
       // and hidden from screen readers so it doesn't leak the answer.
       s.className = "dx-chip locked";
-      s.innerHTML = `<span class="dx-lock" aria-hidden="true">🔒</span><span class="dx-blur" aria-hidden="true"></span><span class="sr-only">Locked category</span>`;
+      s.innerHTML = `<span class="dx-lock" aria-hidden="true">?</span><span class="dx-blur" aria-hidden="true"></span><span class="sr-only">Locked category</span>`;
       s.querySelector(".dx-blur").textContent = c.label;
     } else {
       s.className = "dx-chip info";
@@ -1069,7 +1069,7 @@
         <li><span>Daily streak · ${t.streak} day${t.streak === 1 ? "" : "s"}</span><b>+${t.streak_bonus}</b><small>${streakLine}</small></li>
       </ul>
       <p class="dx-shiny-note2">Draft and Shuffle boards roll at your charm odds too, and Reverse boards can show shiny sightings, but only Daily Board shinies are registered.</p>
-      ${t.complete ? `<button type="button" class="dx-seal-btn">✦ Seal this Pokédex & earn a charm</button>` : ""}
+      ${t.complete ? `<button type="button" class="dx-seal-btn">Seal this Pokédex and earn a charm</button>` : ""}
       ${history ? `<ul class="dx-history">${history}</ul>` : ""}
     </section>`;
   }

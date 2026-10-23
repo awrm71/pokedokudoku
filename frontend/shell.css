@@ -6,11 +6,11 @@
    ============================================================================ */
 
 :root {
-  --mode-daily: #e0306f;
-  --mode-draft: #8b5cf6;
-  --mode-reverse: #22c7de;
-  --shell-panel: rgba(13, 6, 21, 0.86);
-  --shell-line: rgba(204, 34, 85, 0.22);
+  --mode-daily: #e03f30;
+  --mode-draft: #e7ba6b;
+  --mode-reverse: #4bb5ab;
+  --shell-panel: rgba(13, 12, 15, 0.86);
+  --shell-line: rgba(204, 48, 34, 0.22);
   --shell-line-soft: rgba(255, 255, 255, 0.06);
 }
 
@@ -23,7 +23,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 :where(.topbar, .mode-tabs, .console, .howto) button:focus-visible {
-  outline: 2px solid #ff7ab0;
+  outline: 2px solid #f09189;
   outline-offset: 2px;
 }
 
@@ -65,11 +65,10 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 3px solid #12060f;
+  border: 3px solid #0b0b0d;
   background:
-    linear-gradient(#12060f, #12060f) center / 100% 4px no-repeat,
-    linear-gradient(to bottom, #ee2a5e 0 50%, #f3e6ee 50% 100%);
-  box-shadow: 0 0 0 2px rgba(224, 48, 111, 0.35), 0 0 18px rgba(224, 48, 111, 0.45);
+    linear-gradient(#0b0b0d, #0b0b0d) center / 100% 4px no-repeat, linear-gradient(to bottom, #e64132 0 50%, #f1ede8 50% 100%);
+  box-shadow: 0 0 0 2px rgba(224, 63, 48, 0.35);
   animation: ball-wobble 5s ease-in-out infinite;
   transform-origin: 50% 90%;
 }
@@ -81,8 +80,8 @@
   height: 10px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: #f3e6ee;
-  border: 3px solid #12060f;
+  background: #f1ede8;
+  border: 3px solid #0b0b0d;
 }
 @keyframes ball-wobble {
   0%, 82%, 100% { transform: rotate(0); }
@@ -103,7 +102,7 @@
   padding: 0 0.85rem;
   border-radius: 12px;
   border: 1px solid var(--shell-line);
-  background: rgba(204, 34, 85, 0.06);
+  background: rgba(204, 48, 34, 0.06);
   color: var(--ink);
   font-family: var(--pixel-font);
   font-size: 0.68rem;
@@ -111,13 +110,13 @@
   text-transform: uppercase;
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
-.icon-btn:hover { background: rgba(204, 34, 85, 0.16); border-color: rgba(255, 92, 154, 0.5); transform: translateY(-1px); }
+.icon-btn:hover { background: rgba(204, 48, 34, 0.16); border-color: rgba(237, 121, 110, 0.5); transform: translateY(-1px); }
 .icon-btn-glyph { font-size: 1rem; line-height: 1; }
 .icon-btn-q {
   font-family: var(--pixel-font);
   font-size: 0.95rem;
   font-weight: 700;
-  color: #ff7ab0;
+  color: #f09189;
 }
 
 /* ── Mode switcher ──────────────────────────────────────────────────────── */
@@ -155,9 +154,8 @@ nav.mode-tabs .mode-tab:hover {
 nav.mode-tabs .mode-tab.active {
   border-color: color-mix(in srgb, var(--tab) 70%, transparent);
   background:
-    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--tab) 26%, transparent), transparent 60%),
     var(--shell-panel);
-  box-shadow: 0 0 22px color-mix(in srgb, var(--tab) 28%, transparent);
+  box-shadow: none;
   color: var(--ink);
 }
 nav.mode-tabs .mode-tab::after {
@@ -173,7 +171,7 @@ nav.mode-tabs .mode-tab::after {
   transform: scaleX(0.4);
   transition: opacity 180ms ease, transform 220ms ease;
 }
-nav.mode-tabs .mode-tab.active::after { opacity: 1; transform: none; box-shadow: 0 0 10px var(--tab); }
+nav.mode-tabs .mode-tab.active::after { opacity: 1; transform: none; box-shadow: none; }
 
 .mt-icon {
   display: grid;
@@ -194,7 +192,7 @@ nav.mode-tabs .mode-tab.active::after { opacity: 1; transform: none; box-shadow:
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.mode-tab.active .mt-name { color: #fff; }
+.mode-tab.active .mt-name { color: #ffffff; }
 .mt-sub {
   font-family: var(--pixel-font);
   font-size: 0.56rem;
@@ -261,7 +259,7 @@ body.draft-building .console { display: none; }
   height: 8px;
   border-radius: 50%;
   background: var(--chip-dot, var(--mode-daily));
-  box-shadow: 0 0 8px var(--chip-dot, var(--mode-daily));
+  box-shadow: none;
 }
 .ctx-panel[data-ctx="draft"] .board-chip { --chip-dot: var(--mode-draft); }
 .ctx-panel[data-ctx="reverse"] .board-chip { --chip-dot: var(--mode-reverse); }
@@ -275,7 +273,7 @@ body.draft-building .console { display: none; }
   padding: 0 0.85rem;
   border-radius: 10px;
   border: 1px solid var(--shell-line);
-  background: rgba(204, 34, 85, 0.07);
+  background: rgba(204, 48, 34, 0.07);
   color: var(--ink);
   font-family: var(--pixel-font);
   font-size: 0.64rem;
@@ -284,7 +282,7 @@ body.draft-building .console { display: none; }
   white-space: nowrap;
   transition: background 140ms ease, border-color 140ms ease;
 }
-.console .ctx-btn:hover { background: rgba(204, 34, 85, 0.18); border-color: rgba(255, 92, 154, 0.5); transform: none; color: var(--ink); }
+.console .ctx-btn:hover { background: rgba(204, 48, 34, 0.18); border-color: rgba(237, 121, 110, 0.5); transform: none; color: var(--ink); }
 
 /* HUD sits under the context row, divided by a hairline. */
 .console .hud-strip {
@@ -332,7 +330,7 @@ body.draft-building section.legend { display: none; }
   margin-bottom: 0.75rem;
 }
 #revProgressText { font-family: var(--pixel-font); font-size: 0.8rem; }
-#revProgressBar { background: linear-gradient(90deg, #1aa9c2, var(--mode-reverse)); box-shadow: 0 0 8px rgba(34, 199, 222, 0.5); }
+#revProgressBar { background: #409c93; box-shadow: none; }
 
 /* ── Toasts (replace the old inline status line) ───────────────────────── */
 .toast-stack {
@@ -358,10 +356,10 @@ body.draft-building section.legend { display: none; }
   line-height: 1.5;
   letter-spacing: 0.04em;
   color: var(--ink);
-  background: rgba(16, 7, 25, 0.96);
+  background: rgba(15, 14, 18, 0.96);
   border: 1px solid var(--toast, rgba(255, 255, 255, 0.14));
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), 0 0 18px color-mix(in srgb, var(--toast, transparent) 30%, transparent);
-  animation: toast-in 260ms cubic-bezier(.34, 1.56, .64, 1) both;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  animation: toast-in 260ms cubic-bezier(.2, .7, .3, 1) both;
   cursor: pointer;
 }
 .toast::before {
@@ -370,7 +368,7 @@ body.draft-building section.legend { display: none; }
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--toast, #b99aad);
+  background: var(--toast, #a5a3b0);
 }
 .toast.out { animation: toast-out 200ms ease both; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
@@ -382,17 +380,16 @@ dialog.howto {
   max-height: 88vh;
   margin: auto;
   padding: 0;
-  border: 1px solid rgba(255, 92, 154, 0.35);
+  border: 1px solid rgba(237, 121, 110, 0.35);
   border-radius: 18px;
   background:
-    radial-gradient(120% 50% at 50% 0%, rgba(224, 48, 111, 0.16), transparent 70%),
-    #10061a;
+    #0f0e12;
   color: var(--ink);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
   overflow: auto;
 }
-dialog.howto::backdrop { background: rgba(5, 2, 10, 0.72); backdrop-filter: blur(3px); }
-dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.34, 1.56, .64, 1) both; }
+dialog.howto::backdrop { background: rgba(6, 5, 7, 0.72);  }
+dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both; }
 
 .howto-inner { padding: 1.4rem 1.3rem 1.2rem; }
 .howto-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.9rem; }
@@ -402,13 +399,13 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.34, 1.56, .64, 1) b
   font-family: var(--pixel-font);
   font-size: 1.05rem;
   line-height: 1.3;
-  color: #fff;
+  color: #ffffff;
 }
 .howto-lede {
   margin: 0 0 1rem;
   font-size: 0.86rem;
   line-height: 1.6;
-  color: #d9c3d4;
+  color: #d7cfc5;
 }
 .howto-modes { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
 .howto-mode {
@@ -432,9 +429,9 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.34, 1.56, .64, 1) b
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #fff;
+  color: #ffffff;
 }
-.howto-mode p { margin: 0; font-size: 0.8rem; line-height: 1.5; color: #c8b0c3; }
+.howto-mode p { margin: 0; font-size: 0.8rem; line-height: 1.5; color: #c8beb0; }
 .howto-tips {
   display: grid;
   gap: 0.35rem;
@@ -443,7 +440,7 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.34, 1.56, .64, 1) b
   list-style: none;
   font-size: 0.8rem;
   line-height: 1.5;
-  color: #c8b0c3;
+  color: #c8beb0;
 }
 .howto-tips li { display: flex; gap: 0.5rem; }
 .howto-go {
@@ -457,9 +454,9 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.34, 1.56, .64, 1) b
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #fff;
-  background: linear-gradient(100deg, #e0306f, #9b1fcc);
-  box-shadow: 0 0 22px rgba(224, 48, 111, 0.45);
+  color: #ffffff;
+  background: #e03f30;
+  box-shadow: none;
 }
 .howto-go:hover { filter: brightness(1.1); }
 

@@ -3,22 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08030f" />
+    <meta name="theme-color" content="#121117" />
     <title>Privacy · PokeDokuDoku</title>
     <style>
       :root { color-scheme: dark; }
       body {
         margin: 0;
-        background: #08030f;
-        color: #e8d0e4;
+        background: #121117;
+        color: #ece6dc;
         font: 16px/1.65 "IBM Plex Mono", ui-monospace, monospace;
       }
       main { max-width: 680px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
       h1 { font-size: 1.6rem; color: #fff; margin: 0 0 0.3rem; }
-      h2 { font-size: 1.05rem; color: #ff7ab0; margin: 2rem 0 0.4rem; }
-      p, li { color: #d8bfd2; }
-      a { color: #ff9cc4; }
-      .muted { color: #9a7f95; font-size: 0.85rem; }
+      h2 { font-size: 1.05rem; color: #ece6dc; margin: 2rem 0 0.4rem; padding-left: 0.6rem; border-left: 3px solid #e5483b; }
+      p, li { color: #c9c3cf; }
+      a { color: #f5c542; }
+      .muted { color: #8a8492; font-size: 0.85rem; }
     </style>
   </head>
   <body>
@@ -29,16 +29,25 @@
       <h2>Playing without an account</h2>
       <p>Your browser gets a random ID so the game can remember your Pokédex, your Daily board and your stats. It isn't linked to who you are.</p>
 
-      <h2>Signing in with Google</h2>
-      <p>If you sign in, Google shares your name, email address and profile picture with us. We use them only to run your account: to recognise you on any device, show your picture and trainer name, and keep your progress. We never see your Google password, and we can't post anything or read anything else in your Google account.</p>
+      <h2>Accounts</h2>
+      <p>You can make an account with any email address and a password, or sign in with Google.</p>
+      <ul>
+        <li>Email and password: we store your email and a scrambled (hashed) copy of your password. We can't read your password. If you ask to reset it, we email you a one-time code.</li>
+        <li>Google: Google shares your name, email address and profile picture with us. We never see your Google password, and we can't post anything or read anything else in your Google account.</li>
+      </ul>
+      <p>Either way, we use these only to run your account: to recognise you on any device and keep your progress.</p>
 
       <h2>What we store</h2>
       <ul>
-        <li>Your account: name, email, profile picture link and the trainer name you choose.</li>
-        <li>Your game progress: Pokédex entries, shinies, Daily and Reverse Board answers, streaks.</li>
-        <li>A sign-in session cookie so you stay signed in.</li>
+        <li>Your account: email, the trainer name you choose, your partner Pokémon, and your Google picture link if you use Google.</li>
+        <li>Your game progress: Pokédex entries, shinies, Daily and Reverse Board answers, streaks, and whether you used a revive.</li>
+        <li>A sign-in cookie so you stay signed in.</li>
       </ul>
-      <p>Your answers count anonymously toward the percentages everyone sees on the Daily boards. Your trainer name may appear on leaderboards once they launch.</p>
+      <p>Your answers count anonymously toward the percentages everyone sees on the Daily boards. Your trainer name is public and may appear on leaderboards once they launch. Your email is never shown.</p>
+
+      <h2>Ads</h2>
+      <p>The site is free and paid for by ads from Google. Google and its partners use cookies to show ads, and may use them to show ads based on your visits to this and other websites. You can turn off personalised ads in <a href="https://adssettings.google.com" rel="noopener">Google's Ad Settings</a>, and read how Google uses data at <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">policies.google.com/technologies/partner-sites</a>. Visitors in the EEA, UK and Switzerland are asked for consent first.</p>
+      <p>A revive ad is only shown when you ask for one.</p>
 
       <h2>What we don't do</h2>
       <p>We don't sell your data or share your email with anyone.</p>
@@ -46,7 +55,7 @@
       <h2>Deleting your data</h2>
       <p>Email us at <a href="mailto:YOUR-CONTACT-EMAIL">YOUR-CONTACT-EMAIL</a> and we'll delete your account and everything attached to it.</p>
 
-      <p class="muted"><a href="./">← Back to the game</a></p>
+      <p class="muted"><a href="./">Back to the game</a></p>
     </main>
   </body>
 </html>

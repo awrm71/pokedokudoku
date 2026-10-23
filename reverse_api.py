@@ -47,6 +47,7 @@ import engine
 import reverse_engine
 import reverse_store
 import pokedex_store
+import ads_api
 
 
 # ── Difficulty presets ────────────────────────────────────────────────────────
@@ -153,6 +154,7 @@ class ReverseBoardResponse(BaseModel):
     missed: List[dict] = []            # [{axis, index, rule_id}] wrong guesses so far
     game_over: bool = False            # out of lives: the board is locked
     reveal: List[dict] = []            # only when game_over: the lines left unsolved
+    revive: bool = False               # daily: out of lives, but an ad can buy one more
     # NOTE: no rule ids or labels for UNSOLVED lines — that's the whole puzzle.
 
 
@@ -177,7 +179,15 @@ class ReverseValidateResponse(BaseModel):
     hints_left: int = MAX_HINTS
     game_over: bool = False
     reveal: List[dict] = []           # filled only when this guess ended the board
+    revive: bool = False              # daily: out of lives, but an ad can buy one more
     pct: Optional[float] = None       # daily only: share of players who named this line the same way
+
+
+class ReverseReviveResponse(BaseModel):
+    lives_left: int
+    game_over: bool
+    revive: bool = False
+    reveal: List[dict] = []
 
 
 class ReverseHintRequest(BaseModel):
@@ -313,8 +323,21 @@ def attach(app, ctx: _Ctx) -> None:
         play = meta.setdefault("play", {"solved": {}, "misses": set(), "hint": None})
         return play["solved"], play["misses"], play["hint"]
 
-    def _lives_left(misses) -> int:
-        return max(0, MAX_LIVES - len(misses))
+    def _status(meta: dict, client_id: Optional[str], misses):
+        """(lives_left, game_over, revive_available) for this player.
+
+        On the daily board, running out of lives pauses the board while a
+        revive is still available (an ad buys one more life): no guesses,
+        hints, answers or stats until they revive or end the board."""
+        day = meta.get("day_seed")
+        daily = bool(meta.get("is_qualifying") and day and client_id)
+        rv = reverse_store.get_daily_revive(client_id, day) if daily else {"revives": 0, "declined": False}
+        lives = max(0, MAX_LIVES + rv["revives"] * ads_api.REVIVE_LIVES - len(misses))
+        if lives > 0:
+            return lives, False, False
+        can = (daily and not rv["declined"] and ads_api.revive_enabled()
+               and rv["revives"] < ads_api.REVIVES_PER_BOARD)
+        return 0, not can, can
 
     def _hints_left(hint) -> int:
         return max(0, MAX_HINTS - (1 if hint else 0))
@@ -423,8 +446,7 @@ def attach(app, ctx: _Ctx) -> None:
                 "hinted": hinted,
                 "pct": None if hinted else _mine_pct(counts, v["axis"], v["line_index"], v["named_rule_id"]),
             })
-        lives_left = _lives_left(misses)
-        game_over = lives_left <= 0
+        lives_left, game_over, can_revive = _status(meta, x_client_id, misses)
 
         return ReverseBoardResponse(
             board_id=board_id,
@@ -442,6 +464,7 @@ def attach(app, ctx: _Ctx) -> None:
             missed=[{"axis": a, "index": i, "rule_id": r} for a, i, r in sorted(misses)],
             game_over=game_over,
             reveal=_reveal(rb, solved) if game_over else [],
+            revive=can_revive,
         )
 
     @app.post("/board/reverse", response_model=ReverseBoardResponse)
@@ -502,7 +525,7 @@ def attach(app, ctx: _Ctx) -> None:
 
         solved, misses, hint = _play(meta, x_client_id)
         key = f"{payload.axis}:{payload.index}"
-        lives_left = _lives_left(misses)
+        lives_left, over, can_revive = _status(meta, x_client_id, misses)
         status = dict(lives_left=lives_left, hints_left=_hints_left(hint))
 
         # A solved line stays solved; guessing it again changes nothing.
@@ -511,10 +534,10 @@ def attach(app, ctx: _Ctx) -> None:
             return ReverseValidateResponse(ok=True, reason="already_solved",
                                            canonical_rule_id=done["named_rule_id"],
                                            canonical_label=done["named_label"], **status)
-        # Out of lives: the board is locked.
+        # Out of lives: the board is locked (or paused, waiting on a revive).
         if lives_left <= 0:
-            return ReverseValidateResponse(ok=False, reason="out_of_lives", game_over=True,
-                                           reveal=_reveal(rb, solved), **status)
+            return ReverseValidateResponse(ok=False, reason="out_of_lives", game_over=over, revive=can_revive,
+                                           reveal=_reveal(rb, solved) if over else [], **status)
         # Not a real category (the UI can't send one): wrong, but no charge.
         if payload.guessed_rule_id not in ctx.rules:
             return ReverseValidateResponse(ok=False, reason="wrong", **status)
@@ -550,11 +573,11 @@ def attach(app, ctx: _Ctx) -> None:
             else:
                 with _boards_lock:
                     misses.add(miss)
-            lives_left = max(0, lives_left - 1)
-            game_over = lives_left <= 0
+            lives_left, game_over, can_revive = _status(meta, x_client_id, misses | {miss})
             return ReverseValidateResponse(
                 ok=False, reason="wrong", lives_left=lives_left, hints_left=status["hints_left"],
                 game_over=game_over, reveal=_reveal(rb, solved) if game_over else [],
+                revive=can_revive,
             )
 
         named_id = result.canonical_rule_id
@@ -619,7 +642,7 @@ def attach(app, ctx: _Ctx) -> None:
             return ReverseHintResponse(ok=False, reason="unknown_axis")
 
         solved, misses, hint = _play(meta, x_client_id)
-        status = dict(lives_left=_lives_left(misses), hints_left=_hints_left(hint))
+        status = dict(lives_left=_status(meta, x_client_id, misses)[0], hints_left=_hints_left(hint))
         if f"{payload.axis}:{payload.index}" in solved:
             return ReverseHintResponse(ok=False, reason="already_solved", **status)
         if status["lives_left"] <= 0:
@@ -658,6 +681,45 @@ def attach(app, ctx: _Ctx) -> None:
                                    lives_left=status["lives_left"],
                                    hints_left=max(0, status["hints_left"] - 1))
 
+    def _daily_meta(x_client_id: Optional[str]):
+        if not x_client_id:
+            raise HTTPException(status_code=400, detail="Missing client id.")
+        day_seed = ctx.today_seed()
+        with _daily_lock:
+            cached = _daily_cache.get(day_seed)
+        if cached is None:
+            raise HTTPException(status_code=404, detail="Load today's Reverse Board first.")
+        board_id, rb = cached
+        with _boards_lock:
+            meta = dict(_boards_meta.get(board_id) or {"is_qualifying": True, "day_seed": day_seed})
+        return day_seed, rb, meta
+
+    def _revive_out(rb, meta, x_client_id) -> ReverseReviveResponse:
+        solved, misses, _ = _play(meta, x_client_id)
+        lives, over, can = _status(meta, x_client_id, misses)
+        return ReverseReviveResponse(lives_left=lives, game_over=over, revive=can,
+                                     reveal=_reveal(rb, solved) if over else [])
+
+    @app.post("/reverse/daily/revive", response_model=ReverseReviveResponse)
+    def reverse_revive(x_client_id: Optional[str] = Header(default=None)):
+        """One more life on today's board after a rewarded ad."""
+        day_seed, rb, meta = _daily_meta(x_client_id)
+        _, misses, _ = _play(meta, x_client_id)
+        if not _status(meta, x_client_id, misses)[2] or \
+                not reverse_store.add_daily_revive(x_client_id, day_seed, ads_api.REVIVES_PER_BOARD):
+            raise HTTPException(status_code=409, detail="No revive available.")
+        return _revive_out(rb, meta, x_client_id)
+
+    @app.post("/reverse/daily/end", response_model=ReverseReviveResponse)
+    def reverse_end(x_client_id: Optional[str] = Header(default=None)):
+        """Skip the revive: end today's board and show the answers."""
+        day_seed, rb, meta = _daily_meta(x_client_id)
+        _, misses, _ = _play(meta, x_client_id)
+        if _status(meta, x_client_id, misses)[0] > 0:
+            raise HTTPException(status_code=409, detail="You still have lives left.")
+        reverse_store.decline_daily_revive(x_client_id, day_seed)
+        return _revive_out(rb, meta, x_client_id)
+
     @app.get("/reverse/stats", response_model=ReverseStatsResponse)
     def reverse_stats(x_client_id: Optional[str] = Header(default=None)):
         """How everyone named each line of today's board, with every category
@@ -673,7 +735,7 @@ def attach(app, ctx: _Ctx) -> None:
         with _boards_lock:
             meta = dict(_boards_meta.get(board_id) or {"is_qualifying": True, "day_seed": day_seed})
         solved, misses, hint = _play(meta, x_client_id)
-        over = _lives_left(misses) <= 0 or len(solved) >= rb.n_rows + rb.n_cols
+        over = _status(meta, x_client_id, misses)[1] or len(solved) >= rb.n_rows + rb.n_cols
         counts = _counts_with_mine(day_seed, solved, hint)
 
         lines_out: List[LineStats] = []

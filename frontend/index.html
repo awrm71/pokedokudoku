@@ -23,8 +23,8 @@
         flex-direction: row;
         align-items: center;
         gap: 0;
-        background: rgba(14, 7, 22, 0.90);
-        border: 1px solid rgba(58, 15, 50, 0.8);
+        background: rgba(14, 13, 16, 0.90);
+        border: 1px solid rgba(34, 33, 40, 0.8);
         border-radius: 12px;
         padding: 0.5rem 0.9rem;
         margin-bottom: 0.55rem;
@@ -50,7 +50,7 @@
       .hud-divider {
         width: 1px;
         height: 1.8rem;
-        background: rgba(58, 15, 50, 0.9);
+        background: rgba(34, 33, 40, 0.9);
         flex-shrink: 0;
       }
 
@@ -59,8 +59,8 @@
         font-size: 1.3rem;
         line-height: 1;
         display: inline-block;
-        transition: filter 250ms ease, transform 280ms cubic-bezier(.34,1.56,.64,1), opacity 250ms ease;
-        filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.55));
+        transition: filter 250ms ease, transform 280ms cubic-bezier(.2, .7, .3, 1), opacity 250ms ease;
+        filter: none;
       }
 
       .pip-life.spent {
@@ -74,7 +74,7 @@
         font-family: "Silkscreen", "IBM Plex Mono", monospace;
         font-size: 0.95rem;
         font-weight: 700;
-        color: #e8d0e4;
+        color: #e5ddd3;
         white-space: nowrap;
         flex-shrink: 0;
         letter-spacing: 0.04em;
@@ -83,20 +83,20 @@
       .hud-bar {
         flex: 1;
         height: 6px;
-        background: rgba(58, 15, 50, 0.6);
+        background: rgba(34, 33, 40, 0.6);
         border-radius: 99px;
         overflow: hidden;
         min-width: 60px;
-        border: 1px solid rgba(58, 15, 50, 0.8);
+        border: 1px solid rgba(34, 33, 40, 0.8);
       }
 
       .hud-fill {
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, #cc2255 0%, #e040a0 45%, #9b1fcc 100%);
+        background: #cc3022;
         border-radius: 99px;
         transition: width 400ms cubic-bezier(.4, 0, .2, 1);
-        box-shadow: 0 0 8px rgba(204, 34, 85, 0.55);
+        box-shadow: none;
       }
 
       .hud-tag {
@@ -104,7 +104,7 @@
         font-size: 0.6rem;
         text-transform: uppercase;
         letter-spacing: 0.14em;
-        color: #7a4d72;
+        color: #5e5c6b;
         white-space: nowrap;
         flex-shrink: 0;
       }
@@ -120,13 +120,13 @@
         box-shadow: none;
         border-radius: 50%;
         display: inline-block;
-        transition: filter 200ms ease, transform 240ms cubic-bezier(.34,1.56,.64,1), opacity 200ms ease;
-        filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.45));
+        transition: filter 200ms ease, transform 240ms cubic-bezier(.2, .7, .3, 1), opacity 200ms ease;
+        filter: none;
       }
 
       .pip-hint:hover:not(.spent):not(:disabled) {
         transform: scale(1.32) rotate(14deg);
-        filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.7));
+        filter: none;
       }
 
       .pip-hint:active:not(.spent):not(:disabled) { transform: scale(1.1); }
@@ -151,7 +151,7 @@
         font-size: 0.85rem;
         font-weight: 500;
         font-family: "IBM Plex Mono", monospace;
-        animation: alert-in 340ms cubic-bezier(.34,1.56,.64,1) both;
+        animation: alert-in 340ms cubic-bezier(.2, .7, .3, 1) both;
       }
 
       .hud-alert.visible { display: flex; }
@@ -162,15 +162,15 @@
       }
 
       .hud-alert-dead {
-        background: rgba(244, 63, 94, 0.08);
-        border: 1.5px solid rgba(244, 63, 94, 0.35);
-        color: #f8a0b0;
+        background: rgba(233, 88, 74, 0.08);
+        border: 1.5px solid rgba(233, 88, 74, 0.35);
+        color: #f4aba4;
       }
 
       .hud-alert-win {
-        background: rgba(16, 217, 138, 0.08);
-        border: 1.5px solid rgba(16, 217, 138, 0.35);
-        color: #80f0c0;
+        background: rgba(58, 175, 117, 0.08);
+        border: 1.5px solid rgba(58, 175, 117, 0.35);
+        color: #94dcb8;
       }
 
       .hud-alert-icon { font-size: 1.4rem; flex-shrink: 0; }
@@ -207,7 +207,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.03em;
-        color: rgba(230, 165, 198, 0.88);
+        color: rgba(232, 169, 163, 0.88);
         overflow: hidden;
         display: -webkit-box;
         -webkit-line-clamp: 3;
@@ -219,12 +219,12 @@
       }
       .q-col {
         font-size: 0.68rem;
-        color: rgba(205, 140, 175, 0.72);
+        color: rgba(222, 131, 123, 0.72);
       }
       .q-sep {
         font-size: 0.62rem;
         font-weight: 700;
-        color: rgba(220, 80, 130, 0.55);
+        color: rgba(220, 92, 80, 0.55);
         line-height: 1;
         font-family: "Silkscreen", "IBM Plex Mono", monospace;
         letter-spacing: 0;
@@ -235,17 +235,17 @@
          Power × Ability: Sheer Force") out of the bottom of the square. */
       .cell:hover .q-row,
       .cell:focus-within .q-row {
-        color: rgba(255, 210, 235, 1);
-        text-shadow: 0 0 10px rgba(220, 80, 140, 0.55);
+        color: rgba(238, 233, 227, 1);
+        text-shadow: none;
       }
       .cell:hover .q-col,
       .cell:focus-within .q-col {
-        color: rgba(240, 185, 215, 0.95);
-        text-shadow: 0 0 8px rgba(200, 70, 120, 0.40);
+        color: rgba(240, 190, 185, 0.95);
+        text-shadow: none;
       }
       .cell:hover .q-sep,
       .cell:focus-within .q-sep {
-        color: rgba(240, 90, 150, 0.80);
+        color: rgba(235, 106, 95, 0.80);
       }
       /* Long pairs (app.js adds .q-long): a size down so both always fit. */
       .qual-combo { min-height: 0; overflow: hidden; }
@@ -259,7 +259,7 @@
         .q-sep           { font-size: 0.52rem; }
         .qual-combo      { gap: 0.14rem; }
         .cell:hover .q-row,
-        .cell:focus-within .q-row { text-shadow: 0 0 8px rgba(220,80,140,0.4); }
+        .cell:focus-within .q-row { text-shadow: none; }
         /* styles.css grows these on hover with !important; keep them put. */
         .cell:hover .qual-combo .q-row, .cell:focus-within .qual-combo .q-row { font-size: 0.64rem !important; }
         .cell:hover .qual-combo .q-col, .cell:focus-within .qual-combo .q-col { font-size: 0.58rem !important; }
@@ -270,7 +270,7 @@
       .cell.ok .q-row, .cell.ok .q-col,
       .cell.hint-cell .q-row, .cell.hint-cell .q-col {
         font-size: 0.5rem;
-        color: rgba(180, 120, 150, 0.42);
+        color: rgba(144, 142, 158, 0.42);
         -webkit-line-clamp: 1;
         text-shadow: none;
       }
@@ -285,8 +285,8 @@
       .cell-modal-overlay {
         position: fixed; inset: 0;
         background: rgba(0,0,0,0.82);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+        
+        
         z-index: 200;
         display: grid;
         place-items: center;
@@ -297,14 +297,14 @@
       }
       .cell-modal-overlay.open { opacity: 1; pointer-events: all; }
       .cell-modal-card {
-        background: rgba(14, 4, 22, 0.98);
-        border: 1px solid rgba(204, 34, 85, 0.52);
+        background: rgba(12, 12, 14, 0.98);
+        border: 1px solid rgba(204, 48, 34, 0.52);
         border-radius: 22px;
         padding: 1.6rem 1.5rem 1.4rem;
         width: min(520px, 94vw);
         position: relative;
-        box-shadow: 0 0 60px rgba(204,34,85,0.18), 0 30px 80px rgba(0,0,0,0.8);
-        animation: modal-in 300ms cubic-bezier(.34,1.56,.64,1) both;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.8);
+        animation: modal-in 300ms cubic-bezier(.2, .7, .3, 1) both;
       }
       @keyframes modal-in {
         from { opacity:0; transform: scale(0.90) translateY(20px); }
@@ -344,7 +344,7 @@
       .modal-rule-x {
         font-family: "Silkscreen", monospace;
         font-size: 0.78rem;
-        color: rgba(204, 100, 140, 0.40);
+        color: rgba(214, 101, 90, 0.40);
         line-height: 1;
         align-self: center;
       }
@@ -353,22 +353,22 @@
         border-radius: 50%; flex-shrink: 0;
         display: grid; place-items: center;
         font-size: 0.9rem; padding: 0;
-        background: rgba(204,34,85,0.08);
-        border: 1px solid rgba(204,34,85,0.28);
-        color: rgba(220,160,190,0.65);
+        background: rgba(204, 48, 34,0.08);
+        border: 1px solid rgba(204, 48, 34,0.28);
+        color: rgba(229, 157, 151,0.65);
         box-shadow: none; font-family: "IBM Plex Mono", monospace;
       }
       .modal-close-btn:hover {
-        background: rgba(204,34,85,0.18); border-color: rgba(204,34,85,0.6);
-        color: #e8d0e4; transform: none; box-shadow: none;
+        background: rgba(204, 48, 34,0.18); border-color: rgba(204, 48, 34,0.6);
+        color: #e5ddd3; transform: none; box-shadow: none;
       }
       .modal-rule-tag {
         font-family: "Silkscreen", monospace;
         font-size: 0.82rem; font-weight: 700;
         text-transform: uppercase; letter-spacing: 0.06em;
-        background: rgba(204,34,85,0.10);
-        border: 1px solid rgba(204,34,85,0.38);
-        border-radius: 9px; padding: 0.38rem 0.7rem; color: #e8c0d0;
+        background: rgba(204, 48, 34,0.10);
+        border: 1px solid rgba(204, 48, 34,0.38);
+        border-radius: 9px; padding: 0.38rem 0.7rem; color: #eebeba;
       }
       /* .modal-rule-x now defined in modal-header block above */
       .modal-preview {
@@ -385,40 +385,40 @@
         margin: 0; font-family: "Silkscreen", monospace;
         font-size: 1rem; font-weight: 700;
         text-transform: uppercase; letter-spacing: 0.06em;
-        color: #e8d0e4; min-height: 1.4em; text-align: center;
+        color: #e5ddd3; min-height: 1.4em; text-align: center;
       }
       .modal-input-wrap { margin-bottom: 0.55rem; }
       .modal-input {
         width: 100%; padding: 0.75rem 1rem;
         font-size: 1rem; font-family: "IBM Plex Mono", monospace;
-        background: rgba(204,34,85,0.05);
-        border: 1px solid rgba(204,34,85,0.32);
-        border-radius: 11px; color: #e8d0e4; outline: none;
+        background: rgba(204, 48, 34,0.05);
+        border: 1px solid rgba(204, 48, 34,0.32);
+        border-radius: 11px; color: #e5ddd3; outline: none;
         transition: border-color 150ms, box-shadow 150ms;
       }
       .modal-input:focus {
-        border-color: rgba(204,34,85,0.7);
-        box-shadow: 0 0 16px rgba(204,34,85,0.22);
+        border-color: rgba(204, 48, 34,0.7);
+        box-shadow: none;
       }
-      .modal-input::placeholder { color: rgba(200,140,170,0.38); }
+      .modal-input::placeholder { color: rgba(221, 128, 119,0.38); }
       .modal-suggestions {
         margin-top: 0.45rem; display: flex; flex-direction: column;
         gap: 0.22rem; max-height: 190px; overflow-y: auto;
       }
       .modal-suggestion-btn {
         display: flex; align-items: center; gap: 0.75rem;
-        background: rgba(204,34,85,0.05);
-        border: 1px solid rgba(204,34,85,0.16);
+        background: rgba(204, 48, 34,0.05);
+        border: 1px solid rgba(204, 48, 34,0.16);
         border-radius: 10px; padding: 0.45rem 0.75rem;
-        text-align: left; color: #e8d0e4; font-size: 0.92rem;
+        text-align: left; color: #e5ddd3; font-size: 0.92rem;
         box-shadow: none; width: 100%;
         font-family: "IBM Plex Mono", monospace;
         transition: background 130ms, border-color 130ms;
         min-height: 60px;
       }
       .modal-suggestion-btn:hover {
-        background: rgba(204,34,85,0.16);
-        border-color: rgba(204,34,85,0.5);
+        background: rgba(204, 48, 34,0.16);
+        border-color: rgba(204, 48, 34,0.5);
         transform: none; box-shadow: none;
       }
       .modal-sug-sprite {
@@ -429,19 +429,19 @@
         filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
       }
       .modal-suggestions::-webkit-scrollbar { width: 5px; }
-      .modal-suggestions::-webkit-scrollbar-track { background: rgba(204,34,85,0.05); border-radius: 3px; }
-      .modal-suggestions::-webkit-scrollbar-thumb { background: rgba(204,34,85,0.28); border-radius: 3px; }
-      .modal-suggestions::-webkit-scrollbar-thumb:hover { background: rgba(204,34,85,0.5); }
+      .modal-suggestions::-webkit-scrollbar-track { background: rgba(204, 48, 34,0.05); border-radius: 3px; }
+      .modal-suggestions::-webkit-scrollbar-thumb { background: rgba(204, 48, 34,0.28); border-radius: 3px; }
+      .modal-suggestions::-webkit-scrollbar-thumb:hover { background: rgba(204, 48, 34,0.5); }
       .modal-footer { display:flex; flex-direction:column; gap:0.45rem; margin-top:0.3rem; }
       .modal-status {
         margin: 0; font-size: 0.76rem;
         font-family: "IBM Plex Mono", monospace;
         min-height: 1.1em; text-align: center;
-        color: rgba(200,140,170,0.6);
+        color: rgba(221, 128, 119,0.6);
       }
-      .modal-status.err  { color: #f87a98; }
+      .modal-status.err  { color: #f08c82; }
       .modal-status.warn { color: #fbbf24; }
-      .modal-status.ok   { color: #10d98a; }
+      .modal-status.ok   { color: #3aaf75; }
       .modal-actions { display: flex; gap: 0.55rem; }
       .modal-ok-btn     { flex: 1;       padding: 0.68rem 1rem;   font-size: 0.88rem; border-radius: 11px; }
       .modal-cancel-btn { flex-shrink: 0; padding: 0.68rem 0.95rem; font-size: 0.88rem; border-radius: 11px; }
@@ -453,7 +453,7 @@
         justify-content: center;
         gap: 0.55rem;
         padding: 0.65rem 0 0.1rem;
-        border-top: 1px solid rgba(204, 34, 85, 0.15);
+        border-top: 1px solid rgba(204, 48, 34, 0.15);
         margin-top: 0.5rem;
       }
       .modal-hint-tag {
@@ -461,7 +461,7 @@
         font-size: 0.62rem;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: rgba(200, 130, 165, 0.58);
+        color: rgba(219, 120, 111, 0.58);
         flex-shrink: 0;
       }
       .modal-pip-hint {
@@ -474,12 +474,12 @@
         box-shadow: none;
         border-radius: 50%;
         display: inline-block;
-        transition: filter 180ms ease, transform 220ms cubic-bezier(.34,1.56,.64,1), opacity 180ms ease;
-        filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.45));
+        transition: filter 180ms ease, transform 220ms cubic-bezier(.2, .7, .3, 1), opacity 180ms ease;
+        filter: none;
       }
       .modal-pip-hint:hover:not(.spent):not(:disabled) {
         transform: scale(1.35) rotate(14deg);
-        filter: drop-shadow(0 0 12px rgba(34, 211, 238, 0.75));
+        filter: none;
       }
       .modal-pip-hint.spent,
       .modal-pip-hint:disabled {
@@ -493,7 +493,7 @@
       /* ── Draft (typed but not confirmed) state ─────────────── */
       .cell.drafted:not(.ok):not(.hint-cell) {
         border-color: rgba(245, 158, 11, 0.42);
-        background: linear-gradient(160deg, rgba(245,158,11,0.06), rgba(20,10,28,0.97));
+        background: rgba(245,158,11,0.06);
       }
       .cell.drafted:not(.ok):not(.hint-cell) .picked-name {
         color: rgba(245, 158, 11, 0.72);
@@ -513,7 +513,7 @@
           display: block;
           width: 36px;
           height: 4px;
-          background: rgba(204, 34, 85, 0.30);
+          background: rgba(204, 48, 34, 0.30);
           border-radius: 3px;
           margin: 0 auto 0.75rem;
         }
@@ -607,7 +607,7 @@
           flex-basis: 100%;
           justify-content: center;
           padding: 0;
-          border-top: 1px solid rgba(58,15,50,0.5);
+          border-top: 1px solid rgba(34, 33, 40,0.5);
           padding-top: 0.35rem;
         }
       }
@@ -619,7 +619,7 @@
           text-align: center;
           font-family: "IBM Plex Mono", monospace;
           font-size: 0.65rem;
-          color: rgba(200, 130, 165, 0.45);
+          color: rgba(219, 120, 111, 0.45);
           letter-spacing: 0.08em;
           padding: 0.3rem 0 0;
           animation: hint-fade 4s ease 1.5s forwards;
@@ -644,7 +644,7 @@
       .modal-heart {
         font-size: 1rem;
         line-height: 1;
-        transition: filter 220ms ease, opacity 220ms ease, transform 220ms cubic-bezier(.34,1.56,.64,1);
+        transition: filter 220ms ease, opacity 220ms ease, transform 220ms cubic-bezier(.2, .7, .3, 1);
       }
       .modal-heart.spent {
         filter: grayscale(1) brightness(0.4);
@@ -661,12 +661,12 @@
 
       /* ── Wrong-attempt cell — keep red even after closing modal ─ */
       .cell.err:not(.ok) .picked-name {
-        color: rgba(244, 63, 94, 0.82) !important;
+        color: rgba(233, 88, 74, 0.82) !important;
         font-style: italic;
       }
       .cell.err:not(.ok) {
-        border-color: rgba(244, 63, 94, 0.38);
-        background: linear-gradient(160deg, rgba(244,63,94,0.06), rgba(14,4,22,0.97));
+        border-color: rgba(233, 88, 74, 0.38);
+        background: rgba(233, 88, 74,0.06);
       }
 
     </style>
@@ -679,6 +679,8 @@
     <link rel="stylesheet" href="./shiny.css" />
     <link rel="stylesheet" href="./stats.css" />
     <link rel="stylesheet" href="./account.css" />
+    <link rel="stylesheet" href="./ads.css" />
+    <link rel="stylesheet" href="./theme.css" />
   </head>
   <body>
     <div class="bg-orb orb-a" aria-hidden="true"></div>
@@ -726,20 +728,20 @@
       <!-- Context bar: contents swap with the active mode. -->
       <div class="mode-context" id="modeContext">
         <div class="ctx-panel" data-ctx="daily">
-          <button type="button" class="ctx-btn" id="ctxShuffleBtn" title="Deal a fresh random board">🔀 Shuffle</button>
-          <button type="button" class="ctx-btn" id="ctxStatsBtn" title="See how everyone answered today's board" hidden>📊 Stats</button>
+          <button type="button" class="ctx-btn" id="ctxShuffleBtn" title="Deal a fresh random board">Shuffle</button>
+          <button type="button" class="ctx-btn" id="ctxStatsBtn" title="See how everyone answered today's board" hidden>Stats</button>
           <span class="ctx-meta" id="boardMeta">Loading board…</span>
           <span class="ctx-msg message" id="message"></span>
         </div>
         <div class="ctx-panel hidden" data-ctx="draft">
-          <button type="button" class="ctx-btn" id="ctxConfigureDraftBtn">⚙️ Edit draft</button>
+          <button type="button" class="ctx-btn" id="ctxConfigureDraftBtn">Edit draft</button>
           <span class="ctx-meta" id="boardMetaDraft"></span>
           <span class="ctx-msg message" id="messageDraft"></span>
         </div>
         <div class="ctx-panel hidden" data-ctx="reverse">
-          <button type="button" class="ctx-btn" id="revDailyBtn">🗓️ Daily</button>
-          <button type="button" class="ctx-btn" id="revCustomBtn">🎛️ Custom</button>
-          <button type="button" class="ctx-btn" id="revIndexBtn">📖 Categories</button>
+          <button type="button" class="ctx-btn" id="revDailyBtn">Daily</button>
+          <button type="button" class="ctx-btn" id="revCustomBtn">Custom</button>
+          <button type="button" class="ctx-btn" id="revIndexBtn">Categories</button>
           <span class="ctx-meta" id="revMeta"></span>
           <span class="ctx-msg" id="revMessage"></span>
         </div>
@@ -799,32 +801,32 @@
         </div>
         <div class="hud-section" aria-label="Hint">
           <span class="hud-tag">Hint</span>
-          <button type="button" class="rev-hint" id="revHintBtn" title="Open a row or column, then tap ⭐ Hint">⭐</button>
+          <button type="button" class="rev-hint" id="revHintBtn" title="Open a row or column, then tap Hint">⭐</button>
         </div>
       </div>
       </section>
 
       <!-- Alerts (hidden by default) -->
       <div class="hud-alert hud-alert-dead" id="gameOverBanner" role="alert">
-        <span class="hud-alert-icon">💀</span>
+        <span class="hud-alert-icon" aria-hidden="true"></span>
         <span class="hud-alert-text">
           <strong>Board locked</strong>
-          No lives remaining. Better luck next time!
+          Out of lives. Tap any square to see what fit.
         </span>
-        <button type="button" id="retryBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">Try Again</button>
+        <button type="button" id="retryBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">Try again</button>
       </div>
 
       <div class="hud-alert hud-alert-win" id="winBanner" role="alert">
-        <span class="hud-alert-icon">🏆</span>
+        <span class="hud-alert-icon" aria-hidden="true"></span>
         <span class="hud-alert-text">
-          <strong>Board complete!</strong>
-          You filled the whole grid. Incredible!
+          <strong>Board complete</strong>
+          Every square filled.
         </span>
-        <button type="button" id="newAfterWinBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">New Board</button>
+        <button type="button" id="newAfterWinBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">New board</button>
       </div>
 
       <div id="boardWrap" class="board-wrap" role="region" aria-label="PokeDokuDoku board"></div>
-      <p class="board-scroll-hint" aria-hidden="true">← scroll to see all columns →</p>
+      <p class="board-scroll-hint" aria-hidden="true">Scroll sideways for more columns</p>
 
       <section class="legend" aria-label="Status legend">
         <span><i class="dot ok"></i>Correct</span>
@@ -837,13 +839,13 @@
       <section id="reverseView" aria-label="Reverse Board">
         <!-- Shown when the board is solved or out of lives (Reverse.js fills it) -->
         <div class="hud-alert" id="revBanner" role="alert" hidden>
-          <span class="hud-alert-icon" aria-hidden="true">🏆</span>
+          <span class="hud-alert-icon" aria-hidden="true"></span>
           <span class="hud-alert-text"></span>
           <button type="button" id="revBannerBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem" hidden>New board</button>
         </div>
 
         <div id="revBoardWrap" class="board-wrap" role="region" aria-label="Reverse Board grid"></div>
-        <p class="board-scroll-hint" aria-hidden="true">← scroll to see all columns →</p>
+        <p class="board-scroll-hint" aria-hidden="true">Scroll sideways for more columns</p>
       </section>
 
       <!-- Guess modal: pick the hidden category for a row or column -->
@@ -876,7 +878,7 @@
       <div id="revIndexModal" class="rev-modal" role="dialog" aria-modal="true" aria-labelledby="revIndexTitle">
         <div class="rev-modal-card">
           <div class="rev-modal-head">
-            <h2 id="revIndexTitle">📖 Category Index</h2>
+            <h2 id="revIndexTitle">Category index</h2>
             <button type="button" id="revIndexClose" class="rev-modal-close" aria-label="Close">✕</button>
           </div>
           <div class="rev-modal-body">
@@ -893,12 +895,12 @@
       <div id="revCustomModal" class="rev-modal" role="dialog" aria-modal="true" aria-labelledby="revCustomTitle">
         <div class="rev-modal-card">
           <div class="rev-modal-head">
-            <h2 id="revCustomTitle">🎛️ Custom Reverse Board</h2>
+            <h2 id="revCustomTitle">Custom reverse board</h2>
             <button type="button" id="revCustomClose" class="rev-modal-close" aria-label="Close">✕</button>
           </div>
           <div class="rev-modal-body">
             <p style="font-size:0.82rem;opacity:0.75;margin:0 0 0.4rem">
-              Practice board — won't count toward your Category Index. Difficulty sets how
+              Practice board. It won't count toward your Category Index. Difficulty sets how
               pinned-down each line's answer is.
             </p>
             <div class="rev-diff-options">
@@ -906,7 +908,7 @@
                 <input type="radio" name="revDiff" value="easy">
                 <span>
                   <span class="rev-diff-name">Easy</span>
-                  <span class="rev-diff-desc">Lines often have a few valid answers — an easy observation usually works.</span>
+                  <span class="rev-diff-desc">Lines often have a few valid answers, so an easy observation usually works.</span>
                 </span>
               </label>
               <label class="rev-diff-option">
@@ -920,7 +922,7 @@
                 <input type="radio" name="revDiff" value="hard">
                 <span>
                   <span class="rev-diff-name">Hard</span>
-                  <span class="rev-diff-desc">Lines are near-unique — you must find the specific rule. (Same as Daily.)</span>
+                  <span class="rev-diff-desc">Lines are near-unique: you need the exact rule. Same as Daily.</span>
                 </span>
               </label>
             </div>
@@ -930,15 +932,19 @@
           </div>
         </div>
       </div>
-      
     </main>
+
+    <footer class="site-foot">
+      <a href="./privacy.html">Privacy</a>
+      <span>A fan-made game. Not affiliated with Nintendo, Game Freak or The Pokémon Company.</span>
+    </footer>
 
     <template id="cellTemplate">
       <article class="cell" role="gridcell" tabindex="0">
         <div class="cell-summary">
           <img class="summary-sprite hidden" alt="Selected Pokémon" loading="lazy" />
           <p class="picked-name-row">
-            <span class="picked-name">Tap to enter</span>
+            <span class="picked-name"></span>
             <span class="result-mark" aria-hidden="true"></span>
           </p>
           <div class="qual-stack">
@@ -981,7 +987,7 @@
         </div>
 
         <div class="modal-input-wrap">
-          <input type="text" id="modalInput" class="modal-input" placeholder="Pokémon name…" autocomplete="off" />
+          <input type="text" id="modalInput" class="modal-input" placeholder="Pokémon name" autocomplete="off" />
           <div id="modalSuggestions" class="modal-suggestions"></div>
         </div>
 
@@ -1039,11 +1045,11 @@
                 </div>
               </div>
               <div class="dx-stat dx-stat-streak">
-                <span class="dx-stat-icon" aria-hidden="true">🔥</span>
+                <span class="dx-stat-icon px-flame" aria-hidden="true"></span>
                 <div class="dx-stat-text"><strong id="dexStreak">—</strong><span id="dexStreakSub">Daily streak</span></div>
               </div>
               <div class="dx-stat dx-stat-next">
-                <span class="dx-stat-icon" aria-hidden="true">🏅</span>
+                <span class="dx-stat-icon px-trophy" aria-hidden="true"></span>
                 <div class="dx-stat-text">
                   <strong id="dexNext">—</strong><span id="dexNextSub">Next milestone</span>
                   <span class="dx-mini-track"><span id="dexNextBar"></span></span>
@@ -1059,7 +1065,7 @@
             <div class="dx-banner" id="dexBanner" role="status" hidden></div>
 
             <div class="dx-sealbar" id="dexSealBar" hidden>
-              <span>✦ Pokédex complete!</span>
+              <span>Pokédex complete</span>
               <button type="button">Seal it &amp; earn a Shiny Charm</button>
             </div>
 
@@ -1083,7 +1089,7 @@
                 <button type="button" data-status="all" aria-pressed="true">All</button>
                 <button type="button" data-status="caught" aria-pressed="false">Caught</button>
                 <button type="button" data-status="missing" aria-pressed="false">Missing</button>
-                <button type="button" data-status="shiny" aria-pressed="false">✨ Shiny</button>
+                <button type="button" data-status="shiny" aria-pressed="false">★ Shiny</button>
               </div>
               <select id="dexGen" class="dx-select" aria-label="Generation"><option value="">All gens</option></select>
             </div>
@@ -1127,10 +1133,10 @@
           </div>
         </div>
         <ul class="howto-tips">
-          <li><span aria-hidden="true">👆</span><span>Tap a square to enter a Pokémon.</span></li>
-          <li><span aria-hidden="true">⭐</span><span>Stuck? Spend a hint to reveal an answer.</span></li>
-          <li><span aria-hidden="true">✨</span><span>Every correct pick has a 1 in 4,096 shot at a shiny. Daily shinies go in your Shiny Dex forever.</span></li>
-          <li><span aria-hidden="true">📕</span><span>Every correct Daily pick registers in your Pokédex.</span></li>
+          <li><span class="howto-ic px-ball" aria-hidden="true"></span><span>Tap a square to enter a Pokémon.</span></li>
+          <li><span class="howto-ic px-star" aria-hidden="true"></span><span>Stuck? Spend a hint to reveal an answer.</span></li>
+          <li><span class="howto-ic howto-shiny" aria-hidden="true">★</span><span>Every correct pick has a 1 in 4,096 shot at a shiny. Daily shinies go in your Shiny Dex forever.</span></li>
+          <li><span class="howto-ic px-trophy" aria-hidden="true"></span><span>Every correct Daily pick registers in your Pokédex.</span></li>
         </ul>
         <button type="button" class="howto-go" data-close>Let's play</button>
       </div>
@@ -1146,5 +1152,6 @@
     <script src="./mobile.js"></script>
     <script src="./shell.js"></script>
     <script src="./account.js"></script>
+    <script src="./ads.js"></script>
   </body>
 </html>

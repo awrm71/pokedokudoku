@@ -1,0 +1,346 @@
+/* ============================================================================
+   theme.css — the look of the site. Load LAST.
+   ----------------------------------------------------------------------------
+   Direction: a handheld-game menu, not a tech landing page.
+     • Flat surfaces with solid 2px borders. No glows, no glass blur, no
+       decorative gradients.
+     • One accent: Poké Ball red. Yellow is the selection colour (focus
+       outlines, the menu cursor), as in the games.
+     • Buttons sit on a hard bottom edge and press down, like menu buttons.
+     • Hand-drawn pixel icons for lives, hints and the modes (no emoji).
+     • Pixel font for names and buttons; plain text for everything you read.
+   Each mode keeps a quiet colour: Daily red, Draft amber, Reverse teal.
+   ============================================================================ */
+
+:root {
+  --bg-deep: #121117;
+  --bg-1: #121117;
+  --bg-2: #17161d;
+  --ink: #ece6dc;
+  --ink-soft: #a7a1ae;
+  --ink-faint: #77727f;
+  --accent: #e5483b;
+  --accent-hi: #f05a4d;
+  --accent-lo: #9e2e25;
+  --accent-2: #f5c542;
+  --line: #2a2832;
+  --line-strong: #3a3745;
+  --card: #1b1a21;
+  --card-hover: #211f28;
+  --glass: #18171e;
+  --ok: #4cc38a;
+  --warn: #e9a23b;
+  --err: #ef5b4f;
+  --glow-accent: 0 0 0 transparent;
+  --glow-ok: 0 0 0 transparent;
+  --glow-err: 0 0 0 transparent;
+  --shell-panel: #18171e;
+  --shell-line: #2c2a35;
+  --shell-line-soft: #24222b;
+  --mode-daily: #e5483b;
+  --mode-draft: #e0a53a;
+  --mode-reverse: #4fb3a9;
+  --focus: #f5c542;
+  --edge: #0b0a0e;                       /* the hard bottom edge under buttons */
+  --px-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 8' shape-rendering='crispEdges'%3E%3Crect x='1' y='0' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='0' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='0' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='0' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='0' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffc2bb'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='2' width='1' height='1' fill='%23ffc2bb'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='0' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%23e5483b'/%3E%3C/svg%3E");   /* 9x8 */
+  --px-heart-empty: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 8' shape-rendering='crispEdges'%3E%3Crect x='1' y='0' width='1' height='1' fill='%2355505f'/%3E%3Crect x='2' y='0' width='1' height='1' fill='%2355505f'/%3E%3Crect x='6' y='0' width='1' height='1' fill='%2355505f'/%3E%3Crect x='7' y='0' width='1' height='1' fill='%2355505f'/%3E%3Crect x='0' y='1' width='1' height='1' fill='%2355505f'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%2355505f'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%2355505f'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%2355505f'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='2' width='1' height='1' fill='%2355505f'/%3E%3Crect x='0' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%2355505f'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%2355505f'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%2355505f'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%2355505f'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%2355505f'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%2355505f'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%2355505f'/%3E%3C/svg%3E");   /* 9x8 */
+  --px-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11' shape-rendering='crispEdges'%3E%3Crect x='5' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='6' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='0' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='9' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='10' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='9' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='7' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='7' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='7' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='2' y='8' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='8' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='6' y='8' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='8' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='9' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='9' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='7' y='9' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='9' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='9' y='9' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='1' y='10' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='8' y='10' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='9' y='10' width='1' height='1' fill='%23c9951c'/%3E%3C/svg%3E");   /* 11x11 */
+  --px-star-empty: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11' shape-rendering='crispEdges'%3E%3Crect x='5' y='0' width='1' height='1' fill='%2355505f'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%2355505f'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%2355505f'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%2355505f'/%3E%3Crect x='6' y='2' width='1' height='1' fill='%2355505f'/%3E%3Crect x='0' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='9' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='10' y='3' width='1' height='1' fill='%2355505f'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%2355505f'/%3E%3Crect x='9' y='4' width='1' height='1' fill='%2355505f'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%2355505f'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%2355505f'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%2355505f'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%2355505f'/%3E%3Crect x='2' y='8' width='1' height='1' fill='%2355505f'/%3E%3Crect x='5' y='8' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%2355505f'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%2355505f'/%3E%3Crect x='4' y='9' width='1' height='1' fill='%2355505f'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%2355505f'/%3E%3Crect x='9' y='9' width='1' height='1' fill='%2355505f'/%3E%3Crect x='1' y='10' width='1' height='1' fill='%2355505f'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%2355505f'/%3E%3Crect x='3' y='10' width='1' height='1' fill='%2355505f'/%3E%3Crect x='7' y='10' width='1' height='1' fill='%2355505f'/%3E%3Crect x='8' y='10' width='1' height='1' fill='%2355505f'/%3E%3Crect x='9' y='10' width='1' height='1' fill='%2355505f'/%3E%3C/svg%3E");   /* 11x11 */
+  --px-calendar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='1' height='1' fill='%2316151c'/%3E%3Crect x='8' y='0' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='7' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='9' y='1' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='9' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='10' y='2' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='3' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='9' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='10' y='3' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='4' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='10' y='4' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='5' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%2316151c'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%2316151c'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%2316151c'/%3E%3Crect x='9' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='10' y='5' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='6' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='10' y='6' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='7' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%2316151c'/%3E%3Crect x='3' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='7' width='1' height='1' fill='%2316151c'/%3E%3Crect x='6' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='10' y='7' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='8' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='10' y='8' width='1' height='1' fill='%2316151c'/%3E%3Crect x='0' y='9' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='10' y='9' width='1' height='1' fill='%2316151c'/%3E%3Crect x='1' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='3' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='4' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='5' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='6' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='7' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='8' y='10' width='1' height='1' fill='%2316151c'/%3E%3Crect x='9' y='10' width='1' height='1' fill='%2316151c'/%3E%3C/svg%3E");   /* 11x11 */
+  --px-cards: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11' shape-rendering='crispEdges'%3E%3Crect x='4' y='0' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='5' y='0' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='6' y='0' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='7' y='0' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='8' y='0' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='9' y='0' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='10' y='0' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='7' y='1' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='9' y='1' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='10' y='1' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='6' y='2' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='8' y='2' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='9' y='2' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='10' y='2' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='9' y='3' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='10' y='3' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='4' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='9' y='4' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='10' y='4' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='1' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='9' y='5' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='10' y='5' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='1' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='6' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='9' y='6' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='10' y='6' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='1' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='7' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='9' y='7' width='1' height='1' fill='%23e0a53a'/%3E%3Crect x='10' y='7' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='9' y='8' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='10' y='8' width='1' height='1' fill='%23c48a25'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='1' y='10' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='10' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='10' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='10' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='10' width='1' height='1' fill='%23ece6dc'/%3E%3C/svg%3E");   /* 11x11 */
+  --px-magnifier: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='0' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='0' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='0' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='0' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='7' y='1' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='1' y='2' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23c9f0eb'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='6' y='2' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='8' y='2' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='0' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23c9f0eb'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='0' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='1' y='4' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='8' y='4' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='0' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='1' y='5' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='1' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='6' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%234fb3a9'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='3' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='5' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='6' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='7' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='8' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='8' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='10' y='9' width='1' height='1' fill='%23ece6dc'/%3E%3Crect x='9' y='10' width='1' height='1' fill='%23ece6dc'/%3E%3C/svg%3E");   /* 11x11 */
+  --px-ball: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Crect x='4' y='0' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='5' y='0' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='6' y='0' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='7' y='0' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='9' y='1' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='1' y='2' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='10' y='2' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='10' y='3' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='0' y='4' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='11' y='4' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='0' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='1' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='9' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='10' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='11' y='5' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='0' y='6' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='11' y='6' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='0' y='7' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='11' y='7' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='10' y='8' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='10' y='9' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='3' y='10' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='8' y='10' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='9' y='10' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='4' y='11' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='5' y='11' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='6' y='11' width='1' height='1' fill='%233d3a47'/%3E%3Crect x='7' y='11' width='1' height='1' fill='%233d3a47'/%3E%3C/svg%3E");   /* 12x12 */
+  --px-trophy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11' shape-rendering='crispEdges'%3E%3Crect x='1' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='9' y='0' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='0' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='10' y='1' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='10' y='2' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='9' y='3' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='8' y='4' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='5' y='7' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='5' y='8' width='1' height='1' fill='%23f5c542'/%3E%3Crect x='6' y='8' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='3' y='9' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='4' y='9' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='5' y='9' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='7' y='9' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='3' y='10' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='4' y='10' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='5' y='10' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='6' y='10' width='1' height='1' fill='%23c9951c'/%3E%3Crect x='7' y='10' width='1' height='1' fill='%23c9951c'/%3E%3C/svg%3E");   /* 11x11 */
+  --px-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 11' shape-rendering='crispEdges'%3E%3Crect x='4' y='0' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='5' y='5' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='6' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='0' y='7' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='7' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='3' y='7' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='5' y='7' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='6' y='7' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='0' y='8' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='8' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='3' y='8' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='5' y='8' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='6' y='8' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='7' y='8' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='8' y='8' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='9' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='3' y='9' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='4' y='9' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='5' y='9' width='1' height='1' fill='%23fff1c2'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%23f5a33b'/%3E%3Crect x='7' y='9' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='3' y='10' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='4' y='10' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='5' y='10' width='1' height='1' fill='%23e5483b'/%3E%3Crect x='6' y='10' width='1' height='1' fill='%23e5483b'/%3E%3C/svg%3E");   /* 9x11 */
+
+}
+
+html, body { background: var(--bg-deep); }
+body { background-attachment: scroll; }
+.bg-orb { display: none !important; }            /* blurred glow blobs */
+::selection { background: rgba(245, 197, 66, 0.35); color: #fff; }
+
+/* One focus style everywhere: the yellow selection outline. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus) !important;
+  outline-offset: 2px;
+}
+
+/* ── Logo ──────────────────────────────────────────────────────────────── */
+.brand h1 {
+  color: var(--ink);
+  -webkit-text-fill-color: currentColor;
+  background: none;
+  text-shadow: 3px 3px 0 var(--accent-lo);
+  letter-spacing: 0.01em;
+}
+.brand-ball { animation: none !important; box-shadow: 0 0 0 2px var(--edge) !important; }
+.brand-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-soft);
+}
+
+/* ── Buttons: flat, a hard bottom edge, press down ─────────────────────
+   The base <button> look lives in styles.css so component styles (and the
+   mobile `all: unset` resets) still win over it. */
+.icon-btn,
+.console .ctx-btn {
+  border: 2px solid var(--line-strong) !important;
+  border-radius: 6px !important;
+  background: var(--card) !important;
+  color: var(--ink) !important;
+  box-shadow: 0 3px 0 var(--edge) !important;
+  transition: background 120ms ease, transform 80ms ease, box-shadow 80ms ease !important;
+}
+.icon-btn:hover,
+.console .ctx-btn:hover { background: var(--card-hover) !important; border-color: #4a4656 !important; transform: none !important; }
+.icon-btn:active,
+.console .ctx-btn:active { transform: translateY(2px) !important; box-shadow: 0 1px 0 var(--edge) !important; }
+.icon-btn-q { color: var(--accent-2) !important; }
+
+/* ── Mode tabs: a game menu with a ▶ cursor ────────────────────────────── */
+nav.mode-tabs .mode-tab {
+  border: 2px solid var(--line) !important;
+  border-radius: 8px !important;
+  background: var(--shell-panel) !important;
+  box-shadow: 0 3px 0 var(--edge) !important;
+}
+nav.mode-tabs .mode-tab:hover { background: var(--card-hover) !important; transform: none !important; }
+nav.mode-tabs .mode-tab.active {
+  border-color: var(--tab) !important;
+  background: color-mix(in srgb, var(--tab) 10%, var(--shell-panel)) !important;
+}
+nav.mode-tabs .mode-tab::after { height: 3px !important; border-radius: 0 !important; background: var(--tab) !important; }
+.mode-tab .mt-name { letter-spacing: 0.04em; }
+.mode-tab.active .mt-name::before {
+  content: "▶";
+  display: inline-block;
+  margin-right: 0.4em;
+  font-size: 0.8em;
+  color: var(--focus);
+}
+.mt-sub {
+  font-family: "IBM Plex Mono", monospace !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: var(--ink-soft) !important;
+}
+.mt-icon {
+  font-size: 0 !important;
+  color: transparent !important;
+  background: var(--card) center / 22px 22px no-repeat !important;
+  border: 2px solid var(--line-strong) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  image-rendering: pixelated;
+}
+.mode-tab[data-mode="daily"] .mt-icon, .howto-mode[data-m="daily"] .mt-icon { background-image: var(--px-calendar) !important; }
+.mode-tab[data-mode="draft"] .mt-icon, .howto-mode[data-m="draft"] .mt-icon { background-image: var(--px-cards) !important; }
+.mode-tab[data-mode="reverse"] .mt-icon, .howto-mode[data-m="reverse"] .mt-icon { background-image: var(--px-magnifier) !important; }
+@media (max-width: 767px) {
+  .mt-icon { width: 26px !important; height: 26px !important; background-size: 18px 18px !important; border: 0 !important; background-color: transparent !important; }
+  .mode-tab.active .mt-name::before { display: none; }
+}
+
+/* ── Console + HUD ─────────────────────────────────────────────────────── */
+.console, .rev-progress {
+  border: 2px solid var(--shell-line) !important;
+  border-radius: 10px !important;
+  background: var(--shell-panel) !important;
+  box-shadow: none !important;
+}
+.board-chip {
+  border-radius: 6px !important;
+  background: var(--card) !important;
+  border: 2px solid var(--line) !important;
+}
+.board-chip::before { box-shadow: none !important; border-radius: 1px !important; }
+.hud-tag { display: none !important; }           /* the icons say "lives" and "hints" */
+.hud-bar { border-radius: 2px !important; background: var(--line) !important; border: 0 !important; }
+.hud-fill, #revProgressBar { border-radius: 2px !important; background: var(--accent) !important; box-shadow: none !important; }
+#revProgressBar { background: var(--mode-reverse) !important; }
+.hud-score { font-family: var(--pixel-font); }
+
+/* Hearts and stars: pixel icons instead of emoji (which look different on
+   every phone). The game scripts still toggle .spent; only the look changes. */
+.pip-life, .rev-life, .rg-life, .modal-heart,
+.pip-hint, .modal-pip-hint, #revHud .rev-hint {
+  display: inline-block !important;
+  width: 20px !important;
+  height: 18px !important;
+  font-size: 0 !important;
+  color: transparent !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: center / 20px 18px no-repeat !important;
+  image-rendering: pixelated;
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+.pip-life, .rev-life, .rg-life, .modal-heart { background-image: var(--px-heart) !important; }
+.pip-life.spent, .rev-life.spent, .rg-life.spent, .modal-heart.spent { background-image: var(--px-heart-empty) !important; }
+.pip-hint, .modal-pip-hint, #revHud .rev-hint { background-image: var(--px-star) !important; background-size: 22px 22px !important; width: 22px !important; height: 22px !important; cursor: pointer; }
+@media (pointer: coarse) { .pip-hint, #revHud .rev-hint { width: 36px !important; height: 36px !important; min-width: 0 !important; min-height: 0 !important; } }
+.pip-hint.spent, .pip-hint:disabled, .modal-pip-hint.spent, .modal-pip-hint:disabled,
+#revHud .rev-hint.spent, #revHud .rev-hint:disabled { background-image: var(--px-star-empty) !important; cursor: default; }
+.pip-hint:hover:not(:disabled), .modal-pip-hint:hover:not(:disabled), #revHud .rev-hint:hover:not(:disabled) { transform: translateY(-2px) !important; }
+.modal-heart { width: 15px !important; height: 14px !important; background-size: 15px 14px !important; }
+.rg-life { width: 18px !important; height: 16px !important; background-size: 18px 16px !important; }
+.rev-lives.hit, #revLives.hit { animation: none; }
+
+/* ── Board ─────────────────────────────────────────────────────────────── */
+.board-wrap { border: 2px solid var(--line) !important; border-radius: 10px !important; background: var(--bg-2) !important; box-shadow: none !important; }
+.rule-head, .row-head { border: 2px solid var(--line) !important; border-radius: 6px !important; background: var(--card) !important; box-shadow: none !important; }
+.cell {
+  border: 2px solid var(--line) !important;
+  border-radius: 6px !important;
+  background: var(--card) !important;
+  animation: none !important;                  /* no staggered fade-in of 81 squares */
+}
+.cell:hover, .cell:focus, .cell:focus-within, .cell.active {
+  transform: scale(1.1) !important;
+  border-color: var(--focus) !important;
+  background: var(--card-hover) !important;
+  box-shadow: 0 6px 0 var(--edge) !important;
+}
+.cell.ok { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)) !important; background: color-mix(in srgb, var(--ok) 7%, var(--card)) !important; }
+.cell.err { border-color: color-mix(in srgb, var(--err) 60%, var(--line)) !important; background: color-mix(in srgb, var(--err) 7%, var(--card)) !important; }
+.cell.hint-cell { border-color: color-mix(in srgb, var(--accent-2) 55%, var(--line)) !important; background: color-mix(in srgb, var(--accent-2) 6%, var(--card)) !important; }
+.cell.hint-cell .picked-name { color: var(--accent-2) !important; }
+.cell.locked:hover, .cell.locked.active { transform: scale(1.04) !important; box-shadow: none !important; border-color: inherit; }
+.q-row, .q-col { text-shadow: none !important; }
+.q-row { color: var(--ink) !important; }
+.q-col { color: var(--ink-soft) !important; }
+.q-sep { color: var(--ink-faint) !important; }
+.cell:hover .q-row, .cell:focus-within .q-row { color: #fff !important; }
+.rule-badge { box-shadow: none !important; }
+
+/* ── Dialogs and sheets ────────────────────────────────────────────────── */
+.cell-modal-card, .rev-modal-card, .rg-card, .sp-card, dialog.howto, .dex-shell, .db-card {
+  border: 2px solid var(--line-strong) !important;
+  border-radius: 12px !important;
+  background: var(--shell-panel) !important;
+  box-shadow: 0 8px 0 var(--edge) !important;
+}
+.cell-modal-overlay, .rev-modal, .sp, .dex-overlay { background: rgba(8, 8, 11, 0.82) !important; }
+dialog.howto::backdrop { background: rgba(8, 8, 11, 0.82) !important; }
+
+/* ── Toasts ────────────────────────────────────────────────────────────── */
+.toast {
+  border: 2px solid var(--line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--shell-panel) !important;
+  box-shadow: 0 4px 0 var(--edge) !important;
+}
+
+/* ── Calm motion: no decorative loops ──────────────────────────────────── */
+.dex-lens-glass::after, .dex-led, .dx-stat-latest img, .dx-hero-img, .dx-stage-ring,
+.dx-stat-streak.hot .dx-stat-icon, .brand-ball { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+/* ── Icons that used to be emoji ───────────────────────────────────────── */
+.hud-alert-icon {
+  width: 26px; height: 26px; flex: none;
+  font-size: 0 !important;
+  background: center / 22px 22px no-repeat;
+  image-rendering: pixelated;
+}
+.hud-alert-dead .hud-alert-icon { background-image: var(--px-heart-empty); background-size: 22px 20px; }
+.hud-alert-win .hud-alert-icon { background-image: var(--px-trophy); }
+.hud-alert { border-width: 2px !important; border-radius: 8px !important; box-shadow: none !important; }
+
+.dx-stat-icon.px-flame, .dx-stat-icon.px-trophy {
+  width: 24px; height: 26px; font-size: 0;
+  background: center / contain no-repeat; image-rendering: pixelated;
+}
+.dx-stat-icon.px-flame { background-image: var(--px-flame); }
+.dx-stat-icon.px-trophy { background-image: var(--px-trophy); }
+
+.howto-ic {
+  display: inline-block; flex: none;
+  width: 20px; height: 20px;
+  background: center / contain no-repeat; image-rendering: pixelated;
+}
+.howto-ic.px-ball { background-image: var(--px-ball); }
+.howto-ic.px-star { background-image: var(--px-star); }
+.howto-ic.px-trophy { background-image: var(--px-trophy); }
+.howto-ic.howto-shiny { color: var(--accent-2); font-size: 1.1rem; line-height: 20px; text-align: center; }
+
+/* Empty square on phones: a pixel Poké Ball where the Pokémon will go. */
+@media (max-width: 767px) {
+  :is(.m-focus, .m-fit) .cell:has(.summary-sprite.hidden) .cell-summary::before {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--px-ball) center / contain no-repeat !important;
+    image-rendering: pixelated;
+    opacity: 0.9;
+  }
+  :is(.m-focus, .m-fit) .cell.err:has(.summary-sprite.hidden) .cell-summary::before { opacity: 1; filter: none; }
+}
+
+/* Empty squares no longer say "Tap to enter"; the square itself is the button. */
+.cell .picked-name:empty { display: none; }
+
+/* Lives and hints: a little air between icons. */
+.hud-lives, .rev-lives, #revLives, .modal-lives, .hud-hints, .modal-hints { gap: 4px !important; }
+.pip-life, .rev-life, .modal-heart { margin: 0 1px !important; }
+
+/* Pokédex lens: a flat blue lens with a square highlight. */
+.dex-lens-glass {
+  background: #3d8fd1 !important;
+  box-shadow: 0 0 0 4px #ece6dc, 0 0 0 6px rgba(0, 0, 0, 0.35) !important;
+}
+.dex-lens-glass::before {
+  content: ""; position: absolute; left: 24%; top: 22%;
+  width: 22%; height: 22%; background: #d7ebfa; border-radius: 2px;
+}
+.dex-lens-glass::after { display: none; }
+
+/* Small helper labels in plain sentence case, not tiny tracked capitals. */
+.rev-tap-hint, .modal-hint-tag {
+  font-family: "IBM Plex Mono", monospace !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 0.68rem !important;
+  color: var(--ink-faint) !important;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+.site-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1rem;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 1rem 1rem calc(5.5rem + env(safe-area-inset-bottom));
+  border-top: 2px solid var(--line);
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  text-align: center;
+}
+.site-foot a { color: var(--ink-soft); }
+
+/* Draft deck buttons lost their emoji; the label keeps the button's size. */
+.db-deck span:first-child { font-size: inherit; }
+
+/* Pokédex subtitle: plain sentence case. */
+.dex-heading p {
+  font-family: "IBM Plex Mono", monospace !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 0.74rem !important;
+}
+
+/* Text fields already show focus with their border; keep the outline tight. */
+input:focus-visible { outline-offset: 0 !important; }

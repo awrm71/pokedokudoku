@@ -53,6 +53,7 @@
     lives: MAX_LIVES,
     hints: MAX_HINTS,
     gameOver: false,      // out of lives: board locked, answers revealed
+    revivePending: false, // daily: out of lives, waiting on "watch an ad" or "end board"
     pick: null,           // the category picked in the sheet, waiting for "Lock in"
     foot: "idle",         // sheet footer: "idle" | "pick" | "hint" | "busy"
     busy: false,
@@ -149,7 +150,7 @@
       } else if (revealed) {
         // Lost board: the answer, shown dimmed so it doesn't read as a solve.
         head.classList.add("rev-revealed");
-        head.title = "You ran out of lives — this was the answer";
+        head.title = "You ran out of lives. This was the answer.";
       }
       // Daily: your % in the corner, and a tap shows how everyone named it.
       if (rev.isDaily && window.PDD_STATS) {
@@ -216,7 +217,7 @@
       hintBtn.classList.toggle("spent", rev.hints <= 0);
       hintBtn.disabled = !usable;
       hintBtn.title = rev.hints > 0
-        ? "1 hint: reveals one row or column. Open a line, then tap ⭐ Hint."
+        ? "1 hint: reveals one row or column. Open a line, then tap Hint."
         : "Hint used for this board";
     }
     updateBanner();
@@ -234,7 +235,7 @@
     if (rev.board && rev.gameOver) {
       show = true;
       elBanner.className = "hud-alert hud-alert-dead visible";
-      icon.textContent = "💀";
+      icon.textContent = "";
       text.innerHTML = "<strong>Out of lives</strong><span></span>";
       text.lastChild.textContent = rev.isDaily
         ? ` The answers are shown in grey. ${solvedCount()} of ${totalLines()} lines solved. Tap any category to see how everyone named it.`
@@ -242,8 +243,8 @@
     } else if (rev.board && isComplete()) {
       show = true;
       elBanner.className = "hud-alert hud-alert-win visible";
-      icon.textContent = "🏆";
-      text.innerHTML = "<strong>Board solved!</strong><span></span>";
+      icon.textContent = "";
+      text.innerHTML = "<strong>Board solved</strong><span></span>";
       const bits = [mistakes === 0 ? "No mistakes" : `${mistakes} mistake${mistakes === 1 ? "" : "s"}`,
         usedHint ? "1 hint" : "no hints"];
       text.lastChild.textContent = ` ${bits.join(", ")}.` + (rev.isDaily ? " Tap any category to see how everyone named it." : "");
@@ -288,7 +289,7 @@
     const fits = line.answers.length;
     let note = "";
     if (line.hinted) note = "You used your hint on this line, so it isn't counted.";
-    else if (unnamed > 0) note = `${unnamed === 1 ? "The faded one fits" : "The faded ones fit"} too — nobody has named ${unnamed === 1 ? "it" : "them"} yet.`;
+    else if (unnamed > 0) note = `${unnamed === 1 ? "The faded one fits" : "The faded ones fit"} too. Nobody has named ${unnamed === 1 ? "it" : "them"} yet.`;
     window.PDD_STATS.openSheet({
       title: lineName(axis, index),
       sub: (line.total
@@ -313,7 +314,8 @@
 
   async function openGuess(axis, index) {
     if (!rev.board) return;
-    if (rev.gameOver) { setMsg("Out of lives — this board is locked.", "err"); return; }
+    if (rev.gameOver) { setMsg("Out of lives. This board is locked.", "err"); return; }
+    if (rev.revivePending) { pauseForRevive(); return; }
     if (rev.solved[lineKey(axis, index)]) return;
     rev.activeLine = { axis, index };
     try { await ensureCatalog(); }
@@ -625,7 +627,7 @@
     } else {
       mid.innerHTML = `<small class="rg-foot-kicker"></small><span class="rg-foot-tip">Tap a category, then lock it in.</span>`;
       mid.firstChild.textContent = rev.lives === 1 ? "Last life" : `${rev.lives} lives`;
-      const hint = mkBtn("rg-btn star-quiet", rev.hints > 0 ? "⭐ Hint" : "Hint used",
+      const hint = mkBtn("rg-btn star-quiet", rev.hints > 0 ? "Hint" : "Hint used",
         () => { rev.foot = "hint"; renderFoot(); }, rev.hints <= 0);
       hint.title = rev.hints > 0 ? "Reveal this line's category (1 per board)" : "You've used this board's hint";
       actions.append(hint);
@@ -676,7 +678,7 @@
         setGuessStatus(`${res.canonical_label} ✓`, "ok");
         let m = `${lineName(axis, index)}: ${res.canonical_label} ✓`;
         if (res.pct != null) m += ` (${window.PDD_STATS?.fmt(res.pct) || `${res.pct}%`} named it that)`;
-        if (res.newly_indexed) m += " — new category added to your Index!";
+        if (res.newly_indexed) m += ". New category added to your Index.";
         setMsg(m, "ok");
         setTimeout(() => { closeGuess(); renderBoard(); }, 620);
         return;
@@ -694,14 +696,14 @@
       if (res.reason === "already_used") {
         const [ax, ix] = String(res.used_on || "").split(":");
         const where = ax ? lineName(ax, Number(ix)) : "another line";
-        setGuessStatus(`You already named ${splitLabel(entry.label).main} on ${where}. Each category counts once — no life lost.`, "err");
+        setGuessStatus(`You already named ${splitLabel(entry.label).main} on ${where}. Each category counts once. No life lost.`, "err");
         rev.pick = null;
         rev.foot = "idle";
         btn?.classList.remove("picked");
         return;
       }
       if (res.reason === "out_of_lives") {
-        endBoard(res.reveal);
+        if (res.revive) { closeGuess(); pauseForRevive(); } else endBoard(res.reveal);
         return;
       }
       // Wrong (or a repeat that didn't cost anything).
@@ -718,16 +720,18 @@
           btn.removeAttribute("aria-pressed");
         }, 450);
       }
-      if (res.game_over) {
+      if (res.game_over || res.revive) {
         setGuessStatus(`Not ${splitLabel(entry.label).main}. That was your last life.`, "err");
         updateHud();
-        setTimeout(() => endBoard(res.reveal), 1100);
+        setTimeout(() => {
+          if (res.revive) { closeGuess(); pauseForRevive(); } else endBoard(res.reveal);
+        }, 1100);
         return;
       }
       const left = `${rev.lives} ${rev.lives === 1 ? "life" : "lives"} left`;
       setGuessStatus(res.reason === "repeat"
         ? `Already tried ${splitLabel(entry.label).main}. No life lost.`
-        : `Not ${splitLabel(entry.label).main} — ${left}.`, "err");
+        : `Not ${splitLabel(entry.label).main}. ${left}.`, "err");
       bumpLives();
       updateHud();
     } catch (e) {
@@ -751,7 +755,7 @@
       applyStatus(res);
       if (res.ok) {
         rev.solved[lineKey(axis, index)] = { rule_id: res.rule_id, label: res.label, hinted: true };
-        setGuessStatus(`⭐ ${res.label}`, "ok");
+        setGuessStatus(`Hint: ${res.label}`, "ok");
         setMsg(`${lineName(axis, index)} revealed: ${res.label}`
           + (rev.isDaily ? " (hinted lines don't count toward your Index)." : "."), "ok");
         setTimeout(() => { closeGuess(); renderBoard(); }, 900);
@@ -788,6 +792,34 @@
     el.classList.add("hit");
   }
 
+  // Daily only: out of lives with a revive left. Nothing is revealed until
+  // the player watches an ad (one more life) or ends the board.
+  function pauseForRevive() {
+    if (!rev.board) return;
+    rev.revivePending = true;
+    const board = rev.board;
+    const finish = async () => {
+      let res = null;
+      try { res = await fetchJson(`${state.apiBase}/reverse/daily/end`, { method: "POST" }); } catch (_) { /* fall back to a reload */ }
+      rev.revivePending = false;
+      if (rev.board !== board) return;
+      if (res) endBoard(res.reveal); else loadDaily();
+    };
+    if (!window.PDD_ADS) { finish(); return; }
+    window.PDD_ADS.offerRevive({
+      what: "board",
+      onEnd: finish,
+      onRevive: async () => {
+        const res = await fetchJson(`${state.apiBase}/reverse/daily/revive`, { method: "POST" });
+        if (rev.board !== board) return;
+        rev.revivePending = false;
+        rev.lives = res.lives_left;
+        renderBoard();
+        setMsg("One more life. Make it count.", "ok");
+      },
+    });
+  }
+
   // Out of lives: lock the board and show what the unsolved lines were.
   function endBoard(reveal) {
     rev.gameOver = true;
@@ -798,7 +830,7 @@
     });
     closeGuess();
     renderBoard();
-    setMsg("💀 Out of lives — board locked.", "err");
+    setMsg("Out of lives. Board locked.", "err");
     elBanner?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
@@ -832,6 +864,8 @@
     rev.lives = typeof b.lives_left === "number" ? b.lives_left : MAX_LIVES;
     rev.hints = typeof b.hints_left === "number" ? b.hints_left : MAX_HINTS;
     rev.gameOver = !!b.game_over;
+    rev.revivePending = false;
+    rev.reviveDue = !!b.revive;
     (b.reveal || []).forEach((r) => {
       rev.revealed[lineKey(r.axis, r.index)] = { rule_id: r.rule_id, label: r.label };
     });
@@ -850,10 +884,11 @@
       if (elMeta) elMeta.textContent =
         `Daily Reverse (Hard) | ${b.day_seed} | ${b.n_rows}×${b.n_cols}`;
       const done = solvedCount();
-      if (rev.gameOver) setMsg("Out of lives on today's board. Come back tomorrow!", "err");
+      if (rev.reviveDue) { rev.reviveDue = false; pauseForRevive(); }
+      else if (rev.gameOver) setMsg("Out of lives on today's board. Come back tomorrow!", "err");
       else if (isComplete()) setMsg("Today's board is solved. Come back tomorrow!", "ok");
       else setMsg(done > 0
-        ? `Welcome back — ${done} line${done === 1 ? "" : "s"} already solved today.`
+        ? `Welcome back. ${done} line${done === 1 ? "" : "s"} already solved today.`
         : "Name the hidden category of each row and column. 3 lives, 1 hint.", "ok");
     } catch (e) {
       setMsg(`Couldn't load the Daily Reverse Board: ${e.message || e}`, "err");
@@ -886,7 +921,7 @@
       renderBoard();
       if (elMeta) elMeta.textContent =
         `Custom Reverse (${b.difficulty}) | ${b.n_rows}×${b.n_cols}`;
-      setMsg(b.note || "Custom board — practice only.", "warn");
+      setMsg(b.note || "Custom board. Practice only.", "warn");
     } catch (e) {
       const detail = (e && e.detail) ? e.detail : (e.message || e);
       setMsg(`Couldn't build that board: ${detail}`, "err");
@@ -923,7 +958,7 @@
       if (data.entries.length === 0) {
         const none = document.createElement("p");
         none.className = "rev-index-empty";
-        none.textContent = "None yet — solve lines on the Daily Reverse Board to fill this in.";
+        none.textContent = "None yet. Solve lines on the Daily Reverse Board to fill this in.";
         foundWrap.appendChild(none);
       } else {
         foundWrap.appendChild(fg);
@@ -1023,7 +1058,7 @@
     // HUD star: the hint is spent from inside a line's sheet.
     document.getElementById("revHintBtn")?.addEventListener("click", () => {
       if (rev.activeLine) { rev.foot = "hint"; renderFoot(); return; }
-      setMsg("Open a row or column, then tap ⭐ Hint inside it.", "warn");
+      setMsg("Open a row or column, then tap Hint inside it.", "warn");
     });
     // Banner button: a fresh practice board.
     document.getElementById("revBannerBtn")?.addEventListener("click", openCustomPanel);

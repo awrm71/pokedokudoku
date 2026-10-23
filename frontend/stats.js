@@ -65,7 +65,7 @@
   function tag(pct, extra = "") {
     const t = document.createElement("span");
     t.className = `cs-pct ${tier(pct)} ${extra}`.trim();
-    t.textContent = (pct != null && pct <= 1 ? "✦ " : "") + fmt(pct);
+    t.textContent = (pct != null && pct <= 1 ? "★ " : "") + fmt(pct);
     return t;
   }
 
@@ -244,7 +244,7 @@
     clearTimeout(confirmTimer);
     if (!btn) return;
     btn.classList.remove("confirm");
-    btn.textContent = "📊 Stats";
+    btn.textContent = "Stats";
   }
 
   btn?.addEventListener("click", () => {

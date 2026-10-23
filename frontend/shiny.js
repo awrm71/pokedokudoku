@@ -75,7 +75,7 @@
       `<div class="shiny-banner-card">` +
       `<span class="shiny-banner-rays" aria-hidden="true"></span>` +
       `<img class="shiny-banner-img" alt="">` +
-      `<p class="shiny-banner-kicker">✦ Shiny ✦</p>` +
+      `<p class="shiny-banner-kicker">★ Shiny ★</p>` +
       `<p class="shiny-banner-name"></p>` +
       `<p class="shiny-banner-sub"></p>` +
       `</div>`;

@@ -1,0 +1,129 @@
+/* ============================================================================
+   ads.css — ad slots and the revive offer. Same look as theme.css.
+   Nothing here takes up space unless ads.js adds a slot.
+   ============================================================================ */
+
+/* ── Slots ─────────────────────────────────────────────────────────────── */
+.ad-slot {
+  position: relative;
+  display: block;
+  text-align: center;
+}
+.ad-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  color: var(--ink-faint);
+}
+.ad-demo {
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--ink-faint);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.75rem;
+}
+
+/* Under the board: in the page flow, never over the game. */
+.ad-inline {
+  margin: 1.6rem auto 0.4rem;
+  max-width: 970px;
+  min-height: 120px;
+}
+.ad-inline .ad-demo { height: 100px; }
+
+/* Side rails on wide screens. The page narrows to make room so the board
+   never sits under an ad. */
+.ad-rail { display: none; }
+body.ads-rails .ad-rail {
+  display: block;
+  position: fixed;
+  top: 110px;
+  z-index: 1;
+  width: 160px;
+}
+body.ads-rails .ad-rail.left { left: 16px; }
+body.ads-rails .ad-rail.right { right: 16px; }
+body.ads-rails .ad-rail .ad-demo { height: 600px; }
+body.ads-rails .app-shell { max-width: min(1480px, calc(100vw - 2 * 192px)); }
+
+/* Modals and sheets sit above the rails. */
+body.ads-rails .acct, body.ads-rails .revive { z-index: 1300; }
+
+@media (max-width: 767px) {
+  .ad-inline { margin-top: 1.2rem; min-height: 100px; }
+  .ad-inline .ad-demo { height: 90px; }
+}
+
+/* ── Revive offer ──────────────────────────────────────────────────────── */
+.revive {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 8, 11, 0.82);
+  animation: revive-in 160ms ease-out both;
+}
+@keyframes revive-in { from { opacity: 0; } }
+.revive-card {
+  width: min(360px, 100%);
+  padding: 1.4rem 1.3rem 1.1rem;
+  border: 2px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--shell-panel);
+  box-shadow: 0 8px 0 var(--edge);
+  text-align: center;
+  color: var(--ink);
+}
+.revive-icon {
+  display: block;
+  width: 40px;
+  height: 36px;
+  margin: 0 auto 0.7rem;
+  background: var(--px-heart-empty) center / contain no-repeat;
+  image-rendering: pixelated;
+}
+.revive-card h2 {
+  margin: 0 0 0.45rem;
+  font-family: var(--pixel-font);
+  font-size: 1.05rem;
+}
+.revive-text { margin: 0 0 1.1rem; color: var(--ink-soft); font-size: 0.9rem; line-height: 1.5; min-height: 2.7em; }
+.revive-actions { display: grid; gap: 0.55rem; }
+.revive-actions button { min-height: 46px; }
+.revive-go[hidden] { display: none; }
+.revive-go:disabled { opacity: 0.55; cursor: default; }
+.revive-fine { margin: 0.9rem 0 0; color: var(--ink-faint); font-size: 0.74rem; }
+
+@media (max-width: 520px) {
+  .revive { place-items: end center; padding: 0; }
+  .revive-card {
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    border-bottom: 0;
+    padding-bottom: calc(1.1rem + env(safe-area-inset-bottom));
+    box-shadow: none;
+  }
+}
+
+/* ── Demo "ad" (ADS_DEMO=1 only) ───────────────────────────────────────── */
+.ad-demo-player {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+.ad-demo-card { text-align: center; color: #ccc; font-family: "IBM Plex Mono", monospace; }
+.ad-demo-card p { margin: 0.4rem 0; }
+.ad-demo-count { font-size: 2.4rem; color: #fff; }
+.ad-demo-card button { margin-top: 1rem; }
+
+/* Toasts would cover the offer on phones; it says everything they would. */
+body:has(.revive) .toast-stack { display: none; }

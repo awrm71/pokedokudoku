@@ -107,7 +107,7 @@
       ui.status.hidden = false;
       const pct = head.querySelector(".cs-pct")?.textContent;
       ui.status.textContent = head.classList.contains("rev-revealed") ? "Answer"
-        : head.classList.contains("rev-hinted") ? "Hint ⭐"
+        : head.classList.contains("rev-hinted") ? "Hint"
         : solved ? (pct ? `Solved · ${pct}` : "Solved") : "Unsolved";
       ui.status.classList.toggle("done", !!solved);
       if (shown) {
@@ -161,7 +161,7 @@
     const dash = el("div", "m-dash");
     const mini = el("div", "m-mini");
     mini.setAttribute("role", "group");
-    mini.setAttribute("aria-label", "Board overview — tap a square to jump to it");
+    mini.setAttribute("aria-label", "Board overview. Tap a square to jump to it.");
     const band = el("div", "m-band");
     band.setAttribute("aria-hidden", "true");
 

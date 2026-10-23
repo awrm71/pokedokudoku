@@ -41,7 +41,14 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Accounts: Sign in with Google + sessions. Its middleware swaps a signed-in
 # player's browser id for their account id on every request (see auth_api.py).
 import auth_api
-auth_api.attach(app)
+# The partner-Pokémon check looks the key up in the dataset loaded below
+# (the lambda only runs on a request, long after loading).
+auth_api.attach(app, find_pokemon=lambda key: _find_pokemon(key))
+
+# Ads: settings for the front end, /ads.txt, and whether revives are on.
+# All off until the ADSENSE_* / ADS_* variables are set (see ads_api.py).
+import ads_api
+ads_api.attach(app)
 
 N = 9
 
@@ -66,6 +73,7 @@ class ValidatePickResponse(BaseModel):
     lives_left: Optional[int] = None    # the server's count, so a refresh can't reset it
     pct: Optional[float] = None         # share of players who answered this square with this Pokemon
     finished: bool = False              # the board just ended (filled, or out of lives)
+    revive: bool = False                # out of lives, but an ad can buy one more
 
 
 # ── Shiny odds ──────────────────────────────────────────────────────────────
@@ -263,6 +271,23 @@ daily_store.init_db()
 DAILY_LIVES = 3
 DAILY_HINTS = 3
 
+
+def _daily_status(run: dict):
+    """(lives_left, finished, revive_available) for a Daily run.
+
+    Out of lives with a revive still available is a pause, not the end: the
+    board takes no answers or hints, and the stats stay hidden (they'd give
+    the answers away), until the player watches an ad (POST /daily/revive)
+    or ends the board (POST /daily/finish)."""
+    revives = run.get("revives", 0)
+    lives = max(0, DAILY_LIVES + revives * ads_api.REVIVE_LIVES - run["misses"])
+    if run["finished"]:
+        return lives, True, False
+    if lives > 0:
+        return lives, False, False
+    can = ads_api.revive_enabled() and revives < ads_api.REVIVES_PER_BOARD
+    return 0, not can, can
+
 def is_daily_seed(seed: str) -> bool:
     """A board only counts toward the Pokedex if its seed is today's canonical
     daily seed — i.e. the same value /board falls back to when no seed is given.
@@ -280,6 +305,16 @@ def serialize_board(board):
         "row_rule_labels": [compact_rule_label(rules[rid].label) for rid in board.row_rule_ids],
         "col_rule_labels": [compact_rule_label(rules[cid].label) for cid in board.col_rule_ids],
     }
+
+
+def _find_pokemon(key: str) -> Optional[dict]:
+    """A Pokémon by its dataset key (used for partner Pokémon)."""
+    row = df_play.loc[df_play["key"] == str(key)]
+    if row.empty:
+        return None
+    r0 = row.iloc[0]
+    pid = int(r0["pokemon_id"]) if "pokemon_id" in r0 and pd.notna(r0["pokemon_id"]) else None
+    return {"key": str(r0["key"]), "display_name": str(r0["display_name"]), "pokemon_id": pid}
 
 
 def lookup_pokemon(name: str) -> Optional[dict]:
@@ -620,9 +655,10 @@ def validate_pick_api(
     run = None
     if daily:
         run = daily_store.get_run(x_client_id, payload.seed)
-        lives_left = max(0, DAILY_LIVES - run["misses"])
-        if run["finished"] or lives_left <= 0:
-            return ValidatePickResponse(ok=False, reason="board_locked", lives_left=lives_left, finished=True)
+        lives_left, done, can_revive = _daily_status(run)
+        if done or lives_left <= 0:
+            return ValidatePickResponse(ok=False, reason="board_locked", lives_left=lives_left,
+                                        finished=done, revive=can_revive)
         saved = {(p["row_i"], p["col_j"]): p["pokemon_key"] for p in run["picks"]}
         if (payload.row_i, payload.col_j) in saved:
             return ValidatePickResponse(ok=False, reason="already_filled", lives_left=lives_left)
@@ -641,13 +677,12 @@ def validate_pick_api(
     if daily and not res.ok:
         if res.reason in ("does_not_match", "duplicate"):
             misses = daily_store.add_miss(x_client_id, payload.seed)
-            lives_left = max(0, DAILY_LIVES - misses)
-            if lives_left <= 0:
+            lives_left, done, can_revive = _daily_status({**run, "misses": misses})
+            if done:
                 daily_store.finish(x_client_id, payload.seed)
             return ValidatePickResponse(ok=False, reason=res.reason, lives_left=lives_left,
-                                        finished=lives_left <= 0)
-        return ValidatePickResponse(ok=False, reason=res.reason,
-                                    lives_left=max(0, DAILY_LIVES - run["misses"]))
+                                        finished=done, revive=can_revive)
+        return ValidatePickResponse(ok=False, reason=res.reason, lives_left=lives_left)
 
     # Pokedex tracking: only correct picks, only on today's daily board, only
     # when the client sent an id. Shuffle boards (random-int seeds) never
@@ -703,7 +738,7 @@ def validate_pick_api(
             daily_store.finish(x_client_id, payload.seed)
         return ValidatePickResponse(
             ok=True, reason=res.reason, shiny=shiny, shiny_registered=shiny_registered,
-            lives_left=max(0, DAILY_LIVES - run["misses"]),
+            lives_left=lives_left,
             pct=_pct(same, total), finished=done,
         )
 
@@ -1061,7 +1096,8 @@ def get_hint(seed: str, n: int = 9, n_rows: int | None = None, n_cols: int | Non
     run = None
     if daily:
         run = daily_store.get_run(x_client_id, seed)
-        if run["finished"] or run["misses"] >= DAILY_LIVES:
+        lives_left, done, _ = _daily_status(run)
+        if done or lives_left <= 0:
             raise HTTPException(status_code=409, detail="Today's board is finished.")
         if run["hints_used"] >= DAILY_HINTS:
             raise HTTPException(status_code=409, detail="No hints left today.")
@@ -1140,6 +1176,8 @@ class DailyStateResponse(BaseModel):
     hints_left: int
     finished: bool
     picks: List[DailyPick]
+    revive: bool = False        # out of lives, and an ad can buy one more
+    revives_used: int = 0
 
 
 class StatPick(BaseModel):
@@ -1196,17 +1234,35 @@ def _daily_pick_out(p: dict, counts: dict) -> DailyPick:
 
 @app.get("/daily/state", response_model=DailyStateResponse)
 def daily_state(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
-    seed = str(date.today())
-    run = daily_store.get_run(x_client_id, seed)
+    return _daily_state_out(x_client_id, str(date.today()))
+
+
+def _daily_state_out(client_id: Optional[str], seed: str) -> DailyStateResponse:
+    run = daily_store.get_run(client_id, seed)
     counts = _counts_with_mine(seed, run["picks"]) if run["picks"] else {"cells": {}}
-    lives_left = max(0, DAILY_LIVES - run["misses"])
+    lives_left, done, can_revive = _daily_status(run)
     return DailyStateResponse(
         seed=seed,
         lives_left=lives_left,
         hints_left=max(0, DAILY_HINTS - run["hints_used"]),
-        finished=run["finished"] or lives_left <= 0,
+        finished=done,
         picks=[_daily_pick_out(p, counts) for p in run["picks"]],
+        revive=can_revive,
+        revives_used=run["revives"],
     )
+
+
+@app.post("/daily/revive", response_model=DailyStateResponse)
+def daily_revive(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
+    """One more life after a rewarded ad. Only while the board is paused
+    out of lives, and only REVIVES_PER_BOARD times a day."""
+    if not x_client_id:
+        raise HTTPException(status_code=400, detail="Missing client id.")
+    seed = str(date.today())
+    _, _, can_revive = _daily_status(daily_store.get_run(x_client_id, seed))
+    if not can_revive or not daily_store.add_revive(x_client_id, seed, ads_api.REVIVES_PER_BOARD):
+        raise HTTPException(status_code=409, detail="No revive available.")
+    return _daily_state_out(x_client_id, seed)
 
 
 def _daily_stats(client_id: str, seed: str) -> DailyStatsResponse:
@@ -1241,7 +1297,7 @@ def _daily_stats(client_id: str, seed: str) -> DailyStatsResponse:
 def daily_stats(x_client_id: str | None = Header(default=None, alias="X-Client-Id")):
     seed = str(date.today())
     run = daily_store.get_run(x_client_id, seed)
-    if not (run["finished"] or run["misses"] >= DAILY_LIVES):
+    if not _daily_status(run)[1]:
         raise HTTPException(status_code=403, detail="Finish today's board to see everyone's answers.")
     return _daily_stats(x_client_id, seed)
 

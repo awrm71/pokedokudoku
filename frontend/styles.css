@@ -4,25 +4,25 @@
    ══════════════════════════════════════════════════════════════ */
 
 :root {
-  --bg-deep:      #08030f;
-  --bg-1:         #0e0818;
-  --bg-2:         #130a20;
-  --ink:          #e8d0e4;
-  --ink-soft:     #7a4d72;
-  --accent:       #cc2255;
+  --bg-deep:      #08080a;
+  --bg-1:         #0f0e12;
+  --bg-2:         #141317;
+  --ink:          #e5ddd3;
+  --ink-soft:     #5e5c6b;
+  --accent:       #cc3022;
   --accent-2:     #f59e0b;
-  --line:         #2a1428;
-  --line-strong:  #3d1a35;
-  --card:         rgba(20, 10, 28, 0.97);
-  --card-hover:   rgba(30, 14, 40, 0.99);
-  --glass:        rgba(14, 7, 22, 0.88);
-  --ok:           #10d98a;
+  --line:         #1d1c22;
+  --line-strong:  #292730;
+  --card:         rgba(18, 17, 21, 0.97);
+  --card-hover:   rgba(25, 24, 30, 0.99);
+  --glass:        rgba(14, 13, 16, 0.88);
+  --ok:           #3aaf75;
   --warn:         #f59e0b;
-  --err:          #f43f5e;
+  --err:          #e9584a;
   --pixel-font:   "Silkscreen", "IBM Plex Mono", monospace;
-  --glow-accent:  0 0 18px rgba(204, 34, 85, 0.32);
-  --glow-ok:      0 0 14px rgba(16, 217, 138, 0.25);
-  --glow-err:     0 0 14px rgba(244, 63, 94, 0.22);
+  --glow-accent:  0 0 18px rgba(204, 48, 34, 0.32);
+  --glow-ok:      0 0 14px rgba(58, 175, 117, 0.25);
+  --glow-err:     0 0 14px rgba(233, 88, 74, 0.22);
 }
 
 * { box-sizing: border-box; }
@@ -32,10 +32,7 @@ body {
   font-family: "IBM Plex Mono", monospace;
   color: var(--ink);
   background:
-    radial-gradient(900px 700px at -6% -10%, rgba(140, 10, 60, 0.30), transparent),
-    radial-gradient(600px 500px at 108% 5%,  rgba(80, 10, 120, 0.18), transparent),
-    radial-gradient(800px 400px at 50% 110%, rgba(100, 5, 80, 0.18), transparent),
-    linear-gradient(160deg, var(--bg-1) 0%, var(--bg-deep) 55%, var(--bg-2) 100%);
+    var(--bg-1);
   min-height: 100vh;
   background-attachment: fixed;
 }
@@ -50,7 +47,7 @@ body {
   opacity: 0.12;
   pointer-events: none;
 }
-.orb-a { background: #cc2255; top: -12rem; left: -10rem; }
+.orb-a { background: #cc3022; top: -12rem; left: -10rem; }
 .orb-b { background: #f59e0b; right: -12rem; bottom: -14rem; }
 
 /* ── Shell ───────────────────────────────────────────────── */
@@ -86,11 +83,11 @@ h1 {
   font-size: clamp(1.8rem, 3.5vw, 3.2rem);
   letter-spacing: 0.02em;
   line-height: 1;
-  background: linear-gradient(110deg, #e040a0 0%, #cc2255 38%, #9b1fcc 65%, #f59e0b 100%);
+  background: #e04d40;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 22px rgba(204, 34, 85, 0.35));
+  filter: none;
 }
 
 .subtitle {
@@ -114,43 +111,45 @@ input, select {
 
 button {
   border: 0;
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--accent);
-  color: #031014;
+  color: #fff;
   padding: 0.56rem 1rem;
   font-family: var(--pixel-font);
   font-weight: 700;
   font-size: 0.82rem;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  box-shadow: 0 0 16px rgba(204, 34, 85, 0.30), 0 4px 12px rgba(0, 0, 0, 0.4);
-  transition: filter 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+  transition: background 120ms ease, transform 80ms ease, box-shadow 80ms ease;
 }
 
 button:hover {
-  filter: brightness(1.12) saturate(1.1);
-  transform: translateY(-2px);
-  box-shadow: 0 0 24px rgba(204, 34, 85, 0.45), 0 6px 18px rgba(0, 0, 0, 0.5);
+  background: var(--accent-hi, var(--accent));
+}
+
+button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
 }
 
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 2px;
 }
 
 button.ghost {
-  background: transparent;
+  background: var(--card);
   color: var(--ink);
-  border: 1px solid var(--line-strong);
-  box-shadow: none;
+  border: 2px solid var(--line-strong);
 }
 
 button.ghost:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  box-shadow: 0 0 12px rgba(204, 34, 85, 0.20);
+  background: var(--card-hover);
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 
 .player-actions {
@@ -195,10 +194,10 @@ button.ghost:hover {
   border-radius: 50%;
   margin-right: 0.3rem;
 }
-.dot.ok   { background: var(--ok); box-shadow: 0 0 6px rgba(16,217,138,0.6); }
+.dot.ok   { background: var(--ok); box-shadow: none; }
 .dot.warn { background: var(--warn); }
 .dot.err  { background: var(--err); }
-.dot.hint { background: #22d3ee; box-shadow: 0 0 6px rgba(34,211,238,0.55); }
+.dot.hint { background: #56bab0; box-shadow: none; }
 
 /* ── Board wrap ──────────────────────────────────────────── */
 .board-wrap {
@@ -206,14 +205,10 @@ button.ghost:hover {
   border: 1px solid var(--line-strong);
   border-radius: 18px;
   background:
-    linear-gradient(160deg, rgba(13, 28, 44, 0.95), rgba(9, 18, 30, 0.98)),
-    radial-gradient(circle at 0 0,   rgba(204, 34, 85, 0.06), transparent 40%),
-    radial-gradient(circle at 100% 100%, rgba(245, 158, 11, 0.05), transparent 38%);
+    rgba(13, 28, 44, 0.95);
   padding: 0.55rem;
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(204, 34, 85, 0.08),
-    inset 0 0 0 1px rgba(204, 34, 85, 0.04);
+    0 24px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(204, 48, 34, 0.08), inset 0 0 0 1px rgba(204, 48, 34, 0.04);
 }
 
 /* ── Board grid ──────────────────────────────────────────── */
@@ -254,8 +249,8 @@ button.ghost:hover {
 
 .rule-head:hover,
 .row-head:hover {
-  border-color: rgba(204, 34, 85, 0.40);
-  background: rgba(204, 34, 85, 0.09);
+  border-color: rgba(204, 48, 34, 0.40);
+  background: rgba(204, 48, 34, 0.09);
 }
 
 .rule-badge {
@@ -264,8 +259,8 @@ button.ghost:hover {
   justify-content: center;
   padding: 0.26rem 0.42rem;
   border-radius: 8px;
-  border: 1px solid rgba(204, 34, 85, 0.22);
-  background: rgba(204, 34, 85, 0.06);
+  border: 1px solid rgba(204, 48, 34, 0.22);
+  background: rgba(204, 48, 34, 0.06);
   max-width: 100%;
 }
 
@@ -357,13 +352,13 @@ button.ghost:hover {
 }
 
 .cell.ok {
-  background: linear-gradient(160deg, rgba(16, 217, 138, 0.1), rgba(13, 24, 38, 0.97));
-  border-color: rgba(16, 217, 138, 0.35);
+  background: rgba(58, 175, 117, 0.1);
+  border-color: rgba(58, 175, 117, 0.35);
 }
 
 .cell.err {
-  background: linear-gradient(160deg, rgba(244, 63, 94, 0.08), rgba(13, 24, 38, 0.97));
-  border-color: rgba(244, 63, 94, 0.28);
+  background: rgba(233, 88, 74, 0.08);
+  border-color: rgba(233, 88, 74, 0.28);
 }
 
 /* Prevent locked cells from reopening editor */
@@ -481,10 +476,10 @@ button.ghost:hover {
   inset: 0.24rem;
   border-radius: 8px;
   background: rgba(10, 22, 36, 0.98);
-  border: 1px solid rgba(204, 34, 85, 0.30);
+  border: 1px solid rgba(204, 48, 34, 0.30);
   padding: 0.38rem;
   transition: max-height 140ms ease, opacity 140ms ease;
-  box-shadow: 0 0 20px rgba(204, 34, 85, 0.10);
+  box-shadow: none;
 }
 
 .cell:hover .cell-editor,
@@ -516,7 +511,7 @@ button.ghost:hover {
   min-width: 0;
   padding: 0.38rem 0.5rem;
   font-size: 0.78rem;
-  background: rgba(204, 34, 85, 0.06);
+  background: rgba(204, 48, 34, 0.06);
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   color: var(--ink);
@@ -525,7 +520,7 @@ button.ghost:hover {
 .name-input:focus {
   border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 10px rgba(204, 34, 85, 0.22);
+  box-shadow: none;
 }
 
 .cell-status {
@@ -537,30 +532,30 @@ button.ghost:hover {
 }
 
 /* ── Cell state colours ──────────────────────────────────── */
-.cell.ok  { border-color: rgba(16, 217, 138, 0.4); }
-.cell.err { border-color: rgba(244, 63,  94, 0.35); }
+.cell.ok  { border-color: rgba(58, 175, 117, 0.4); }
+.cell.err { border-color: rgba(233, 88, 74, 0.35); }
 .cell.warn{ border-color: rgba(245, 158, 11, 0.3);  }
 
 .cell.ok  .picked-name { color: var(--ok); }
 .cell.ok  .result-mark {
   color: var(--ok);
-  border-color: rgba(16, 217, 138, 0.45);
-  background: rgba(16, 217, 138, 0.12);
+  border-color: rgba(58, 175, 117, 0.45);
+  background: rgba(58, 175, 117, 0.12);
 }
 
 .cell.err .picked-name { color: var(--err); }
 .cell.err .result-mark {
   color: var(--err);
-  border-color: rgba(244, 63, 94, 0.4);
-  background: rgba(244, 63, 94, 0.1);
+  border-color: rgba(233, 88, 74, 0.4);
+  background: rgba(233, 88, 74, 0.1);
 }
 
 /* Hint cell — cyan to distinguish from amber "not submitted" */
 .cell.hint-cell {
-  border-color: rgba(34, 211, 238, 0.45) !important;
-  background: linear-gradient(160deg, rgba(34,211,238,0.07), rgba(13,24,38,0.97)) !important;
+  border-color: rgba(86, 186, 176, 0.45) !important;
+  background: linear-gradient(160deg, rgba(86, 186, 176,0.07), rgba(13,24,38,0.97)) !important;
 }
-.cell.hint-cell .picked-name { color: #22d3ee !important; }
+.cell.hint-cell .picked-name { color: #56bab0 !important; }
 
 /* Board locked (game over) */
 .board-wrap.board-locked {
@@ -705,7 +700,7 @@ button.ghost:hover {
     position: sticky;
     left: 0;
     z-index: 30;                            /* above cell hover z-index: 8 */
-    background: #0a0310;                    /* fully opaque — no cell bleed-through */
+    background: #09090a;                    /* fully opaque — no cell bleed-through */
     box-shadow: 3px 0 10px rgba(0,0,0,0.7); /* hard right-edge separator */
   }
 
@@ -714,7 +709,7 @@ button.ghost:hover {
     position: sticky;
     left: 0;
     z-index: 31;
-    background: #0a0310;
+    background: #09090a;
     box-shadow: 3px 0 10px rgba(0,0,0,0.7);
     overflow: hidden;
   }

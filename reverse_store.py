@@ -14,8 +14,9 @@ Same design philosophy as pokedex_store.py, deliberately so:
   - shares the SAME database file as pokedex_store, in its own table, so the
     two features can't collide and a single merge covers both.
 
-Lives and hints for the daily board live here too (reverse_daily_misses,
-reverse_daily_hints), so reloading the page can't reset them.
+Lives, hints and revives for the daily board live here too
+(reverse_daily_misses, reverse_daily_hints, reverse_daily_revives), so
+reloading the page can't reset them.
 
 What counts as "identified": the caller (api_main) decides, exactly like
 is_daily_seed() gates the Pokedex. Reverse Board only logs on full-size 9x9
@@ -113,6 +114,20 @@ def init_db() -> None:
                     rule_id     TEXT NOT NULL,
                     label       TEXT NOT NULL DEFAULT '',
                     used_at     TEXT NOT NULL,
+                    PRIMARY KEY (client_id, day_seed)
+                );
+                """
+            )
+            # Revives: an extra life bought by watching an ad, or the player
+            # choosing to end the board instead (declined = 1).
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reverse_daily_revives (
+                    client_id   TEXT NOT NULL,
+                    day_seed    TEXT NOT NULL,
+                    revives     INTEGER NOT NULL DEFAULT 0,
+                    declined    INTEGER NOT NULL DEFAULT 0,
+                    updated_at  TEXT NOT NULL,
                     PRIMARY KEY (client_id, day_seed)
                 );
                 """
@@ -372,6 +387,71 @@ def get_daily_hint(client_id: str, day_seed: str) -> Optional[dict]:
             conn.close()
 
 
+def get_daily_revive(client_id: str, day_seed: str) -> dict:
+    """{revives, declined} for this player's daily board."""
+    out = {"revives": 0, "declined": False}
+    if not client_id or not day_seed:
+        return out
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT revives, declined FROM reverse_daily_revives WHERE client_id = ? AND day_seed = ?",
+                (client_id, day_seed),
+            ).fetchone()
+            if row:
+                out["revives"], out["declined"] = row[0], bool(row[1])
+            return out
+        finally:
+            conn.close()
+
+
+def _revive_row(conn, client_id: str, day_seed: str) -> None:
+    conn.execute(
+        "INSERT OR IGNORE INTO reverse_daily_revives (client_id, day_seed, updated_at) VALUES (?, ?, ?)",
+        (client_id, day_seed, datetime.now(timezone.utc).isoformat()),
+    )
+
+
+def add_daily_revive(client_id: str, day_seed: str, limit: int) -> bool:
+    """Spend a revive. False once the limit is reached or the player ended
+    the board (a single UPDATE, so two tabs can't both get one)."""
+    if not client_id or not day_seed:
+        return False
+    with _lock:
+        conn = _connect()
+        try:
+            _revive_row(conn, client_id, day_seed)
+            cur = conn.execute(
+                """
+                UPDATE reverse_daily_revives SET revives = revives + 1, updated_at = ?
+                WHERE client_id = ? AND day_seed = ? AND revives < ? AND declined = 0
+                """,
+                (datetime.now(timezone.utc).isoformat(), client_id, day_seed, limit),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
+
+def decline_daily_revive(client_id: str, day_seed: str) -> None:
+    """The player chose to end the board rather than watch an ad."""
+    if not client_id or not day_seed:
+        return
+    with _lock:
+        conn = _connect()
+        try:
+            _revive_row(conn, client_id, day_seed)
+            conn.execute(
+                "UPDATE reverse_daily_revives SET declined = 1, updated_at = ? WHERE client_id = ? AND day_seed = ?",
+                (datetime.now(timezone.utc).isoformat(), client_id, day_seed),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
 def merge_client(from_client_id: str, to_client_id: str) -> int:
     """Fold guest Category Index progress into an account. Rules the target
     already named are kept (with their earlier timestamp) and the source's
@@ -428,6 +508,20 @@ def merge_client(from_client_id: str, to_client_id: str) -> int:
 
             # Lives and hints follow the same rule: the account keeps its own
             # record for a day it already played; otherwise the guest's moves over.
+            # (Revives go first: they belong with the misses they paid for.)
+            conn.execute(
+                """
+                UPDATE reverse_daily_revives
+                SET client_id = ?
+                WHERE client_id = ?
+                  AND day_seed NOT IN (
+                      SELECT day_seed FROM reverse_daily_misses WHERE client_id = ?
+                      UNION SELECT day_seed FROM reverse_daily_revives WHERE client_id = ?
+                  )
+                """,
+                (to_client_id, from_client_id, to_client_id, to_client_id),
+            )
+            conn.execute("DELETE FROM reverse_daily_revives WHERE client_id = ?", (from_client_id,))
             conn.execute(
                 """
                 UPDATE reverse_daily_misses

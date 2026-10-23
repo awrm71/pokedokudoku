@@ -1,10 +1,10 @@
 """
-auth_api.py — Sign in with Google, sessions, and the player's account.
+auth_api.py — accounts: Google or email sign-in, sessions, the trainer profile.
 
 Wired into api_main.py with:
 
     import auth_api
-    auth_api.attach(app)
+    auth_api.attach(app, find_pokemon=...)
 
 How it fits the rest of the app
 -------------------------------
@@ -21,38 +21,52 @@ middleware that runs before every request:
 
 So the Pokédex, Daily, Reverse and stats code didn't change at all.
 
-On sign-in, everything the current device had as a guest is merged into the
-account (the account's own data wins on any clash). Signing in on a second
-device merges that device's guest progress too.
+Whichever way someone signs in, everything the current device had as a
+guest is merged into the account (the account's own data wins on a clash).
 
 Endpoints
-  GET  /auth/config    is Google sign-in set up? (+ the public client id)
-  GET  /auth/me        the signed-in account, or null; plus a progress summary
-  POST /auth/google    sign in with a Google ID token
-  POST /auth/logout    sign out (this device)
-  POST /auth/profile   change the trainer name
+  GET  /auth/config            which sign-in methods are on
+  GET  /auth/me                the signed-in account (or null) + progress
+  GET  /auth/name-available    is a trainer name free?
+  POST /auth/google            sign in with a Google ID token
+  POST /auth/register          create an account with email + password
+  POST /auth/login             sign in with email + password
+  POST /auth/password/forgot   email a 6-digit reset code
+  POST /auth/password/reset    set a new password with that code
+  POST /auth/logout            sign out (this device)
+  POST /auth/profile           change trainer name and/or partner Pokémon
 
 Settings (environment variables)
-  GOOGLE_CLIENT_ID   the OAuth "Web application" client id from Google Cloud.
-                     Not a secret. Without it, sign-in is simply hidden.
+  GOOGLE_CLIENT_ID   OAuth "Web application" client id (not a secret).
+                     Without it the Google button is hidden.
+  RESEND_API_KEY     Resend.com API key, for password-reset emails.
+  MAIL_FROM          Sender, e.g. "PokeDokuDoku <hello@pokedokudoku.com>"
+                     (the domain must be verified in Resend).
+                     Without these two, "Forgot password?" is hidden.
 """
 
 from __future__ import annotations
 
 import os
+import time
+from collections import defaultdict, deque
 from http.cookies import SimpleCookie
-from typing import Optional
+from typing import Callable, Optional
 
 from fastapi import HTTPException, Request, Response
 from pydantic import BaseModel
 
 import accounts_store
+from accounts_store import AccountError
 import daily_store
 import pokedex_store
 import reverse_store
 
 COOKIE = "pdd_session"
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+MAIL_FROM = os.environ.get("MAIL_FROM", "").strip()
+RESET_ENABLED = bool(RESEND_API_KEY and MAIL_FROM)
 GOOGLE_ISSUERS = ("accounts.google.com", "https://accounts.google.com")
 
 
@@ -97,11 +111,49 @@ class SessionMiddleware:
             new_headers.append((b"x-client-id", effective.encode("latin-1")))
         scope = dict(scope)
         scope["headers"] = new_headers
-        # The browser's own (guest) id, kept for the sign-in merge.
         scope.setdefault("state", {})
+        # The browser's own (guest) id, kept for the sign-in merge.
         scope["state"]["guest_id"] = client_id if client_id and not client_id.startswith("acct_") else None
         scope["state"]["account"] = acct
         await self.app(scope, receive, send)
+
+
+# ── Rate limits (per server process; enough for one Railway instance) ────────
+
+class _Limiter:
+    """At most `limit` events per `window` seconds for each key."""
+
+    def __init__(self, limit: int, window: float):
+        self.limit, self.window = limit, window
+        self.hits: dict = defaultdict(deque)
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        q = self.hits[key]
+        while q and now - q[0] > self.window:
+            q.popleft()
+        if len(q) >= self.limit:
+            return False
+        q.append(now)
+        if len(self.hits) > 20000:
+            self.hits.clear()
+        return True
+
+
+_login_by_email = _Limiter(8, 15 * 60)       # wrong passwords for one email
+_login_by_ip = _Limiter(30, 15 * 60)         # sign-in attempts from one address
+_signup_by_ip = _Limiter(8, 60 * 60)         # new accounts from one address
+_reset_by_email = _Limiter(3, 60 * 60)       # reset emails for one address
+_reset_by_ip = _Limiter(10, 60 * 60)
+
+
+def _ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "?")
+
+
+def _too_many():
+    raise HTTPException(status_code=429, detail="Too many tries. Wait a few minutes and try again.")
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -121,16 +173,47 @@ class AccountOut(BaseModel):
     email: str = ""
     picture: str = ""
     created_at: str = ""
+    partner_key: str = ""
+    partner_name: str = ""
+    partner_id: Optional[int] = None
+    has_password: bool = False
+    has_google: bool = False
 
 
 class MeResponse(BaseModel):
     enabled: bool
     account: Optional[AccountOut] = None
-    progress: Progress          # this player's progress (account, or this device as a guest)
+    progress: Progress
 
 
 class GoogleSignIn(BaseModel):
-    credential: str             # the ID token from Google Identity Services
+    credential: str
+
+
+class RegisterIn(BaseModel):
+    email: str
+    password: str
+    trainer_name: str
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class ForgotIn(BaseModel):
+    email: str
+
+
+class ResetIn(BaseModel):
+    email: str
+    code: str
+    password: str
+
+
+class ProfileIn(BaseModel):
+    trainer_name: Optional[str] = None
+    partner_key: Optional[str] = None     # "" clears the partner
 
 
 class SignInResponse(BaseModel):
@@ -138,10 +221,6 @@ class SignInResponse(BaseModel):
     is_new: bool
     merged: int                 # Pokémon moved over from this device
     progress: Progress
-
-
-class ProfileIn(BaseModel):
-    trainer_name: str
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -162,13 +241,38 @@ def _progress(client_id: Optional[str]) -> Progress:
 
 
 def _out(acct: dict) -> AccountOut:
-    return AccountOut(**{k: acct.get(k) or "" for k in AccountOut.model_fields})
+    data = {k: acct.get(k) for k in AccountOut.model_fields}
+    for k in ("name", "email", "picture", "created_at", "partner_key", "partner_name"):
+        data[k] = data.get(k) or ""
+    data["has_password"] = bool(data.get("has_password"))
+    data["has_google"] = bool(data.get("has_google"))
+    return AccountOut(**data)
 
 
 def _secure(request: Request) -> bool:
-    # Railway (and most hosts) terminate HTTPS at a proxy and forward plain HTTP.
     proto = request.headers.get("x-forwarded-proto", request.url.scheme)
     return proto.split(",")[0].strip() == "https"
+
+
+def _fail(err: AccountError, status: int = 400):
+    raise HTTPException(status_code=status, detail={"message": str(err), "field": err.field})
+
+
+def _sign_in(acct: dict, is_new: bool, request: Request, response: Response) -> SignInResponse:
+    """Shared by every sign-in method: merge this device, start a session."""
+    guest = request.scope.get("state", {}).get("guest_id")
+    merged = 0
+    if guest and guest != acct["id"]:
+        merged = pokedex_store.merge_client(guest, acct["id"])
+        reverse_store.merge_client(guest, acct["id"])
+        daily_store.merge_client(guest, acct["id"])
+    old = request.cookies.get(COOKIE)
+    if old:
+        accounts_store.delete_session(old)
+    token = accounts_store.create_session(acct["id"])
+    response.set_cookie(COOKIE, token, max_age=accounts_store.SESSION_DAYS * 86400,
+                        httponly=True, samesite="lax", secure=_secure(request), path="/")
+    return SignInResponse(account=_out(acct), is_new=is_new, merged=merged, progress=_progress(acct["id"]))
 
 
 def _verify_google(credential: str) -> dict:
@@ -190,54 +294,131 @@ def _verify_google(credential: str) -> dict:
     return info
 
 
+def _send_reset_email(to: str, code: str, trainer: str) -> bool:
+    """Send the code through Resend. Returns False if it didn't go out."""
+    try:
+        import requests
+        text = (f"Hi {trainer},\n\nYour PokeDokuDoku reset code is {code}\n\n"
+                f"It works for {accounts_store.RESET_MINUTES} minutes. If you didn't ask for this, ignore this email; "
+                "your password hasn't changed.\n")
+        html = (f"<p>Hi {trainer},</p><p>Your PokeDokuDoku reset code is</p>"
+                f"<p style=\"font:700 28px/1.2 monospace;letter-spacing:4px\">{code}</p>"
+                f"<p>It works for {accounts_store.RESET_MINUTES} minutes. If you didn't ask for this, ignore this email; "
+                "your password hasn't changed.</p>")
+        r = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json={"from": MAIL_FROM, "to": [to], "subject": f"Your reset code: {code}", "text": text, "html": html},
+            timeout=10,
+        )
+        return r.status_code < 300
+    except Exception:
+        return False
+
+
 # ── Attach ────────────────────────────────────────────────────────────────────
 
-def attach(app) -> None:
+def attach(app, find_pokemon: Optional[Callable[[str], Optional[dict]]] = None) -> None:
+    """find_pokemon(key) -> {"key", "display_name", "pokemon_id"} or None;
+    used to check a chosen partner Pokémon exists."""
     accounts_store.init_db()
     app.add_middleware(SessionMiddleware)
 
     @app.get("/auth/config")
     def auth_config():
-        return {"enabled": bool(GOOGLE_CLIENT_ID), "google_client_id": GOOGLE_CLIENT_ID or None}
+        return {
+            "enabled": True,                         # email sign-in is always available
+            "google_client_id": GOOGLE_CLIENT_ID or None,
+            "email": True,
+            "reset": RESET_ENABLED,
+            "name_min": accounts_store.TRAINER_NAME_MIN,
+            "name_max": accounts_store.TRAINER_NAME_MAX,
+            "password_min": accounts_store.PASSWORD_MIN,
+        }
 
     @app.get("/auth/me", response_model=MeResponse)
     def auth_me(request: Request):
         acct = request.scope.get("state", {}).get("account")
         who = acct["id"] if acct else request.scope.get("state", {}).get("guest_id")
-        return MeResponse(enabled=bool(GOOGLE_CLIENT_ID),
-                          account=_out(acct) if acct else None,
-                          progress=_progress(who))
+        return MeResponse(enabled=True, account=_out(acct) if acct else None, progress=_progress(who))
+
+    @app.get("/auth/name-available")
+    def auth_name_available(name: str, request: Request):
+        acct = request.scope.get("state", {}).get("account")
+        try:
+            clean = accounts_store.check_trainer_name(name)
+        except AccountError as e:
+            return {"available": False, "reason": str(e)}
+        free = accounts_store.name_available(clean, except_account=acct["id"] if acct else "")
+        return {"available": free, "reason": "" if free else "That trainer name is taken."}
 
     @app.post("/auth/google", response_model=SignInResponse)
     def auth_google(payload: GoogleSignIn, request: Request, response: Response):
         if not GOOGLE_CLIENT_ID:
-            raise HTTPException(status_code=503, detail="Sign-in isn't set up on this server yet.")
+            raise HTTPException(status_code=503, detail="Google sign-in isn't set up on this server yet.")
         info = _verify_google(payload.credential)
         acct, is_new = accounts_store.upsert_google_account(
             sub=str(info["sub"]), email=info.get("email", ""),
             name=info.get("name", ""), picture=info.get("picture", ""),
         )
+        return _sign_in(acct, is_new, request, response)
 
-        # Fold this device's guest progress into the account.
-        guest = request.scope.get("state", {}).get("guest_id")
-        merged = 0
-        if guest and guest != acct["id"]:
-            merged = pokedex_store.merge_client(guest, acct["id"])
-            reverse_store.merge_client(guest, acct["id"])
-            daily_store.merge_client(guest, acct["id"])
+    @app.post("/auth/register", response_model=SignInResponse)
+    def auth_register(payload: RegisterIn, request: Request, response: Response):
+        if not _signup_by_ip.allow(_ip(request)):
+            _too_many()
+        try:
+            acct = accounts_store.create_email_account(payload.email, payload.password, payload.trainer_name)
+        except AccountError as e:
+            _fail(e)
+        return _sign_in(acct, True, request, response)
 
-        # Replace any session this browser already had.
-        old = request.cookies.get(COOKIE)
-        if old:
-            accounts_store.delete_session(old)
-        token = accounts_store.create_session(acct["id"])
-        response.set_cookie(
-            COOKIE, token,
-            max_age=accounts_store.SESSION_DAYS * 86400,
-            httponly=True, samesite="lax", secure=_secure(request), path="/",
-        )
-        return SignInResponse(account=_out(acct), is_new=is_new, merged=merged,
-                              progress=_progress(acct["id"]))
+    @app.post("/auth/login", response_model=SignInResponse)
+    def auth_login(payload: LoginIn, request: Request, response: Response):
+        ekey = accounts_store.norm_email(payload.email)
+        if not _login_by_ip.allow(_ip(request)):
+            _too_many()
+        acct = accounts_store.email_sign_in(payload.email, payload.password)
+        if not acct:
+            if not _login_by_email.allow(ekey):
+                _too_many()
+            if accounts_store.email_uses_google_only(payload.email):
+                _fail(AccountError("That email signs in with Google. Use the Google button.", "email"), 401)
+            _fail(AccountError("Email or password is wrong.", "password"), 401)
+        return _sign_in(acct, False, request, response)
+
+    @app.post("/auth/password/forgot")
+    def auth_forgot(payload: ForgotIn, request: Request):
+        if not RESET_ENABLED:
+            raise HTTPException(status_code=503, detail="Password reset isn't set up yet.")
+        ekey = accounts_store.norm_email(payload.email)
+        if not _reset_by_ip.allow(_ip(request)) or not _reset_by_email.allow(ekey):
+            _too_many()
+        code = accounts_store.start_reset(payload.email)
+        if code:
+            acct_name = ""
+            try:
+                with accounts_store._lock:
+                    conn = accounts_store._connect()
+                    row = conn.execute("SELECT trainer_name, email FROM accounts WHERE email_key = ?", (ekey,)).fetchone()
+                    conn.close()
+                acct_name, to = (row[0], row[1]) if row else ("Trainer", payload.email)
+            except Exception:
+                acct_name, to = "Trainer", payload.email
+            if not _send_reset_email(to, code, acct_name or "Trainer"):
+                raise HTTPException(status_code=502, detail="The email didn't send. Try again in a minute.")
+        # Same answer whether or not the email has an account.
+        return {"ok": True, "message": "If that email has an account, a code is on its way."}
+
+    @app.post("/auth/password/reset", response_model=SignInResponse)
+    def auth_reset(payload: ResetIn, request: Request, response: Response):
+        if not RESET_ENABLED:
+            raise HTTPException(status_code=503, detail="Password reset isn't set up yet.")
+        try:
+            acct = accounts_store.finish_reset(payload.email, payload.code, payload.password)
+        except AccountError as e:
+            _fail(e)
+        return _sign_in(acct, False, request, response)
 
     @app.post("/auth/logout")
     def auth_logout(request: Request, response: Response):
@@ -250,7 +431,17 @@ def attach(app) -> None:
         acct = request.scope.get("state", {}).get("account")
         if not acct:
             raise HTTPException(status_code=401, detail="Sign in first.")
-        ok, msg = accounts_store.set_trainer_name(acct["id"], payload.trainer_name)
-        if not ok:
-            raise HTTPException(status_code=400, detail=msg)
-        return _out(accounts_store.get_account(acct["id"]))
+        partner = None
+        if payload.partner_key is not None:
+            if payload.partner_key == "":
+                partner = ("", "", None)
+            else:
+                mon = find_pokemon(payload.partner_key) if find_pokemon else None
+                if not mon:
+                    raise HTTPException(status_code=400, detail={"message": "Pick a Pokémon from the list.", "field": "partner"})
+                partner = (mon["key"], mon["display_name"], mon.get("pokemon_id"))
+        try:
+            updated = accounts_store.update_profile(acct["id"], trainer_name=payload.trainer_name, partner=partner)
+        except AccountError as e:
+            _fail(e)
+        return _out(updated)

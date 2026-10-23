@@ -45,19 +45,19 @@
     "base stage":
       "Must be the first stage in its evolution line (what everything else evolves from).",
     "middle stage":
-      "Must be a middle stage — it evolves from something and into something else.",
+      "Must be a middle stage: it evolves from something and into something else.",
     "mid stage":
-      "Must be a middle stage — it evolves from something and into something else.",
+      "Must be a middle stage: it evolves from something and into something else.",
     "final form":
       "Must be the last stage in its evolution line (it doesn't evolve further).",
     "doesn't evolve":
-      "Must be a Pokémon with no evolutions at all — it neither evolves nor is evolved from.",
+      "Must be a Pokémon with no evolutions at all. It neither evolves nor is evolved from.",
     "branched evolution":
       "Must belong to an evolution line that splits into more than one possible evolution (like Eevee).",
 
     // Category flags
     "baby pokemon":
-      "Must be a Baby Pokémon — the pre-evolution introduced in a later generation (like Pichu).",
+      "Must be a Baby Pokémon, the pre-evolution added in a later generation (like Pichu).",
     "fossil pokemon":
       "Must be a Pokémon revived from a fossil.",
     "mega evolution":

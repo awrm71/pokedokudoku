@@ -368,17 +368,17 @@
   // Whole-group presets plus a random mix. A deck lights up when the current
   // selection exactly matches it.
   const DECKS = [
-    { id: "all", icon: "✨", label: "Everything", groups: GROUPS.map(([g]) => g) },
-    { id: "classic", icon: "🏆", label: "Classic", groups: ["type", "region", "evolution", "other"] },
-    { id: "battle", icon: "⚔️", label: "Battle", groups: ["type", "move", "ability"] },
-    { id: "random", icon: "🎲", label: "Surprise me" },
+    { id: "all", icon: "", label: "Everything", groups: GROUPS.map(([g]) => g) },
+    { id: "classic", icon: "", label: "Classic", groups: ["type", "region", "evolution", "other"] },
+    { id: "battle", icon: "", label: "Battle", groups: ["type", "move", "ability"] },
+    { id: "random", icon: "", label: "Surprise me" },
   ];
   DECKS.forEach((d) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "db-deck";
     b.dataset.deck = d.id;
-    b.innerHTML = `<span aria-hidden="true">${d.icon}</span><span></span>`;
+    b.innerHTML = `<span></span>`;
     b.lastChild.textContent = d.label;
     b.addEventListener("click", () => {
       if (d.id === "random") surprise(); else applyGroups(d.groups);

@@ -75,11 +75,11 @@
   // Things that only confirm the obvious. Anything else (errors, hint results,
   // "size adjusted", Reverse's welcome line) still shows.
   // Shiny finds get their own full-screen moment (shiny.js), so no toast.
-  const QUIET = [/^board loaded\.?$/i, /^draft board loaded$/i, /^loading/i, /^pick accepted/i, /^✨ shiny/i];
+  const QUIET = [/^board loaded\.?$/i, /^draft board loaded$/i, /^loading/i, /^pick accepted/i, /^(✨|★) shiny/i];
 
   function toneColor(el, text) {
     const c = (el.style.color || "").toLowerCase();
-    if (c.includes("err") || /^(💀|unable|couldn)/i.test(text)) return "var(--err, #f43f5e)";
+    if (c.includes("err") || /^(💀|out of lives|unable|couldn)/i.test(text)) return "var(--err, #f43f5e)";
     if (c.includes("warn")) return "var(--warn, #f59e0b)";
     if (c.includes("ok")) return "var(--ok, #10d98a)";
     return "";

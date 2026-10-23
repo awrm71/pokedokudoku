@@ -3,9 +3,10 @@ daily_store.py — the Daily Board's saved progress and its answer stats.
 
 Two jobs, one table each:
 
-  daily_runs   one row per player per day: wrong guesses, hints used, and
-               whether the board is finished (won, out of lives, or ended
-               early to see the stats). This is what makes the Daily survive
+  daily_runs   one row per player per day: wrong guesses, hints used,
+               revives (an extra life after watching an ad), and whether
+               the board is finished (won, out of lives, or ended early to
+               see the stats). This is what makes the Daily survive
                a refresh, and what stops a reload from handing lives back.
 
   daily_picks  one row per player per square: the FIRST correct answer they
@@ -88,6 +89,10 @@ def init_db() -> None:
                 );
                 """
             )
+            # Added later: revives used on this board (an ad-for-a-life).
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(daily_runs)")}
+            if "revives" not in cols:
+                conn.execute("ALTER TABLE daily_runs ADD COLUMN revives INTEGER NOT NULL DEFAULT 0")
             # Serves both the per-square % and the board-wide GROUP BY.
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_daily_picks_cell "
@@ -108,20 +113,21 @@ def _ensure_run(conn: sqlite3.Connection, client_id: str, day_seed: str) -> None
 
 
 def get_run(client_id: str, day_seed: str) -> dict:
-    """{misses, hints_used, finished, picks: [{row_i, col_j, pokemon_key, hinted, shiny}]}.
+    """{misses, hints_used, revives, finished, picks: [{row_i, col_j, pokemon_key, hinted, shiny}]}.
     A player who hasn't started yet gets an empty run (nothing is written)."""
-    out = {"misses": 0, "hints_used": 0, "finished": False, "picks": []}
+    out = {"misses": 0, "hints_used": 0, "revives": 0, "finished": False, "picks": []}
     if not client_id or not day_seed:
         return out
     with _lock:
         conn = _connect()
         try:
             row = conn.execute(
-                "SELECT misses, hints_used, finished_at FROM daily_runs WHERE day_seed = ? AND client_id = ?",
+                "SELECT misses, hints_used, finished_at, revives FROM daily_runs WHERE day_seed = ? AND client_id = ?",
                 (day_seed, client_id),
             ).fetchone()
             if row:
                 out["misses"], out["hints_used"], out["finished"] = row[0], row[1], row[2] is not None
+                out["revives"] = row[3]
             picks = conn.execute(
                 """
                 SELECT row_i, col_j, pokemon_key, hinted, shiny FROM daily_picks
@@ -189,6 +195,28 @@ def add_miss(client_id: str, day_seed: str) -> int:
                 (day_seed, client_id),
             ).fetchone()
             return row[0] if row else 0
+        finally:
+            conn.close()
+
+
+def add_revive(client_id: str, day_seed: str, limit: int) -> bool:
+    """Spend one revive on an unfinished board. False if the limit is used up
+    or the board is already finished (one UPDATE, so two tabs can't both win)."""
+    if not client_id or not day_seed:
+        return False
+    with _lock:
+        conn = _connect()
+        try:
+            _ensure_run(conn, client_id, day_seed)
+            cur = conn.execute(
+                """
+                UPDATE daily_runs SET revives = revives + 1
+                WHERE day_seed = ? AND client_id = ? AND revives < ? AND finished_at IS NULL
+                """,
+                (day_seed, client_id, limit),
+            )
+            conn.commit()
+            return cur.rowcount > 0
         finally:
             conn.close()
 

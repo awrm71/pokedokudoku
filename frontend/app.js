@@ -23,20 +23,20 @@ const state = {
 // ── Custom type badges — no copyrighted images ───────────────────────────────
 const TYPE_CONFIG = {
   normal:   { bg: "#888888", fg: "#fff",    icon: "○" },
-  fire:     { bg: "#E84000", fg: "#fff",    icon: "☀" },
-  fighting: { bg: "#B81414", fg: "#fff",    icon: "⚔" },
+  fire:     { bg: "#E84000", fg: "#fff",    icon: "☀\uFE0E" },
+  fighting: { bg: "#B81414", fg: "#fff",    icon: "⚔\uFE0E" },
   water:    { bg: "#1B7FE8", fg: "#fff",    icon: "≋" },
-  ice:      { bg: "#20CCDD", fg: "#222",    icon: "❄" },
-  grass:    { bg: "#2DAA4C", fg: "#fff",    icon: "✿" },
-  bug:      { bg: "#7DA900", fg: "#fff",    icon: "✳" },
+  ice:      { bg: "#20CCDD", fg: "#222",    icon: "❄\uFE0E" },
+  grass:    { bg: "#2DAA4C", fg: "#fff",    icon: "✿\uFE0E" },
+  bug:      { bg: "#7DA900", fg: "#fff",    icon: "✳\uFE0E" },
   ground:   { bg: "#C47A00", fg: "#fff",    icon: "≡" },
-  rock:     { bg: "#A08045", fg: "#fff",    icon: "⛏" },
-  flying:   { bg: "#91B2F5", fg: "#222",    icon: "✈" },
-  electric: { bg: "#FFD700", fg: "#222",    icon: "⚡" },
+  rock:     { bg: "#A08045", fg: "#fff",    icon: "⛏\uFE0E" },
+  flying:   { bg: "#91B2F5", fg: "#222",    icon: "✈\uFE0E" },
+  electric: { bg: "#FFD700", fg: "#222",    icon: "⚡\uFE0E" },
   psychic:  { bg: "#E8205A", fg: "#fff",    icon: "✦" },
-  fairy:    { bg: "#E85FAA", fg: "#fff",    icon: "♥" },
+  fairy:    { bg: "#E85FAA", fg: "#fff",    icon: "♥\uFE0E" },
   poison:   { bg: "#8B2BAE", fg: "#fff",    icon: "◎" },
-  ghost:    { bg: "#5B3E7A", fg: "#fff",    icon: "☠" },
+  ghost:    { bg: "#5B3E7A", fg: "#fff",    icon: "☠\uFE0E" },
   dragon:   { bg: "#3425C8", fg: "#fff",    icon: "∞" },
   dark:     { bg: "#2E2B3A", fg: "#eee",    icon: "☽" },
   steel:    { bg: "#6A8FAD", fg: "#fff",    icon: "⬡" },
@@ -522,6 +522,8 @@ function resetGameState() {
   state.lives = 3;
   state.hints = 3;
   state.gameOver = false;
+  state.revive = false;          // Daily: out of lives, and an ad can buy one more
+  state.revivePending = false;   // the offer is on screen
   clearBoardState();
 
   const gameOverBanner = document.getElementById("gameOverBanner");
@@ -560,7 +562,7 @@ function updateHUD() {
   document.querySelectorAll(".pip-hint").forEach((pip, i) => {
     const available = i < state.hints;
     pip.classList.toggle("spent", !available);
-    pip.disabled = !available || state.gameOver;
+    pip.disabled = !available || state.gameOver || state.revivePending;
   });
 
   // Keep modal hint stars and lives in sync
@@ -569,12 +571,45 @@ function updateHUD() {
   // Daily answer stats follow whichever board is on screen (stats.js).
   window.PDD_STATS?.sync();
 
-  // Trigger game over / win
+  // Trigger game over / win (or, on the Daily, offer a revive first)
   if (state.lives <= 0 && !state.gameOver) {
-    triggerGameOver();
+    if (state.revive) pauseForRevive();
+    else triggerGameOver();
   } else if (correct === total && total > 0 && !state.gameOver) {
     triggerWin(correct, total);
   }
+}
+
+// Daily only: out of lives with a revive still available. The board is
+// paused (no picks or hints, no answers or stats) until the player watches
+// an ad for one more life or ends the board.
+function pauseForRevive() {
+  if (state.revivePending) return;
+  state.revivePending = true;
+  const board = state.board;
+  boardWrap.classList.add("board-locked");
+  document.querySelectorAll(".pip-hint").forEach((pip) => { pip.disabled = true; });
+  const end = async () => {
+    state.revivePending = false;
+    state.revive = false;
+    try { await fetchJson(`${state.apiBase}/daily/finish`, { method: "POST" }); } catch (_) { /* stats will retry */ }
+    if (state.board === board) triggerGameOver();
+  };
+  if (!window.PDD_ADS) { end(); return; }
+  window.PDD_ADS.offerRevive({
+    what: "board",
+    onEnd: end,
+    onRevive: async () => {
+      const res = await fetchJson(`${state.apiBase}/daily/revive`, { method: "POST" });
+      if (state.board !== board) return;
+      state.revivePending = false;
+      state.revive = !!res.revive;
+      state.lives = res.lives_left;
+      boardWrap.classList.remove("board-locked");
+      updateHUD();
+      setMessage("One more life. Make it count.", "var(--ok)");
+    },
+  });
 }
 
 function triggerGameOver() {
@@ -583,7 +618,7 @@ function triggerGameOver() {
   const banner = document.getElementById("gameOverBanner");
   if (banner) banner.classList.add("visible");
   document.querySelectorAll(".pip-hint").forEach((pip) => { pip.disabled = true; });
-  setMessage("💀 No lives remaining — board locked.", "var(--err)");
+  setMessage("Out of lives. Board locked.", "var(--err)");
   window.PDD_STATS?.boardEnded();
 }
 
@@ -591,7 +626,7 @@ function triggerWin(correct, total) {
   state.gameOver = true;
   const banner = document.getElementById("winBanner");
   if (banner) banner.classList.add("visible");
-  setMessage(`🏆 Board complete! ${correct}/${total} correct!`, "var(--ok)");
+  setMessage(`Board complete: ${correct}/${total} correct.`, "var(--ok)");
   window.PDD_STATS?.boardEnded();
 }
 
@@ -600,13 +635,13 @@ async function useHint() {
 
   const cellId = state.activeCellId;
   if (!cellId) {
-    setMessage("Click a cell first, then press a ⭐ hint!", "var(--warn)");
+    setMessage("Pick a square first, then use a hint.", "var(--warn)");
     return;
   }
 
   const cell = state.cells.get(cellId);
   if (!cell || cell.locked) {
-    setMessage("That cell is already filled — select an empty one first.", "var(--warn)");
+    setMessage("That square is already filled. Pick an empty one.", "var(--warn)");
     return;
   }
 
@@ -644,7 +679,7 @@ async function useHint() {
     syncDailyHints(result);
   } catch (err) {
     setMessage(err?.message?.startsWith("Request failed") || !err?.message
-      ? "Couldn't find a hint for this cell — try another!" : err.message, "var(--warn)");
+      ? "No hint for this square. Try another." : err.message, "var(--warn)");
   }
 }
 
@@ -663,7 +698,7 @@ function applyHintToCell(cellId, cell, result) {
     setCellSprites(cellEl, spriteFromPokemonId(result.pokemon_id), true);
     setPickedName(cellEl, result.display_name);
     setResultMark(cellEl, "ok");
-    paintCellStatus(cellEl, "⭐ Hint used", "ok");
+    paintCellStatus(cellEl, "Hint used", "ok");
     cellEl.classList.add("locked", "hint-cell");
     cellEl.classList.remove("drafted", "err");
   }
@@ -772,7 +807,7 @@ function bindCellEvents(cellEl, row, col, rowLabel, colLabel) {
   setCellSprites(cellEl, PLACEHOLDER, false);
 
   cellEl.addEventListener("click", () => {
-    if (state.gameOver) return;
+    if (state.gameOver || state.revivePending) return;
     const cell = state.cells.get(cellId);
     if (cell && cell.locked) return;
     setActiveCell(cellId);
@@ -782,7 +817,7 @@ function bindCellEvents(cellEl, row, col, rowLabel, colLabel) {
   cellEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      if (state.gameOver) return;
+      if (state.gameOver || state.revivePending) return;
       const cell = state.cells.get(cellId);
       if (cell && cell.locked) return;
       openCellModal(cellId, row, col, rowLabel, colLabel);
@@ -864,7 +899,7 @@ function updateCellDraftState(cellId) {
     cellEl.classList.add("drafted");
     cellEl.classList.remove("err");
   } else {
-    setPickedName(cellEl, "Tap to enter");
+    setPickedName(cellEl, "");
     cellEl.classList.remove("drafted", "err");
   }
 }
@@ -881,7 +916,7 @@ function syncModalHints() {
   document.querySelectorAll(".modal-pip-hint").forEach((pip, i) => {
     const available = i < state.hints;
     pip.classList.toggle("spent", !available);
-    pip.disabled = !available || state.gameOver;
+    pip.disabled = !available || state.gameOver || state.revivePending;
   });
 }
 
@@ -929,7 +964,7 @@ async function useHintFromModal() {
     closeCellModal();
   } catch (err) {
     setModalStatus(err?.message?.startsWith("Request failed") || !err?.message
-      ? "Couldn't find a hint — try another cell!" : err.message, "warn");
+      ? "No hint for this square. Try another." : err.message, "warn");
     syncModalHints();
   }
 }
@@ -1072,6 +1107,7 @@ async function restoreDaily(board) {
 
   state.lives = saved.lives_left;
   state.hints = saved.hints_left;
+  state.revive = !!saved.revive;
   const filled = (saved.picks || []).length;
   const total = board.n_rows * board.n_cols;
   if (saved.finished && saved.lives_left > 0 && filled < total) {
@@ -1082,7 +1118,7 @@ async function restoreDaily(board) {
   }
   updateHUD();                     // shows the win / out-of-lives banner when due
   if (saved.finished) window.PDD_STATS?.boardEnded();
-  else if (filled) setMessage(`Welcome back — ${filled} of ${total} squares filled today.`, "var(--ok)");
+  else if (filled) setMessage(`Welcome back. ${filled} of ${total} squares filled today.`, "var(--ok)");
 }
 
 function randomSeed() {
@@ -1115,7 +1151,7 @@ document.querySelectorAll(".pip-hint").forEach((pip) => {
         return;
       }
     }
-    setMessage("Tap a cell first, then use a hint ⭐ inside the popup.", "var(--warn)");
+    setMessage("Tap a square first, then use a hint inside it.", "var(--warn)");
   });
 });
 
@@ -1236,7 +1272,7 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
   if (!_modalPicked) { setModalStatus("Type and select a Pokémon first.", "warn"); return; }
   const usedAt = usedOnBoard(_modalPicked.key, _modalCtx.cellId);
   if (usedAt) {
-    setModalStatus(`${_modalPicked.display_name} is already on your board (${usedAt}). Pick another — no life lost.`, "warn");
+    setModalStatus(`${_modalPicked.display_name} is already on your board (${usedAt}). Pick another. No life lost.`, "warn");
     return;
   }
 
@@ -1283,7 +1319,7 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
         window.PDD_STATS?.paintPct(cellEl, cell.pct);
       }
       if (typeof verdict.lives_left === "number") state.lives = verdict.lives_left;
-      setMessage(cell.shiny ? `✨ Shiny ${_modalPicked.display_name}!` : "Pick accepted ✓", "var(--ok)");
+      setMessage(cell.shiny ? `★ Shiny ${_modalPicked.display_name}!` : "Pick accepted ✓", "var(--ok)");
       // Capture the pick BEFORE closing: closeCellModal() clears _modalPicked.
       const found = shinySprite
         ? { cellEl, name: _modalPicked.display_name, pokemonId: _modalPicked.pokemon_id, registered: !!verdict.shiny_registered }
@@ -1299,13 +1335,13 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
       // already ended): reload it from the server.
       closeCellModal();
       setMessage(verdict.reason === "board_locked"
-        ? "Today's board is already finished." : "That square was already filled — syncing.", "var(--warn)");
+        ? "Today's board is already finished." : "That square was already filled. Syncing.", "var(--warn)");
       loadBoard();
     } else {
       const reasonMap = {
-        duplicate:       "Already used elsewhere — costs a life",
-        does_not_match:  "Doesn't match the rules — costs a life",
-        unknown_pokemon: "Unknown Pokémon — check the spelling",
+        duplicate:       "Already used on this board. Costs a life.",
+        does_not_match:  "Doesn't match both rules. Costs a life.",
+        unknown_pokemon: "Unknown Pokémon. Check the spelling.",
       };
       setModalStatus(reasonMap[verdict.reason] || verdict.reason, "err");
       if (cellEl) {
@@ -1323,13 +1359,14 @@ document.getElementById("modalOk")?.addEventListener("click", async () => {
         }
         state.lives = typeof verdict.lives_left === "number"
           ? verdict.lives_left : Math.max(0, state.lives - 1);
+        state.revive = !!verdict.revive;
         updateHUD();
         if (state.lives <= 0) setTimeout(closeCellModal, 800);
       }
       okBtn.disabled = false;
     }
   } catch {
-    setModalStatus("API error — could not validate.", "err");
+    setModalStatus("Couldn't check that pick. Try again.", "err");
     okBtn.disabled = false;
   }
 });
