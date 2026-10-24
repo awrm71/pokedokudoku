@@ -133,6 +133,56 @@
   };
 
   [forward, reverse].forEach(createController);
+  fitCellModal();
+
+  // ── Cell modal: keep it centered in the visible area ───────────────────────
+  // position:fixed is laid out against the full screen, but the iOS/Android
+  // keyboard only shrinks the *visual* viewport, so a fixed card can end up
+  // underneath it. While the modal is open on a phone, size the overlay to
+  // visualViewport so mobile.css can center the card in what's actually
+  // visible, and flag .m-kb when the keyboard has eaten a big chunk of it.
+  function fitCellModal() {
+    const modal = document.getElementById("cellModal");
+    if (!modal) return;
+    const vv = window.visualViewport;
+    let tracking = false;
+    let frame = 0;
+
+    function update() {
+      frame = 0;
+      if (!vv) return;
+      modal.style.setProperty("--vv-top", `${vv.offsetTop}px`);
+      modal.style.setProperty("--vv-h", `${vv.height}px`);
+      modal.classList.toggle("m-kb", vv.height < window.innerHeight * 0.78);
+    }
+    function queue() { if (!frame) frame = requestAnimationFrame(update); }
+
+    function sync() {
+      const open = modal.classList.contains("open") && MQ.matches;
+      document.documentElement.classList.toggle("m-modal-open", open);
+      if (open && !tracking) {
+        tracking = true;
+        update();
+        if (vv) {
+          vv.addEventListener("resize", queue);
+          vv.addEventListener("scroll", queue);
+        }
+      } else if (!open && tracking) {
+        tracking = false;
+        if (vv) {
+          vv.removeEventListener("resize", queue);
+          vv.removeEventListener("scroll", queue);
+        }
+        modal.classList.remove("m-kb");
+        modal.style.removeProperty("--vv-top");
+        modal.style.removeProperty("--vv-h");
+      }
+    }
+
+    new MutationObserver(sync).observe(modal, { attributes: true, attributeFilter: ["class"] });
+    MQ.addEventListener ? MQ.addEventListener("change", sync) : MQ.addListener(sync);
+    sync();
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   function createController(A) {

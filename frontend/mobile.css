@@ -403,9 +403,124 @@ html {
   }
 
   .board-scroll-hint.m-hide { display: none !important; }
+
+
+  /* ── Cell modal: centered card above the keyboard ─────────────────────────
+     Was a bottom sheet. Two problems with that on iPhone: the input was under
+     16px, so Safari zoomed the whole page on focus (the sheet ran off the
+     right edge and the page stayed zoomed), and a sheet pinned to the bottom
+     ends up behind the keyboard. Now the overlay is sized to the *visible*
+     viewport (mobile.js writes --vv-top / --vv-h from visualViewport), and
+     the card centers in whatever space is left above the keyboard. */
+  .cell-modal-overlay {
+    inset: auto 0 auto 0;
+    top: var(--vv-top, 0px);
+    height: var(--vv-h, 100dvh);
+    padding: max(12px, env(safe-area-inset-top)) 12px 12px;
+    place-items: center;
+    overscroll-behavior: contain;
+  }
+  .cell-modal-card {
+    width: 100%;
+    max-width: 420px;
+    max-height: 100%;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.7rem 0.9rem 0.85rem;
+    animation: m-card-in 200ms cubic-bezier(.2, .8, .3, 1) both;
+  }
+  @keyframes m-card-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Header: lives on the left, close on the right, rules underneath. The old
+     absolute corner block forced 3.5rem of side padding onto the rules. */
+  .modal-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    margin-bottom: 0.5rem;
+  }
+  .modal-header-right {
+    position: static;
+    order: -1;
+    justify-content: space-between;
+  }
+  .modal-close-btn { width: 1.9rem; height: 1.9rem; font-size: 0.8rem; }
+
+  /* Both rules on one line when they fit, wrapping when they don't. */
+  .modal-rules {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0;
+  }
+  .modal-rule-tag {
+    font-size: 0.62rem;
+    padding: 0.3rem 0.5rem;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .modal-rule-x { font-size: 0.62rem; }
+
+  .modal-rule-help-row { gap: 0.6rem; padding: 0 0 0.5rem; }
+  .modal-rule-help-row .modal-rule-help { font-size: 0.64rem; line-height: 1.35; }
+
+  .modal-preview {
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.6rem;
+    min-height: 0;
+    margin-bottom: 0.5rem;
+  }
+  .modal-preview:has(.modal-sprite.hidden):has(.modal-picked-name:empty) { display: none; }
+  .modal-sprite { width: 52px; height: 52px; }
+  .modal-picked-name { font-size: 0.8rem; text-align: left; min-height: 0; }
+
+  /* 16px is the floor: anything smaller and iOS zooms the page on focus. */
+  .modal-input {
+    box-sizing: border-box;
+    font-size: 16px;
+    padding: 0.65rem 0.8rem;
+    border-radius: 9px;
+  }
+  .modal-suggestions { max-height: 168px; overscroll-behavior: contain; }
+  .modal-suggestion-btn { font-size: 0.82rem; min-height: 46px; padding: 0.3rem 0.55rem; gap: 0.5rem; }
+  .modal-sug-sprite { width: 38px; height: 38px; }
+
+  .modal-footer { gap: 0.4rem; margin-top: 0.2rem; }
+  .modal-status { font-size: 0.72rem; }
+  .modal-actions { gap: 0.45rem; }
+  .modal-ok-btn, .modal-cancel-btn {
+    font-size: 0.78rem;
+    min-height: 44px;
+    padding: 0.55rem 0.8rem;
+    border-radius: 9px;
+  }
+
+  .modal-hint-bar { padding: 0.45rem 0 0; margin-top: 0.25rem; gap: 0.45rem; }
+  .modal-hint-tag { font-size: 0.56rem; }
+
+  /* Keyboard up: the visible area is roughly half the screen. Drop the
+     explainers and the hint row (both come back when the keyboard closes) so
+     the input, suggestions and Confirm stay on screen without scrolling. */
+  .cell-modal-overlay.m-kb .modal-rule-help-row,
+  .cell-modal-overlay.m-kb .modal-hint-bar { display: none; }
+  .cell-modal-overlay.m-kb .modal-suggestions { max-height: 132px; }
+  .cell-modal-overlay.m-kb .cell-modal-card { padding-top: 0.6rem; padding-bottom: 0.7rem; }
+}
+
+/* While the modal is open the page behind it shouldn't scroll or zoom-drift. */
+@media (max-width: 767px) {
+  html.m-modal-open, html.m-modal-open body { overflow: hidden; }
 }
 
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
   .m-focus .board-grid > .cell { animation: none !important; }
   .m-fill, .m-view-btn { transition: none; }
+  .cell-modal-card { animation: none; }
 }
