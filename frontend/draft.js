@@ -631,6 +631,7 @@
   async function generate() {
     if (B.busy) return;
     B.busy = true;
+    window.PDD_ADS?.boardBreak?.();   // shows only after a finished board, rate-limited
     elError.hidden = true;
     const label = elGoLabel.textContent;
     elGoLabel.textContent = "Dealing…";

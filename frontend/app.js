@@ -1035,6 +1035,8 @@ function applyLoadedBoard(board, runtimeMode, message, tone = "var(--ok)") {
 }
 
 async function loadBoard(seed = "") {
+  // A new Shuffle board (seed given) is a natural break; the daily load isn't.
+  if (seed) window.PDD_ADS?.boardBreak?.();
   // Empty string = relative URLs, which work correctly when FastAPI serves the frontend.
   // Never override with a hardcoded localhost — that breaks remote testers.
   state.apiBase = apiBaseInput?.value?.trim() ?? state.apiBase ?? "";

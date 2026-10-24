@@ -35,6 +35,21 @@
 }
 .ad-inline .ad-demo { height: 100px; }
 
+/* Results: under the end-of-board banner, above the finished board. */
+.ad-results {
+  margin: 0 auto 0.9rem;
+  max-width: 728px;
+  min-height: 110px;
+}
+.ad-results .ad-demo { height: 90px; }
+
+/* Pokédex and Category Index panels: under the progress summary. */
+.ad-page {
+  margin: 0.4rem 0 0.9rem;
+  min-height: 110px;
+}
+.ad-page .ad-demo { height: 90px; }
+
 /* Side rails on wide screens. The page narrows to make room so the board
    never sits under an ad. */
 .ad-rail { display: none; }

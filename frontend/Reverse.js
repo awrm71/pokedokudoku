@@ -899,6 +899,7 @@
 
   async function loadCustom(opts) {
     closeGuess();
+    window.PDD_ADS?.boardBreak?.();   // shows only after a finished board, rate-limited
     setMsg("Building a custom Reverse Board…");
     try {
       const body = {

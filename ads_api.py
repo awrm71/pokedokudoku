@@ -9,8 +9,14 @@ ads until you add them in Railway:
   ADSENSE_SLOT_RAIL    ad unit id for the tall ads beside the board (desktop).
   ADSENSE_SLOT_INLINE  ad unit id for the ad under the board (phones, and
                        under the board on narrow laptops).
+  ADSENSE_SLOT_RESULTS ad unit id for the ad shown with the end-of-board
+                       banner (won, out of lives, Reverse solved).
+  ADSENSE_SLOT_PAGE    ad unit id for the Pokedex and Category Index panels.
   ADS_REWARDED=1       turn on "watch an ad to revive" (needs Google's
                        H5 Games Ads approval on the same publisher id).
+  ADS_INTERSTITIAL=1   a full-screen ad between boards: only after a board
+                       has been finished, at most once every few minutes.
+                       Same H5 Games Ads approval as the revive.
   ADS_TEST=1           ask Google for test ads only (data-adtest="on").
                        Use while checking the layout; turn off when live.
   GA_MEASUREMENT_ID    optional Google Analytics 4 id, "G-XXXXXXX". Counts
@@ -60,6 +66,10 @@ def revive_enabled() -> bool:
     return demo() or (bool(adsense_client()) and _flag("ADS_REWARDED"))
 
 
+def interstitial_enabled() -> bool:
+    return demo() or (bool(adsense_client()) and _flag("ADS_INTERSTITIAL"))
+
+
 def config() -> dict:
     client = adsense_client()
     on = bool(client) or demo()
@@ -73,8 +83,11 @@ def config() -> dict:
         "slots": {
             "rail": os.environ.get("ADSENSE_SLOT_RAIL", "").strip() or None,
             "inline": os.environ.get("ADSENSE_SLOT_INLINE", "").strip() or None,
+            "results": os.environ.get("ADSENSE_SLOT_RESULTS", "").strip() or None,
+            "page": os.environ.get("ADSENSE_SLOT_PAGE", "").strip() or None,
         },
         "rewarded": revive_enabled(),
+        "interstitial": interstitial_enabled(),
         "revives": REVIVES_PER_BOARD,
         "revive_lives": REVIVE_LIVES,
     }

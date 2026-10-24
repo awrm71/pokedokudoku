@@ -9,6 +9,17 @@
        narrows a little to make room; the board never sits under an ad.
      • Everything else (laptops, tablets, phones): one ad below the board,
        in the normal flow of the page. Nothing sticky, nothing over the game.
+     • Results: when a board ends (won, out of lives, Reverse solved), an ad
+       appears under the end banner, while the player is looking at the
+       result. It goes away when the next board starts.
+     • Panels: one ad near the top of the Pokédex and the Category Index,
+       filled the first time each is opened (a hidden ad can't be sized).
+
+   Between boards (ADS_INTERSTITIAL)
+     boardBreak() is called when the player starts a new Shuffle, Draft or
+     Reverse board. It shows a full-screen ad only if they finished a board
+     since the last one and at least BREAK_GAP_MS has passed. Starting a
+     board never waits on it.
 
    Revive (Daily and the Daily Reverse Board)
      When a player runs out of lives, app.js / Reverse.js call
@@ -28,6 +39,13 @@
 
   const ADS_SRC = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js";
   const RAIL_MIN = 1600;            // viewport width that fits two 160px rails
+  const BREAK_GAP_MS = 3 * 60 * 1000; // at most one between-boards ad per 3 minutes
+  const END_BANNERS = ["gameOverBanner", "winBanner", "revBanner"];
+  const PANELS = [
+    // [modal id, element the ad goes after]
+    ["pokedexModal", ".dx-stats"],
+    ["revIndexModal", ".rev-index-progress"],
+  ];
 
   const S = { cfg: null, cfgP: null, loaded: null, ready: false };
 
@@ -55,6 +73,8 @@
     placeInline();
     placeRails();
     window.addEventListener("resize", debounce(placeRails, 200));
+    watchEndBanners();
+    watchPanels();
   }
 
   // ── Google's script ────────────────────────────────────────────────────────
@@ -104,7 +124,7 @@
     if (S.cfg.demo || !slot) {
       const ph = document.createElement("div");
       ph.className = "ad-demo";
-      ph.textContent = S.cfg.demo ? (kind === "rail" ? "160 × 600" : "Responsive ad") : "";
+      ph.textContent = S.cfg.demo ? (kind === "rail" ? "160 × 600" : `Responsive ad (${kind})`) : "";
       box.appendChild(ph);
       if (!S.cfg.demo) return null;                // no slot id: show nothing
       return box;
@@ -156,6 +176,73 @@
     });
   }
 
+  // ── Results ad: under the end-of-board banner ──────────────────────────────
+  function bannerShown(b) {
+    return !b.hidden && (b.id === "revBanner" || b.classList.contains("visible"));
+  }
+
+  function syncResults() {
+    END_BANNERS.forEach((id) => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      const next = b.nextElementSibling;
+      const has = next && next.classList.contains("ad-results");
+      if (bannerShown(b)) {
+        S.boardDone = true;                       // a board was finished: a break may follow
+        if (has) return;
+        const box = unit(S.cfg.slots.results, "results");
+        if (!box) return;
+        b.after(box);
+        fill(box);
+      } else if (has) {
+        next.remove();                            // new board: the result ad goes
+      }
+    });
+  }
+
+  function watchEndBanners() {
+    const obs = new MutationObserver(syncResults);
+    END_BANNERS.forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) obs.observe(b, { attributes: true, attributeFilter: ["class", "hidden"] });
+    });
+    syncResults();
+  }
+
+  // ── Panel ads: Pokédex and Category Index ──────────────────────────────────
+  function watchPanels() {
+    PANELS.forEach(([modalId, afterSel]) => {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      const place = () => {
+        if (!modal.classList.contains("open") || modal.querySelector(".ad-page")) return;
+        const anchor = modal.querySelector(afterSel);
+        if (!anchor) return;
+        const box = unit(S.cfg.slots.page, "page");
+        if (!box) return;
+        anchor.after(box);
+        // Wait a frame so the panel has its width before Google sizes the ad.
+        requestAnimationFrame(() => fill(box));
+      };
+      new MutationObserver(place).observe(modal, { attributes: true, attributeFilter: ["class"] });
+      place();
+    });
+  }
+
+  // ── Between boards ─────────────────────────────────────────────────────────
+  // Fire and forget: the new board loads underneath whether or not an ad shows.
+  function boardBreak() {
+    if (!S.cfg || !S.cfg.interstitial || !S.boardDone) return;
+    if (Date.now() - (S.lastBreak || 0) < BREAK_GAP_MS) return;
+    S.boardDone = false;
+    S.lastBreak = Date.now();
+    if (S.cfg.demo) { demoAd(() => {}, "Between-boards ad"); return; }
+    loadScript().then((ok) => {
+      if (!ok) return;
+      window.adBreak({ type: "next", name: "new-board" });
+    });
+  }
+
   // ── Rewarded ad ────────────────────────────────────────────────────────────
   // Asks Google for a rewarded ad. Calls back once with
   //   ready(show)  an ad is loaded; call show() from a click to play it
@@ -194,11 +281,11 @@
 
   // A stand-in for the real ad in demo mode: 5 seconds, can be skipped
   // (skipping means no revive, same as closing a real one early).
-  function demoAd(done) {
+  function demoAd(done, title = "Demo ad") {
     const el = document.createElement("div");
     el.className = "ad-demo-player";
     el.innerHTML = `<div class="ad-demo-card"><span class="ad-label">Ad</span>` +
-      `<p>Demo ad</p><p class="ad-demo-count">5</p>` +
+      `<p>${title}</p><p class="ad-demo-count">5</p>` +
       `<button type="button" class="ghost">Close</button></div>`;
     document.body.appendChild(el);
     let left = 5;
@@ -298,6 +385,7 @@
 
   window.PDD_ADS = {
     offerRevive,
+    boardBreak,
     get reviveOn() { return !!(S.cfg && S.cfg.rewarded); },
   };
 
