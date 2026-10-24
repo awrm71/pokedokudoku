@@ -492,8 +492,7 @@
         chip.classList.add("db-chip-type");
         chip.style.setProperty("--t-bg", cfg.bg);
         chip.style.setProperty("--t-fg", cfg.fg);
-        chip.innerHTML = `<span class="db-chip-icon" aria-hidden="true"></span><span class="db-chip-label"></span>`;
-        chip.firstChild.textContent = cfg.icon;
+        chip.innerHTML = `${typeIconHtml(typeKey, "db-chip-icon")}<span class="db-chip-label"></span>`;
         chip.lastChild.textContent = typeKey.charAt(0).toUpperCase() + typeKey.slice(1);
       } else {
         chip.innerHTML = `<span class="db-chip-check" aria-hidden="true"></span><span class="db-chip-label"></span>`;

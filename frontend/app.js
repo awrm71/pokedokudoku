@@ -22,26 +22,39 @@ const state = {
 
 // ── Custom type badges — no copyrighted images ───────────────────────────────
 const TYPE_CONFIG = {
-  normal:   { bg: "#888888", fg: "#fff",    icon: "○" },
-  fire:     { bg: "#E84000", fg: "#fff",    icon: "☀\uFE0E" },
-  fighting: { bg: "#B81414", fg: "#fff",    icon: "⚔\uFE0E" },
-  water:    { bg: "#1B7FE8", fg: "#fff",    icon: "≋" },
-  ice:      { bg: "#20CCDD", fg: "#222",    icon: "❄\uFE0E" },
-  grass:    { bg: "#2DAA4C", fg: "#fff",    icon: "✿\uFE0E" },
-  bug:      { bg: "#7DA900", fg: "#fff",    icon: "✳\uFE0E" },
-  ground:   { bg: "#C47A00", fg: "#fff",    icon: "≡" },
-  rock:     { bg: "#A08045", fg: "#fff",    icon: "⛏\uFE0E" },
-  flying:   { bg: "#91B2F5", fg: "#222",    icon: "✈\uFE0E" },
-  electric: { bg: "#FFD700", fg: "#222",    icon: "⚡\uFE0E" },
-  psychic:  { bg: "#E8205A", fg: "#fff",    icon: "✦" },
-  fairy:    { bg: "#E85FAA", fg: "#fff",    icon: "♥\uFE0E" },
-  poison:   { bg: "#8B2BAE", fg: "#fff",    icon: "◎" },
-  ghost:    { bg: "#5B3E7A", fg: "#fff",    icon: "☠\uFE0E" },
-  dragon:   { bg: "#3425C8", fg: "#fff",    icon: "∞" },
-  dark:     { bg: "#2E2B3A", fg: "#eee",    icon: "☽" },
-  steel:    { bg: "#6A8FAD", fg: "#fff",    icon: "⬡" },
+  normal:   { bg: "#888888", fg: "#fff" },
+  fire:     { bg: "#E84000", fg: "#fff" },
+  fighting: { bg: "#B81414", fg: "#fff" },
+  water:    { bg: "#1B7FE8", fg: "#fff" },
+  ice:      { bg: "#20CCDD", fg: "#222" },
+  grass:    { bg: "#2DAA4C", fg: "#fff" },
+  bug:      { bg: "#7DA900", fg: "#fff" },
+  ground:   { bg: "#C47A00", fg: "#fff" },
+  rock:     { bg: "#A08045", fg: "#fff" },
+  flying:   { bg: "#91B2F5", fg: "#222" },
+  electric: { bg: "#FFD700", fg: "#222" },
+  psychic:  { bg: "#E8205A", fg: "#fff" },
+  fairy:    { bg: "#E85FAA", fg: "#fff" },
+  poison:   { bg: "#8B2BAE", fg: "#fff" },
+  ghost:    { bg: "#5B3E7A", fg: "#fff" },
+  dragon:   { bg: "#3425C8", fg: "#fff" },
+  dark:     { bg: "#2E2B3A", fg: "#eee" },
+  steel:    { bg: "#6A8FAD", fg: "#fff" },
 };
 const TYPE_SET = new Set(Object.keys(TYPE_CONFIG));
+
+// Type icons are 9x9 pixel bitmaps (type-icons.css), painted in the badge's
+// text colour. They replaced Unicode symbols, which iOS drew as colour emoji
+// tiles that didn't match the site and overflowed the badges.
+function typeIcon(typeKey, extraClass) {
+  const i = document.createElement("span");
+  i.className = `px-ti px-ti-${typeKey}${extraClass ? ` ${extraClass}` : ""}`;
+  i.setAttribute("aria-hidden", "true");
+  return i;
+}
+function typeIconHtml(typeKey, extraClass) {
+  return `<span class="px-ti px-ti-${typeKey}${extraClass ? ` ${extraClass}` : ""}" aria-hidden="true"></span>`;
+}
 
 // ── Deterministic board display shuffle ──────────────────────────────────────
 function seededPermutation(n, seedStr) {
@@ -358,10 +371,7 @@ function buildTypeBadge(typeKey, cfg) {
   wrap.className = "type-badge-custom";
   wrap.style.cssText = `background:${cfg.bg};color:${cfg.fg};`;
   wrap.setAttribute("title", typeKey.charAt(0).toUpperCase() + typeKey.slice(1));
-  const iconEl = document.createElement("span");
-  iconEl.className = "tbi";
-  iconEl.textContent = cfg.icon;
-  iconEl.setAttribute("aria-hidden", "true");
+  const iconEl = typeIcon(typeKey, "tbi");
   const nameEl = document.createElement("span");
   nameEl.className = "tbn";
   nameEl.textContent = typeKey.toUpperCase();

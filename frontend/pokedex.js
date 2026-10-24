@@ -301,8 +301,7 @@
       b.setAttribute("aria-pressed", String(S.type === key));
       b.title = `${cap(key)}: ${c} of ${t} caught`;
       b.innerHTML = `<span class="dx-type-fill" style="--f:${t ? (c / t) * 100 : 0}%"></span>`
-        + `<span class="dx-type-icon" aria-hidden="true"></span><span class="dx-type-name"></span>`;
-      b.querySelector(".dx-type-icon").textContent = cfg.icon;
+        + `${typeIconHtml(key, "dx-type-icon")}<span class="dx-type-name"></span>`;
       b.querySelector(".dx-type-name").textContent = cap(key);
       b.addEventListener("click", () => {
         S.type = S.type === key ? null : key;
@@ -697,7 +696,7 @@
     const genHtml = gens.map((g) => { const [c, t] = tally((e) => e.gen === g); return bar(`Gen ${g}`, c, t, "#e0306f"); }).join("");
     const typeHtml = Object.entries(TYPE_CONFIG).map(([k, cfg]) => {
       const [c, t] = tally((e) => e.type1 === k || e.type2 === k);
-      return bar(cap(k), c, t, cfg.bg, ` <span class="dx-bar-icon">${cfg.icon}</span>`);
+      return bar(cap(k), c, t, cfg.bg, ` ${typeIconHtml(k, "dx-bar-icon")}`);
     }).join("");
     const [lc, lt] = tally((e) => e.is_legendary);
     const [mc, mt] = tally((e) => e.is_mythical);
@@ -865,7 +864,7 @@
       s.className = "dx-tag type";
       s.style.background = TYPE_CONFIG[t].bg;
       s.style.color = TYPE_CONFIG[t].fg;
-      s.textContent = `${TYPE_CONFIG[t].icon} ${cap(t)}`;
+      s.append(typeIcon(t), ` ${cap(t)}`);
       tags.appendChild(s);
     });
     if (e.gen != null) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag">Gen ${e.gen}</span>`);
@@ -970,7 +969,7 @@
       s.className = "dx-tag type";
       s.style.background = TYPE_CONFIG[t].bg;
       s.style.color = TYPE_CONFIG[t].fg;
-      s.textContent = `${TYPE_CONFIG[t].icon} ${cap(t)}`;
+      s.append(typeIcon(t), ` ${cap(t)}`);
       tags.appendChild(s);
     });
     if (e.gen != null) tags.insertAdjacentHTML("beforeend", `<span class="dx-tag">Gen ${e.gen}</span>`);

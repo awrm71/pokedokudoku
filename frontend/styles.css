@@ -294,13 +294,12 @@ button.ghost:hover {
   border: none !important;
 }
 
+/* Pixel icon (type-icons.css). Sized in whole multiples of its 9px grid so
+   each icon pixel lands on whole screen pixels and stays crisp. */
 .tbi {
-  font-size: 0.88rem;
-  line-height: 1;
+  width: 13.5px;
+  height: 13.5px;
   flex-shrink: 0;
-  /* Wide symbol-font stack for cross-platform Unicode coverage */
-  font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols",
-               "Noto Sans Math", sans-serif;
 }
 
 .tbn {
@@ -313,7 +312,7 @@ button.ghost:hover {
 
 @media (max-width: 767px) {
   .type-badge-custom { padding: 3px 7px; gap: 4px; }
-  .tbi { font-size: 0.78rem; }
+  .tbi { width: 9px; height: 9px; }
   .tbn { font-size: 0.62rem; }
 }
 

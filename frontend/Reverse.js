@@ -468,8 +468,7 @@
       btn.className = "rg-type";
       btn.style.setProperty("--tb", cfg.bg);
       btn.style.setProperty("--tf", cfg.fg);
-      btn.innerHTML = `<span class="rg-type-icon" aria-hidden="true"></span><span></span>`;
-      btn.firstChild.textContent = cfg.icon;
+      btn.innerHTML = `${typeIconHtml(typeKey, "rg-type-icon")}<span></span>`;
       btn.lastChild.textContent = typeKey.charAt(0).toUpperCase() + typeKey.slice(1);
       btn.title = `Must have ${btn.lastChild.textContent} as one of its types.`;
     } else {
