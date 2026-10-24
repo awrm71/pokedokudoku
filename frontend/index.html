@@ -5,7 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Tints the phone browser bars to match the page -->
     <meta name="theme-color" content="#08030f" />
-    <title>PokeDokuDoku</title>
+    <title>Route 81 · Daily Pokémon grid puzzles</title>
+    <meta name="description" content="Route 81 is a free daily Pokémon logic grid: 81 squares, each needs a Pokémon that fits its row and column. New board every day, plus Draft and Reverse modes." />
+    <meta property="og:site_name" content="Route 81" />
+    <meta property="og:title" content="Route 81 · Daily Pokémon grid puzzles" />
+    <meta property="og:description" content="81 squares. Every one needs a Pokémon that fits both rules. New board every day." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,6 +20,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./brand-art.css" />
     <link rel="stylesheet" href="./type-icons.css" />
     <link rel="stylesheet" href="./Reverse.css" />
 
@@ -606,10 +614,10 @@
       <!-- Brand bar: logo + the two things reachable from every mode. -->
       <header class="app-header topbar">
         <div class="brand">
-          <span class="brand-ball" aria-hidden="true"></span>
+          <span class="brand-mark" aria-hidden="true"></span>
           <div>
-            <h1>PokeDokuDoku</h1>
-            <span class="brand-tag">Pokémon logic grids</span>
+            <h1 class="wordmark" aria-label="Route 81">Route <span class="wordmark-num">81</span></h1>
+            <span class="brand-tag">Daily Pokémon logic grids</span>
           </div>
         </div>
         <div class="topbar-actions">
@@ -741,7 +749,7 @@
         <button type="button" id="newAfterWinBtn" class="ghost" style="flex-shrink:0;font-size:0.78rem">New board</button>
       </div>
 
-      <div id="boardWrap" class="board-wrap" role="region" aria-label="PokeDokuDoku board"></div>
+      <div id="boardWrap" class="board-wrap" role="region" aria-label="Route 81 board"></div>
       <p class="board-scroll-hint" aria-hidden="true">Scroll sideways for more columns</p>
 
       <section class="legend" aria-label="Status legend">
@@ -1028,8 +1036,8 @@
     <dialog class="howto" id="howToDialog" aria-labelledby="howToTitle">
       <div class="howto-inner">
         <div class="howto-head">
-          <span class="brand-ball" aria-hidden="true"></span>
-          <h2 id="howToTitle">Welcome, Trainer!</h2>
+          <span class="brand-mark" aria-hidden="true"></span>
+          <h2 id="howToTitle">Welcome to Route 81</h2>
         </div>
         <p class="howto-lede">
           Fill the grid with Pokémon. Each square needs one that fits both its row rule and its column rule,
@@ -1050,7 +1058,7 @@
           </div>
         </div>
         <ul class="howto-tips">
-          <li><span class="howto-ic px-ball" aria-hidden="true"></span><span>Tap a square to enter a Pokémon.</span></li>
+          <li><span class="howto-ic px-grass" aria-hidden="true"></span><span>Tap a square to enter a Pokémon.</span></li>
           <li><span class="howto-ic px-star" aria-hidden="true"></span><span>Stuck? Spend a hint to reveal an answer.</span></li>
           <li><span class="howto-ic howto-shiny" aria-hidden="true">★</span><span>Every correct pick has a 1 in 4,096 shot at a shiny. Daily shinies go in your Shiny Dex forever.</span></li>
           <li><span class="howto-ic px-trophy" aria-hidden="true"></span><span>Every correct Daily pick registers in your Pokédex.</span></li>

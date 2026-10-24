@@ -18,12 +18,12 @@ What it does:
      which surfaced TM filler: Protect (95% of the dex), Frustration, Return,
      Confide, Snore, Double Team, Hidden Power, Strength, Reflect. A category
      that excludes almost nobody is a free cell. These are replaced with a
-     curated list built around PokeDoku's own 21, expanded for variety.
+     curated list built around the genre's standard 21, expanded for variety.
 
   3. is_fossil — currently 6 rows, and the wrong 6 (Aerodactyl, its Mega, and
      the four Galar chimeras), missing every real fossil line. Set from a
      curated species list, applied by species_key so forms inherit. Lands on
-     26, matching PokeDoku exactly.
+     26, matching the standard set exactly.
 
 Run from the project root:
     .\.venv\Scripts\python.exe -u scripts\recurate_categories.py --dry-run
@@ -53,8 +53,8 @@ CSV_PATH = DATA_DIR / "pokedex.csv"
 PQ_PATH = DATA_DIR / "pokedex.parquet"
 
 # ── Move categories ───────────────────────────────────────────────────────────
-# PokeDoku's own 21, for parity with the original game.
-POKEDOKU_MOVES = [
+# The genre's standard 21, for parity with what players expect.
+CORE_MOVES = [
     "acrobatics", "brick-break", "calm-mind", "close-combat", "crunch",
     "dazzling-gleam", "earthquake", "flamethrower", "fly", "hydro-pump",
     "ice-beam", "ice-punch", "metronome", "protect", "psychic", "razor-leaf",
@@ -78,7 +78,7 @@ EXTRA_MOVES = [
     "x-scissor", "zen-headbutt",
 ]
 
-CURATED_MOVES = POKEDOKU_MOVES + EXTRA_MOVES
+CURATED_MOVES = CORE_MOVES + EXTRA_MOVES
 
 # engine.generate_board drops move rules covering more than 35% of the answer
 # pool from daily board generation. Anything above this still works as a Draft
@@ -224,7 +224,7 @@ def rebuild_move_columns(
     df = pd.concat([df, pd.DataFrame(new_cols, index=df.index)], axis=1).copy()
 
     log.append(f"learns_*: built {len(CURATED_MOVES)} curated columns "
-               f"({len(POKEDOKU_MOVES)} from PokeDoku, {len(EXTRA_MOVES)} added)")
+               f"({len(CORE_MOVES)} core, {len(EXTRA_MOVES)} added)")
 
     empty = [t for t, c, _ in stats if c == 0]
     for t in empty:

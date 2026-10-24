@@ -40,7 +40,7 @@ Settings (environment variables)
   GOOGLE_CLIENT_ID   OAuth "Web application" client id (not a secret).
                      Without it the Google button is hidden.
   RESEND_API_KEY     Resend.com API key, for password-reset emails.
-  MAIL_FROM          Sender, e.g. "PokeDokuDoku <hello@pokedokudoku.com>"
+  MAIL_FROM          Sender, e.g. "Route 81 <hello@yourdomain>"
                      (the domain must be verified in Resend).
                      Without these two, "Forgot password?" is hidden.
 """
@@ -298,10 +298,10 @@ def _send_reset_email(to: str, code: str, trainer: str) -> bool:
     """Send the code through Resend. Returns False if it didn't go out."""
     try:
         import requests
-        text = (f"Hi {trainer},\n\nYour PokeDokuDoku reset code is {code}\n\n"
+        text = (f"Hi {trainer},\n\nYour Route 81 reset code is {code}\n\n"
                 f"It works for {accounts_store.RESET_MINUTES} minutes. If you didn't ask for this, ignore this email; "
                 "your password hasn't changed.\n")
-        html = (f"<p>Hi {trainer},</p><p>Your PokeDokuDoku reset code is</p>"
+        html = (f"<p>Hi {trainer},</p><p>Your Route 81 reset code is</p>"
                 f"<p style=\"font:700 28px/1.2 monospace;letter-spacing:4px\">{code}</p>"
                 f"<p>It works for {accounts_store.RESET_MINUTES} minutes. If you didn't ask for this, ignore this email; "
                 "your password hasn't changed.</p>")

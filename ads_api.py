@@ -99,7 +99,7 @@ def attach(app) -> None:
         return config()
 
     # Google checks this file before it pays out. It must sit at the root of
-    # the domain: https://pokedokudoku.com/ads.txt
+    # the domain, e.g. https://yourdomain/ads.txt
     @app.get("/ads.txt", response_class=PlainTextResponse, include_in_schema=False)
     def ads_txt():
         client = adsense_client()

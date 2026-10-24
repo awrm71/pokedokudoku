@@ -270,7 +270,8 @@ html {
   .m-focus .picked-name { font-size: 0.64rem; }
   .m-focus .picked-name-row { justify-content: center; }
 
-  /* Empty tile: a faint Poké Ball outline where the Pokémon will go. */
+  /* Empty tile: a quiet tuft of tall grass where the Pokémon will go
+     (theme.css paints it; this is the shape and fallback). */
   :is(.m-focus, .m-fit) .cell:has(.summary-sprite.hidden) .cell-summary::before {
     content: "";
     flex: none;

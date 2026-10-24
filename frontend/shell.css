@@ -58,36 +58,46 @@
   color: var(--ink-soft);
 }
 
-/* A Poké Ball in pure CSS, with a slow idle wobble. */
-.brand-ball {
-  position: relative;
+/* The tall-grass tuft (brand-art.css). Hovering or tapping the logo gives it
+   one quick rustle, like grass when something's hiding in it. No idle loop. */
+.brand-mark {
   flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 3px solid #0b0b0d;
-  background:
-    linear-gradient(#0b0b0d, #0b0b0d) center / 100% 4px no-repeat, linear-gradient(to bottom, #e64132 0 50%, #f1ede8 50% 100%);
-  box-shadow: 0 0 0 2px rgba(224, 63, 48, 0.35);
-  animation: ball-wobble 5s ease-in-out infinite;
-  transform-origin: 50% 90%;
+  width: 60px;                     /* 20x17 art at 3x: every pixel lands whole */
+  height: 51px;
+  background: var(--px-grass) center bottom / contain no-repeat;
+  image-rendering: pixelated;
 }
-.brand-ball::after {
-  content: "";
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 10px;
-  height: 10px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: #f1ede8;
-  border: 3px solid #0b0b0d;
+.brand:hover .brand-mark,
+.brand:active .brand-mark { animation: grass-rustle 360ms steps(1) 1; }
+@keyframes grass-rustle {
+  0%   { transform: translateX(0); }
+  25%  { transform: translateX(-2px); }
+  50%  { transform: translateX(2px); }
+  75%  { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
 }
-@keyframes ball-wobble {
-  0%, 82%, 100% { transform: rotate(0); }
-  86% { transform: rotate(-14deg); }
-  90% { transform: rotate(11deg); }
-  94% { transform: rotate(-6deg); }
+
+/* Wordmark: ROUTE in the pixel font, 81 on a red route plate built like the
+   site's buttons (hard dark edge underneath). */
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  font-family: var(--pixel-font);
+  text-transform: uppercase;
+}
+/* Both halves sit on the same hard dark edge as the site's buttons. */
+.brand h1.wordmark { text-shadow: 0 3px 0 var(--edge, #0b0a0e); }
+.wordmark-num {
+  display: inline-block;
+  padding: 0.12em 0.32em 0.08em;
+  border-radius: 6px;
+  background: var(--accent, #e5483b);
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+  text-shadow: none;
+  box-shadow: 0 4px 0 var(--edge, #0b0a0e);
+  line-height: 1;
 }
 
 .topbar-actions { display: flex; gap: 0.5rem; flex: none; }
@@ -393,7 +403,7 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
 
 .howto-inner { padding: 1.4rem 1.3rem 1.2rem; }
 .howto-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.9rem; }
-.howto-head .brand-ball { width: 30px; height: 30px; }
+.howto-head .brand-mark { width: 40px; height: 34px; }
 .howto h2 {
   margin: 0;
   font-family: var(--pixel-font);
@@ -481,8 +491,7 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
 @media (max-width: 767px) {
   .app-header.topbar { margin-bottom: 0.7rem; gap: 0.6rem; }
   .brand { gap: 0.55rem; }
-  .brand-ball { width: 28px; height: 28px; border-width: 2.5px; }
-  .brand-ball::after { width: 8px; height: 8px; border-width: 2.5px; }
+  .brand-mark { width: 40px; height: 34px; }
   .brand h1 { font-size: clamp(1.05rem, 5.4vw, 1.4rem); }
   .brand-tag { display: none; }
   .icon-btn { padding: 0; width: 40px; min-width: 40px; min-height: 40px; }
@@ -535,5 +544,5 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand-ball, .toast, dialog.howto[open] { animation: none !important; }
+  .brand-mark, .toast, dialog.howto[open] { animation: none !important; }
 }

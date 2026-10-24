@@ -20,7 +20,7 @@ Stages:
   2. Add curated distinct non-mega forms (Castform weathers, Hoopa Unbound,
      Zacian/Zamazenta Crowned, Ogerpon masks, Basculin White-Striped).
   3. Flip evolution semantics outgoing → incoming (Machamp gets 'trade', etc.),
-     matching PokeDoku's "Evolved by" wording. Uses cached evolution chains.
+     matching the standard "Evolved by" category wording. Uses cached evolution chains.
   4. Derive has_mega / has_gmax / is_mega_form / is_gmax_form correctly from the
      ACTUAL form rows present, not PokeAPI's unreliable flags.
   5. Normalize display names to flat style ("Mega Dragonite", "Kyogre Primal";
@@ -66,7 +66,7 @@ PQ_PATH = DATA_DIR / "pokedex.parquet"
 CACHE_DIR = DATA_DIR / "_cache"
 
 POKEAPI = "https://pokeapi.co/api/v2"
-USER_AGENT = "PokeDokuDoku-build/1.0"
+USER_AGENT = "Route81-build/1.0"
 
 BOOL_PREFIXES = ("is_", "has_", "evolves_by_", "evolved_by_", "learns_", "has_ability_")
 

@@ -385,7 +385,7 @@ def build_default_rules(df: pd.DataFrame) -> Dict[str, Rule]:
                 rules[rid] = Rule(rid, label, lambda d, pos=pos: d["evo_position"].fillna("") == pos)
 
     # Evolution methods (if present)
-    # Evolution method rules: PokeDoku-style semantics are "this Pokémon evolves by X"
+    # Evolution method rules: grid-puzzle semantics are "this Pokémon evolves by X"
     # (outgoing), not "this Pokémon was evolved by X" (incoming).
     if _has_any_true("evolves_by_levelup"):
         rules["evolves_by_levelup"] = Rule(

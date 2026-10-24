@@ -7,7 +7,7 @@ evolution flags (Mega Crabominable counted as "evolved by item" and "by
 level up"), regional forms copied the wrong method (Galarian Slowbro as
 level-up), and the Legends Z-A Megas copied their base abilities.
 
-Rules (PokeDoku style: how a Pokémon was evolved INTO):
+Rules (standard grid-puzzle style: how a Pokémon was evolved INTO):
   level-up                         -> Level up
   level-up with friendship         -> Friendship (only)
   level-up holding an item         -> Item and Level up   (Weavile, Chansey)

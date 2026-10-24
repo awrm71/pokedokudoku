@@ -476,7 +476,24 @@ function setCellSprites(cellEl, src, showSummary = false) {
 // real accounts exist, this same id gets passed to POST /pokedex/claim once
 // at signup/login to fold guest progress into the new account; nothing here
 // needs to change for that to work.
-const CLIENT_ID_KEY = "pokedokudoku_client_id";
+const CLIENT_ID_KEY = "route81_client_id";
+
+// Keys from before the Route 81 rename. Copied over once so nobody's device
+// loses its id (and with it their Pokédex and Daily progress), then removed.
+(function migrateStoredKeys() {
+  const moves = [
+    ["pokedokudoku_client_id", "route81_client_id"],
+    ["pokedokudoku_pokedex_milestone_seen", "route81_pokedex_milestone_seen"],
+  ];
+  try {
+    moves.forEach(([oldKey, newKey]) => {
+      const v = localStorage.getItem(oldKey);
+      if (v === null) return;
+      if (localStorage.getItem(newKey) === null) localStorage.setItem(newKey, v);
+      localStorage.removeItem(oldKey);
+    });
+  } catch (_) { /* storage blocked: nothing to move */ }
+})();
 function getClientId() {
   let id = localStorage.getItem(CLIENT_ID_KEY);
   if (!id) {

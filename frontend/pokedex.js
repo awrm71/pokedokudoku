@@ -74,7 +74,7 @@
 
   const RING_C = 2 * Math.PI * 34;               // matches r=34 in the SVG
   const MILESTONES = [1, 10, 25, 50, 100, 150, 200, 250, 300, 400, 500, 750, 1000];
-  const MILESTONE_KEY = "pokedokudoku_pokedex_milestone_seen";   // same key the old Palette used
+  const MILESTONE_KEY = "route81_pokedex_milestone_seen";   // migrated from the pre-rename key in app.js
   const SEEN_KEY = "pdd.dexSeen";
   const RECENT_MS = 48 * 60 * 60 * 1000;
   const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");

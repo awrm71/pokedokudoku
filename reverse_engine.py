@@ -1,7 +1,7 @@
 """
 reverse_engine.py — engine layer for Reverse Board (a.k.a. the deduction mode).
 
-Normal PokeDokuDoku: the player sees the rules and fills in the Pokemon.
+Normal Route 81: the player sees the rules and fills in the Pokemon.
 Reverse Board: the player sees the Pokemon and deduces the rules.
 
 That inversion needs three things the base engine.py doesn't provide:

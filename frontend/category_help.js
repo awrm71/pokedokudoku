@@ -1,7 +1,7 @@
 /* ============================================================================
    category_help.js — plain-language explainers for every board category.
    ----------------------------------------------------------------------------
-   Powers the PokeDoku-style "what does this category mean?" context lines in
+   Powers the "what does this category mean?" context lines in
    the guess modal (and anywhere else a category needs explaining). Pure data +
    one lookup function; no DOM, no dependencies. Load it before reverse.js.
 
@@ -28,7 +28,7 @@
   ]);
 
   // Exact-match explainers, keyed by the lowercased player-facing label.
-  // Wording mirrors PokeDoku's concise, plain style and our INCOMING evolution
+  // Wording is concise and plain, matching the genre's usual style and our INCOMING evolution
   // semantics ("Evolved by" = the Pokémon that results from the evolution).
   const EXACT = {
     // Evolution method (incoming)

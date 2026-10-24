@@ -31,7 +31,7 @@ PQ_OUT   = DATA_DIR / "pokedex.parquet"
 # ── API helpers ────────────────────────────────────────────────────────────────
 BASE = "https://pokeapi.co/api/v2"
 SESSION = requests.Session()
-SESSION.headers["User-Agent"] = "PokeDokuDoku-augment/1.0"
+SESSION.headers["User-Agent"] = "Route81-augment/1.0"
 
 def get(url: str, retries: int = 3) -> dict:
     for attempt in range(retries):

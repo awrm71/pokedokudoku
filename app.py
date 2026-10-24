@@ -181,7 +181,7 @@ board: engine.Board = st.session_state["board"]
 # UI
 # -------------------------
 
-st.title(f"Local PokeDoku ({N}×{N})")
+st.title(f"Route 81 local ({N}×{N})")
 
 with st.sidebar.expander("Debug: sprites", expanded=False):
     st.write("Working dir:", str(Path(".").resolve()))
