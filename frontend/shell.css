@@ -58,17 +58,40 @@
   color: var(--ink-soft);
 }
 
-/* The tall-grass tuft (brand-art.css). Hovering or tapping the logo gives it
-   one quick rustle, like grass when something's hiding in it. No idle loop. */
-.brand-mark {
-  flex: none;
-  width: 60px;                     /* 20x17 art at 3x: every pixel lands whole */
-  height: 51px;
-  background: var(--px-grass) center bottom / contain no-repeat;
-  image-rendering: pixelated;
+/* ── Logo: the name standing in tall grass ───────────────────────────────
+   ROUTE 81 in the pixel font, with a few tufts of route grass around its base
+   (brand-art.css, drawn by scripts/gen_brand_art.py): darker tufts behind the
+   ends, brighter clumps in front of the letters' feet. The grass is pixel art
+   at whole multiples (2x desktop, 4/3x phones), so the font size is fixed at
+   each size rather than fluid: the grass is drawn to fit the name exactly.
+   Hover or tap: one quick rustle of the front grass. No idle loop. */
+.brand h1.wordmark {
+  position: relative;
+  z-index: 0;
+  font-family: var(--pixel-font);
+  font-size: 2.1rem;                     /* text 210px wide; the grass is 248px */
+  text-transform: uppercase;
+  padding: 0 19px;
+  margin-bottom: 30px;                   /* room for the grass under the name */
+  text-shadow: 0 3px 0 var(--edge, #0b0a0e);
 }
-.brand:hover .brand-mark,
-.brand:active .brand-mark { animation: grass-rustle 360ms steps(1) 1; }
+.wordmark-text { position: relative; z-index: 1; }
+.wordmark-num { color: var(--accent, #e5483b); -webkit-text-fill-color: currentColor; }
+.wordmark::before,
+.wordmark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  margin-left: -124px;
+  width: 248px;                          /* 124px of art at 2x */
+  background: center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.wordmark::before { height: 30px; bottom: -10px; background-image: var(--px-grass-back); z-index: 0; }
+.wordmark::after  { height: 32px; bottom: -26px; background-image: var(--px-grass-front); z-index: 2; }
+.brand:hover .wordmark::after,
+.brand:active .wordmark::after { animation: grass-rustle 360ms steps(1) 1; }
 @keyframes grass-rustle {
   0%   { transform: translateX(0); }
   25%  { transform: translateX(-2px); }
@@ -77,27 +100,13 @@
   100% { transform: translateX(0); }
 }
 
-/* Wordmark: ROUTE in the pixel font, 81 on a red route plate built like the
-   site's buttons (hard dark edge underneath). */
-.wordmark {
-  display: flex;
-  align-items: center;
-  gap: 0.45em;
-  font-family: var(--pixel-font);
-  text-transform: uppercase;
-}
-/* Both halves sit on the same hard dark edge as the site's buttons. */
-.brand h1.wordmark { text-shadow: 0 3px 0 var(--edge, #0b0a0e); }
-.wordmark-num {
-  display: inline-block;
-  padding: 0.12em 0.32em 0.08em;
-  border-radius: 6px;
-  background: var(--accent, #e5483b);
-  color: #fff;
-  -webkit-text-fill-color: #fff;
-  text-shadow: none;
-  box-shadow: 0 4px 0 var(--edge, #0b0a0e);
-  line-height: 1;
+/* A single tuft, used beside headings (the welcome card). */
+.brand-mark {
+  flex: none;
+  width: 32px;                           /* 16x13 art at 2x */
+  height: 26px;
+  background: var(--px-grass) center / contain no-repeat;
+  image-rendering: pixelated;
 }
 
 .topbar-actions { display: flex; gap: 0.5rem; flex: none; }
@@ -403,7 +412,7 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
 
 .howto-inner { padding: 1.4rem 1.3rem 1.2rem; }
 .howto-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.9rem; }
-.howto-head .brand-mark { width: 40px; height: 34px; }
+.howto-head .brand-mark { width: 32px; height: 26px; }
 .howto h2 {
   margin: 0;
   font-family: var(--pixel-font);
@@ -491,8 +500,12 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
 @media (max-width: 767px) {
   .app-header.topbar { margin-bottom: 0.7rem; gap: 0.6rem; }
   .brand { gap: 0.55rem; }
-  .brand-mark { width: 40px; height: 34px; }
   .brand h1 { font-size: clamp(1.05rem, 5.4vw, 1.4rem); }
+  .brand h1.wordmark { font-size: 1.35rem; padding: 0 15px; margin-bottom: 17px; }
+  .wordmark::before,
+  .wordmark::after { margin-left: -82.67px; width: 165.33px; }    /* 4/3x */
+  .wordmark::before { height: 20px; bottom: -7px; }
+  .wordmark::after  { height: 21.33px; bottom: -17px; }
   .brand-tag { display: none; }
   .icon-btn { padding: 0; width: 40px; min-width: 40px; min-height: 40px; }
   .icon-btn-label { display: none; }
@@ -544,5 +557,5 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand-mark, .toast, dialog.howto[open] { animation: none !important; }
+  .wordmark::after, .toast, dialog.howto[open] { animation: none !important; }
 }

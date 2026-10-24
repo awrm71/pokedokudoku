@@ -1,73 +1,103 @@
-"""Generate the Route 81 brand art: the tall-grass tuft logo.
+"""Generate the Route 81 brand art: the tall-grass tuft and the grass around
+the wordmark.
 
 Writes:
   frontend/brand-art.css   CSS variables holding the pixel art as SVG data URIs
-                           (--px-grass: logo colours, --px-grass-dim: the quiet
-                           grey version for empty squares)
-  frontend/favicon.svg     the tuft on a dark tile, for the browser tab
+                           --px-grass         one tuft (logo greens)
+                           --px-grass-dim     the same tuft in quiet greys, for
+                                              empty squares
+                           --px-grass-back    tufts behind the wordmark
+                           --px-grass-front   tufts in front of the wordmark
+  frontend/favicon.svg     one tuft on a dark tile
 
-The tuft is drawn back to front, one blade at a time, each with its own dark
-outline, so overlapping blades stay separate the way tall grass does in the
-2D games. Edit BLADES or the palettes and rerun from the repo root:
+The tuft is our own drawing in the spirit of route tall grass: seven pointed
+leaves fanning out from a centre, painted back to front with a dark outline per
+leaf. Edit LEAVES, the palettes or the placements, then rerun from the repo
+root:
     python scripts/gen_brand_art.py
+The wordmark CSS in shell.css assumes the bed size printed at the end
+(BED_W x bed height, shown at 2x on desktop and 4/3x on phones).
 """
+import math
 import urllib.parse
 
-W, H = 20, 17
-BASE = H - 2
-# (base_x, half_width_at_base, tip_x, tip_y), back to front
-BLADES = [
-    (10.0, 2.6, 10.5, 0),
-    (6.2, 2.4, 4.6, 3),
-    (13.8, 2.4, 15.6, 2),
-    (3.2, 2.0, 1.9, 8),
-    (16.8, 2.0, 18.0, 7),
-    (10.0, 2.2, 9.2, 6),
-]
-# Greens tuned to sit beside the site's red and its "correct" green (#4cc38a).
-LOGO = {"o": "#0b0a0e", "d": "#1f5a3a", "m": "#3a9461", "l": "#7fd49c"}
-# Empty squares: the same tuft, quiet, in the board's line greys.
-DIM = {"o": "#3d3a47", "d": "#24222b", "m": "#24222b", "l": "#2e2c37"}
+N = 16
+CX, CY = 8.0, 10.5
+# (angle from straight up, clockwise +; length; half-width), back to front
+LEAVES = [(-22, 9.4, 1.5), (24, 9.0, 1.5), (-62, 8.2, 1.45), (64, 8.0, 1.45),
+          (-106, 6.4, 1.35), (108, 6.2, 1.35), (0, 6.2, 1.4)]
+
+LOGO = {"o": "#16361f", "d": "#2c6b3c", "m": "#4d9a55", "l": "#93d17c"}
+BACK = {"o": "#122b19", "d": "#1f4d2b", "m": "#2f7040", "l": "#4f9a5a"}   # further away
+DIM = {"o": "#3d3a47", "d": "#24222b", "m": "#2a2832", "l": "#34313d"}    # empty squares
+
+BED_W = 124
+# (x, y, mirrored) in bed pixels. Sparse on purpose: clumps at the ends and
+# under the name, open ground between.
+BACK_TUFTS = [(0, 1, True), (110, 0, False)]
+FRONT_TUFTS = [(2, 3, False), (14, 3, True), (56, 3, False), (90, 3, True), (102, 3, False)]
 
 
-def draw():
-    grid = [["."] * W for _ in range(H)]
-    for bx, hw, tx, ty in BLADES:
-        cells = {}
-        for y in range(ty, BASE + 1):
-            t = (y - ty) / max(1, BASE - ty)
-            cx = tx + (bx - tx) * t
-            w = hw * (t ** 0.85) + 0.3
-            for x in range(W):
-                rel = (x + 0.5 - cx) / w
-                if abs(rel) <= 1:
-                    cells[(x, y)] = "l" if rel < -0.2 else ("m" if rel < 0.4 else "d")
+def leaf_cells(angle, length, hw):
+    th = math.radians(angle)
+    ux, uy = math.sin(th), -math.cos(th)
+    px, py = -uy, ux
+    cells = {}
+    for y in range(N):
+        for x in range(N):
+            dx, dy = x + 0.5 - CX, y + 0.5 - CY
+            s, t = dx * ux + dy * uy, dx * px + dy * py
+            if s < 0.3 or s > length:
+                continue
+            f = s / length
+            w = hw * min(1, f / 0.4) ** 0.6 if f < 0.4 else hw * ((1 - f) / 0.6) ** 0.75
+            if abs(t) <= w + 0.25:
+                lit = (t / (w + 0.25) < 0) == (ux >= 0)
+                cells[(x, y)] = ("l" if f > 0.45 else "m") if lit else ("d" if f < 0.5 else "m")
+    return cells
+
+
+def tuft():
+    g = [["."] * N for _ in range(N)]
+    for leaf in LEAVES:
+        cells = leaf_cells(*leaf)
         for (x, y) in cells:
-            for dx, dy in ((1, 0), (-1, 0), (0, -1)):
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 p = (x + dx, y + dy)
-                if p not in cells and 0 <= p[0] < W and 0 <= p[1] < H:
-                    grid[p[1]][p[0]] = "o"
+                if p not in cells and 0 <= p[0] < N and 0 <= p[1] < N:
+                    g[p[1]][p[0]] = "o"
         for (x, y), c in cells.items():
-            grid[y][x] = c
-    for x in range(W):                                  # the ground line
-        if any(grid[y][x] != "." for y in range(H - 1)):
-            grid[H - 1][x] = "o"
-    return grid
+            g[y][x] = c
+    rows = [y for y, r in enumerate(g) if any(c != "." for c in r)]
+    cols = [x for x in range(N) if any(g[y][x] != "." for y in range(N))]
+    return [r[min(cols):max(cols) + 1] for r in g[min(rows):max(rows) + 1]]
 
 
-def svg(grid, pal, bg=None):
-    rects = "".join(
-        f"<rect x='{x}' y='{y}' width='1' height='1' fill='{pal[c]}'/>"
-        for y, row in enumerate(grid) for x, c in enumerate(row) if c != "."
-    )
-    if bg:
-        pad = 3
-        size = max(W, H) + 2 * pad
-        ox, oy = (size - W) / 2, (size - H) / 2 + 0.5
-        return (f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {size} {size}' shape-rendering='crispEdges'>"
-                f"<rect width='{size}' height='{size}' rx='4' fill='{bg}'/>"
-                f"<g transform='translate({ox} {oy})'>{rects}</g></svg>")
-    return f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {W} {H}' shape-rendering='crispEdges'>{rects}</svg>"
+def paint(tile, pal):
+    return [[pal[c] if c != "." else None for c in row] for row in tile]
+
+
+def bed(tile, placements, pal, height):
+    tw, th = len(tile[0]), len(tile)
+    out = [[None] * BED_W for _ in range(height)]
+    for x0, y0, flip in placements:
+        for y in range(th):
+            for x in range(tw):
+                c = tile[y][tw - 1 - x if flip else x]
+                X, Y = x0 + x, y0 + y
+                if c != "." and 0 <= X < BED_W and 0 <= Y < height:
+                    out[Y][X] = pal[c]
+    return out
+
+
+def svg(colors, bg=None, pad=0):
+    h, w = len(colors), len(colors[0])
+    rects = "".join(f"<rect x='{x + pad}' y='{y + pad}' width='1' height='1' fill='{c}'/>"
+                    for y, row in enumerate(colors) for x, c in enumerate(row) if c)
+    W, H = w + 2 * pad, h + 2 * pad
+    back = f"<rect width='{W}' height='{H}' rx='3' fill='{bg}'/>" if bg else ""
+    return (f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {W} {H}' "
+            f"shape-rendering='crispEdges'>{back}{rects}</svg>")
 
 
 def uri(s):
@@ -75,16 +105,18 @@ def uri(s):
 
 
 if __name__ == "__main__":
-    g = draw()
+    t = tuft()
+    th = len(t)
+    back_h, front_h = th + 2, th + 3
     css = (
-        "/* brand-art.css — generated by scripts/gen_brand_art.py; edit there, not here.\n"
-        f"   The Route 81 tall-grass tuft, {W}x{H} pixels. */\n"
+        "/* brand-art.css — generated by scripts/gen_brand_art.py; edit there, not here. */\n"
         ":root {\n"
-        f'  --px-grass: url("{uri(svg(g, LOGO))}");\n'
-        f'  --px-grass-dim: url("{uri(svg(g, DIM))}");\n'
+        f'  --px-grass: url("{uri(svg(paint(t, LOGO)))}");\n'
+        f'  --px-grass-dim: url("{uri(svg(paint(t, DIM)))}");\n'
+        f'  --px-grass-back: url("{uri(svg(bed(t, BACK_TUFTS, BACK, back_h)))}");\n'
+        f'  --px-grass-front: url("{uri(svg(bed(t, FRONT_TUFTS, LOGO, front_h)))}");\n'
         "}\n"
     )
     open("frontend/brand-art.css", "w").write(css)
-    open("frontend/favicon.svg", "w").write(svg(g, LOGO, bg="#121117") + "\n")
-    print("\n".join("".join(r) for r in g))
-    print("wrote frontend/brand-art.css and frontend/favicon.svg")
+    open("frontend/favicon.svg", "w").write(svg(paint(t, LOGO), bg="#121117", pad=2) + "\n")
+    print(f"tuft {len(t[0])}x{th}; beds {BED_W}x{back_h} (back), {BED_W}x{front_h} (front)")
