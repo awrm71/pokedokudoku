@@ -59,55 +59,81 @@
 }
 
 /* ── Logo: the route sign ─────────────────────────────────────────────────
-   Like the location banner that drops in when you walk onto a route: a pale
-   plate with the name, standing in tall grass. The grass is pixel art from
-   brand-art.css (scripts/gen_brand_art.py): a bed behind the plate and
-   clumps in front of its bottom corners. Both are 2-frame sprite sheets that
-   sway slowly; the sign drops in once when the page loads.
-   Sizes are fixed, not fluid, so the grass stays on whole pixels:
-   desktop 2x (150px art -> 300px), phones 4/3x (-> 200px). */
+   A location banner in the spirit of the DS games: a framed plate with a
+   small landscape inside (sky, hills, trees, drifting clouds), standing in
+   tall grass with a few flowers. Art: brand/*.png, made by
+   scripts/gen_brand_art.py on a 150 x 40 pixel canvas.
+   --k is the pixel scale: 2 on desktop, 4/3 on phones, so every art pixel
+   lands on whole screen pixels. Motion: the sign drops in once on load, a
+   gust of wind travels through the grass (4 frames), the clouds drift.
+   All of it stops for prefers-reduced-motion. */
 .route-sign {
+  --k: 2;
   position: relative;
   display: block;
-  width: 300px;
-  height: 84px;
+  width: calc(150px * var(--k));
+  height: calc(40px * var(--k));
   margin: 0;
   animation: rs-drop 420ms steps(6, end) both;
 }
+.rs-grass {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 400%;                /* four frames stacked */
+  image-rendering: pixelated;
+  pointer-events: none;
+  animation: rs-wind 2.4s steps(1) infinite;
+}
+.rs-back  { z-index: 0; background-image: var(--px-sign-back); }
+.rs-front { z-index: 3; background-image: var(--px-sign-front); }
 .rs-plate {
   position: absolute;
   z-index: 1;
-  left: 20px;
-  top: 6px;
-  width: 260px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  background: #efe9dc;
-  color: #24222b;
-  -webkit-text-fill-color: currentColor;
-  font: 600 30px/1 "Pixelify Sans", var(--pixel-font);
-  letter-spacing: 0.02em;
-  text-transform: none;
-  text-shadow: none;
-  box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #b9b2a4, 0 0 0 2px var(--edge, #0b0a0e);
-}
-.rs-grass {
-  position: absolute;
-  left: 0;
-  width: 300px;
-  background-repeat: no-repeat;
-  background-size: 300px 200%;          /* two frames stacked */
+  left: calc(10px * var(--k));
+  top: calc(3px * var(--k));
+  width: calc(130px * var(--k));
+  height: calc(28px * var(--k));
+  background: var(--px-sign-plate) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
-  pointer-events: none;
-  animation: rs-sway 2.4s steps(1) infinite;
 }
-.rs-back  { z-index: 0; top: 36px; height: 40px; background-image: var(--px-sign-back); }
-.rs-front { z-index: 2; top: 34px; height: 44px; background-image: var(--px-sign-front); animation-delay: -1.2s; }
-@keyframes rs-sway {
-  0%  { background-position: 0 0; }
-  50% { background-position: 0 100%; }
+.rs-sky {                                    /* the clouds, inside the frame */
+  position: absolute;
+  left: calc(4px * var(--k));
+  top: calc(4px * var(--k));
+  width: calc(122px * var(--k));
+  height: calc(12px * var(--k));
+  overflow: hidden;
+  background: var(--px-sign-clouds) 0 0 / calc(122px * var(--k)) 100% repeat-x;
+  image-rendering: pixelated;
+  animation: rs-clouds 90s steps(122) infinite;
+}
+.rs-name {
+  position: absolute;
+  z-index: 2;
+  left: calc(19px * var(--k));
+  top: calc(3px * var(--k));
+  height: calc(28px * var(--k));
+  display: flex;
+  align-items: center;
+  font-family: "Pixelify Sans", "Silkscreen", monospace;
+  font-weight: 600;
+  font-size: calc(15px * var(--k));
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #23262b;
+  -webkit-text-fill-color: currentColor;
+  text-transform: none;
+  text-shadow: 0 calc(1px * var(--k)) 0 #f4f8f6;
+}
+@keyframes rs-wind {
+  0%   { background-position: 0 0; }
+  25%  { background-position: 0 33.333%; }
+  50%  { background-position: 0 66.667%; }
+  75%  { background-position: 0 100%; }
+}
+@keyframes rs-clouds {
+  to { background-position: calc(-122px * var(--k)) 0; }
 }
 @keyframes rs-drop {
   from { transform: translateY(-110%); opacity: 0; }
@@ -517,12 +543,7 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
   .app-header.topbar { margin-bottom: 0.7rem; gap: 0.6rem; }
   .brand { gap: 0.55rem; }
   .brand h1 { font-size: clamp(1.05rem, 5.4vw, 1.4rem); }
-  /* Route sign at 4/3x */
-  .route-sign { width: 200px; height: 56px; }
-  .rs-plate { left: 13.33px; top: 4px; width: 173.33px; height: 37.33px; font-size: 20px; border-radius: 5px; }
-  .rs-grass { width: 200px; background-size: 200px 200%; }
-  .rs-back  { top: 24px; height: 26.67px; }
-  .rs-front { top: 22.67px; height: 29.33px; }
+  .route-sign { --k: 1.3333; }             /* 200 x 53 */
   .brand-tag { display: none; }
   .icon-btn { padding: 0; width: 40px; min-width: 40px; min-height: 40px; }
   .icon-btn-label { display: none; }
@@ -574,5 +595,5 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .route-sign, .rs-grass, .toast, dialog.howto[open] { animation: none !important; }
+  .route-sign, .rs-grass, .rs-sky, .toast, dialog.howto[open] { animation: none !important; }
 }

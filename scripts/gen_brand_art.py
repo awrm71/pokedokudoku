@@ -6,10 +6,14 @@ Writes:
                            --px-grass         one tuft (logo greens)
                            --px-grass-dim     the same tuft in quiet greys, for
                                               empty squares
-                           --px-sign-back     grass bed behind the route sign
-                           --px-sign-front    clumps in front of the sign
-                           (both are 2-frame sprite sheets, frames stacked
-                           vertically, for the sway animation in shell.css)
+                           --px-sign-plate    the sign: frame, sky, hills, trees
+                           --px-sign-clouds   cloud strip that drifts across it
+                           --px-sign-back     grass bed behind the sign
+                           --px-sign-front    grass clumps + flowers in front
+                           (the two grass layers are 4-frame sprite sheets,
+                           frames stacked vertically: a wind gust that travels
+                           across the grass)
+  frontend/brand/*.png     the route sign layers (PNG: exact pixels, tiny files)
   frontend/favicon.svg     one tuft on a dark tile
 
 The tuft is our own drawing in the spirit of route tall grass: seven pointed
@@ -21,6 +25,7 @@ The sign CSS in shell.css assumes the sizes printed at the end (shown at 2x on
 desktop and 4/3x on phones).
 """
 import math
+import random
 import urllib.parse
 
 N = 16
@@ -32,17 +37,158 @@ LEAVES = [(-22, 9.4, 1.5), (24, 9.0, 1.5), (-62, 8.2, 1.45), (64, 8.0, 1.45),
 LOGO = {"o": "#16361f", "d": "#2c6b3c", "m": "#4d9a55", "l": "#93d17c"}
 DIM = {"o": "#3d3a47", "d": "#24222b", "m": "#2a2832", "l": "#34313d"}    # empty squares
 
-# ── Route sign grass ───────────────────────────────────────────────────────
-SIGN_W = 150                  # art pixels; the sign plate sits 10px in from each side
-SIGN_BACK_H, SIGN_FRONT_H = 20, 22
-SIGN_PAL = {"o": "#0f2416", "d": "#235a33", "m": "#3c8a4a", "l": "#6cc070", "h": "#b6ea8f"}
-# Front blades, hand placed: (x, height, half-width, lean). A clump over each
-# bottom corner of the sign, short blades along its base below the letters.
-CORNER = [(-7, 13, 2.1, -2.6), (-3, 18, 2.4, -1.4), (1, 15, 2.3, 1.8), (5, 20, 2.5, 2.8),
-          (9, 12, 2.0, 2.4), (-10, 9, 1.8, -2.0), (12, 10, 1.8, 2.2)]
-BASE_BLADES = [(30, 7, 1.8, -1.6), (42, 8, 1.9, 1.8), (47, 6, 1.7, -1.4), (60, 6, 1.7, 1.5),
-               (71, 7, 1.8, -2.0), (86, 6, 1.7, 1.7), (98, 6, 1.7, 1.6), (104, 8, 1.9, -1.8),
-               (118, 7, 1.8, 1.5)]
+# ── Route sign ────────────────────────────────────────────────────────────
+# A location banner in the spirit of the DS games: a framed plate with a small
+# landscape (sky, drifting clouds, hills, trees), standing in tall grass with a
+# few flowers. All sizes are art pixels; shell.css shows them at 2x (desktop)
+# and 4/3x (phones). Canvas is CW x CH; the plate sits at (PX0, PY0).
+CW, CH = 150, 40
+PX0, PY0, PW, PH = 10, 3, 130, 28           # plate rect in canvas
+GROUND = CH - 1
+FRAMES = 4
+
+# ── palettes ───────────────────────────────────────────────────────────────
+OUT = "#0b0a0e"
+GR = {"o": "#10261a", "d": "#1f5530", "m": "#368342", "l": "#5fb763", "h": "#a8e486"}
+GR_BACK = {"o": "#0e2017", "d": "#1a4429", "m": "#2b6a39", "l": "#4a9852", "h": "#7fc46f"}
+FLOWERS = [("#f2f0ea", "#f6d24a"), ("#ef6a5a", "#ffd9a8"), ("#f6d24a", "#ffffff")]   # petal, centre
+
+def grid(w, h):
+    return [[None] * w for _ in range(h)]
+
+# ── plate ──────────────────────────────────────────────────────────────────
+def plate():
+    g = grid(PW, PH)
+    sky = ["#8cc6e4", "#a3d1ea", "#bcdeee", "#d4e9ef", "#e4f0ee"]
+    inner_top, inner_bot = 3, PH - 4
+    for y in range(PH):
+        for x in range(PW):
+            # rounded corners: cut 2px
+            corner = (x < 2 or x > PW - 3) and (y < 2 or y > PH - 3)
+            if corner and not ((x in (1, PW - 2)) and (y in (1, PH - 2))):
+                continue
+            edge = x == 0 or y == 0 or x == PW - 1 or y == PH - 1 or ((x in (1, PW - 2)) and (y in (1, PH - 2)))
+            if edge: g[y][x] = OUT; continue
+            if x in (1, 2, PW - 2, PW - 3) or y in (1, 2, PH - 2, PH - 3):
+                g[y][x] = "#f8f5ee"; continue                    # white frame
+            if x == 3 or x == PW - 4 or y == 3 or y == PH - 4:
+                g[y][x] = "#a9b8bd"; continue                    # inner line
+            # sky bands with a checker dither on each boundary row
+            yy = y - 4
+            band = min(len(sky) - 1, yy * len(sky) // (PH - 8))
+            nb = min(len(sky) - 1, band + 1)
+            c = sky[band]
+            g[y][x] = c
+    # hills on the right: far (pale) then near
+    def hill(cx, r, top, col, edge):
+        for x in range(4, PW - 4):
+            d = (x - cx) / r
+            if abs(d) >= 1: continue
+            h = top + (PH - 5 - top) * (1 - math.sqrt(1 - d * d)) ** 1.0
+            for y in range(int(h), PH - 4):
+                g[y][x] = col
+            g[int(h)][x] = edge
+    hill(108, 34, 11, "#9cc9a6", "#b6dabc")
+    hill(126, 22, 14, "#7db58a", "#98c9a2")
+    hill(84, 20, 18, "#7db58a", "#98c9a2")
+    # a few trees on the near hill: little rounded pixel trees
+    for tx in (112, 117, 121):
+        ty = 15 if tx != 117 else 14
+        for dy, row in enumerate([".ttt.", "ttttt", "tTTTt", ".ttt.", "..b.."]):
+            for dx, c in enumerate(row):
+                X, Y = tx + dx - 2, ty + dy
+                if c != "." and 4 <= X < PW - 4 and Y < PH - 4:
+                    g[Y][X] = {"t": "#4f9a5e", "T": "#3c7f4b", "b": "#6b5a43"}[c]
+    # ground strip along the bottom of the scene
+    for x in range(4, PW - 4):
+        g[PH - 5][x] = "#7cbf6e"; g[PH - 6][x] = g[PH - 6][x] if (x % 3) else "#8fcb7c"
+    return g
+
+# ── clouds (a tile the width of the plate's inside, scrolls) ───────────────
+def clouds():
+    W, H = PW - 8, 12
+    g = grid(W, H)
+    shapes = [(10, 2, ["..www...", ".wwwwww.", "wwwwwwww", ".ssssss."]),
+              (62, 5, ["...ww..", ".wwwwww", "wwwwwww", ".sssss."]),
+              (96, 1, [".www..", "wwwwww", ".ssss."])]
+    for x0, y0, rows in shapes:
+        for dy, row in enumerate(rows):
+            for dx, c in enumerate(row):
+                if c != ".": g[y0 + dy][(x0 + dx) % W] = "#ffffff" if c == "w" else "#e3eef3"
+    return g
+
+# ── grass ──────────────────────────────────────────────────────────────────
+def blade(g, pal, bx, base, height, width, lean, sway):
+    H, W = len(g), len(g[0]); flip = lean < 0; pts = {}
+    for k in range(height + 1):
+        t = k / height
+        cx = bx + (lean + sway) * (t ** 1.6)
+        w = width * (1 - t) ** 0.9
+        y = base - k
+        for x in range(int(cx - w - 2), int(cx + w + 3)):
+            if not (0 <= x < W and 0 <= y < H): continue
+            d = x + 0.5 - cx
+            if abs(d) <= w + 0.35:
+                rel = d / (w + 0.35)
+                lit = rel > 0.1 if flip else rel < -0.1
+                c = ("h" if lit else "l") if t > 0.78 else ("l" if lit else ("m" if abs(rel) < 0.45 else "d"))
+                pts[(x, y)] = c
+    for (x, y) in pts:
+        for dx, dy in ((1, 0), (-1, 0), (0, -1)):
+            p = (x + dx, y + dy)
+            if p not in pts and 0 <= p[0] < W and 0 <= p[1] < H: g[p[1]][p[0]] = pal["o"]
+    for (x, y), c in pts.items(): g[y][x] = pal[c]
+
+def wind(x, frame, amp):
+    """Travelling wave: a gust moves left to right across the bed."""
+    return round(amp * math.sin(2 * math.pi * (frame / FRAMES - x / 70)))
+
+def flower(g, x, y, petal, centre, dy):
+    y += dy
+    for (dx, dyy, c) in ((0, -1, petal), (-1, 0, petal), (1, 0, petal), (0, 1, petal), (0, 0, centre)):
+        X, Y = x + dx, y + dyy
+        if 0 <= X < CW and 0 <= Y < CH: g[Y][X] = c
+    for (dx, dyy) in ((-1, -1), (1, -1), (-1, 1), (1, 1), (0, -2), (-2, 0), (2, 0)):
+        X, Y = x + dx, y + dyy
+        if 0 <= X < CW and 0 <= Y < CH and g[Y][X] is None: g[Y][X] = OUT
+    # stem
+    for s in range(2, 5):
+        if y + s < CH and g[y + s][x] is None: g[y + s][x] = GR["m"]
+
+def back_bed(frame):
+    rnd = random.Random(7); g = grid(CW, CH); bl = []
+    n = 58
+    for i in range(n):
+        x = (i + rnd.uniform(0.1, 0.9)) * CW / n
+        edge = min(x, CW - x) / (CW / 2)            # 0 at the ends, 1 in the middle
+        hmax = int(23 - 15 * edge)                  # taller at the sides: wraps the plate
+        h = rnd.randint(max(5, hmax - 5), hmax)
+        lean = rnd.choice([-1, 1]) * rnd.uniform(1.0, 3.0)
+        bl.append((x, GROUND - rnd.randint(0, 2), h, rnd.uniform(1.7, 2.7), lean))
+    for (x, base, h, w, lean) in sorted(bl, key=lambda b: -b[2]):
+        blade(g, GR_BACK, x, base, h, w, lean, wind(x, frame, 1.2))
+    return g
+
+CORNER = [(-7, 14, 2.1, -2.6), (-3, 20, 2.4, -1.4), (1, 16, 2.3, 1.8), (5, 23, 2.5, 2.8),
+          (9, 13, 2.0, 2.4), (-10, 10, 1.8, -2.0), (12, 11, 1.8, 2.2), (-5, 8, 1.9, 1.5)]
+BASE = [(30, 8, 1.8, -1.6), (46, 9, 1.9, 1.8), (58, 6, 1.7, -1.4), (75, 7, 1.8, -2.0),
+        (92, 6, 1.7, 1.7), (104, 9, 1.9, -1.6), (120, 7, 1.8, 1.5)]
+FLOWER_SPOTS = [(5, 28, 0), (20, 31, 1), (38, 35, 2), (66, 35, 0), (98, 34, 1), (130, 30, 2), (145, 27, 1)]
+
+def front(frame):
+    g = grid(CW, CH); bl = []
+    for cx, side in ((11, 1), (139, -1)):
+        for (dx, h, w, lean) in CORNER: bl.append((cx + dx * side, h, w, lean * side))
+    bl += BASE
+    for (x, h, w, lean) in sorted(bl, key=lambda b: -b[1]):
+        blade(g, GR, x, GROUND, h, w, lean, wind(x, frame, 1.6))
+    for (x, y, k) in FLOWER_SPOTS:
+        petal, centre = FLOWERS[k]
+        flower(g, x + wind(x, frame, 1.0), y, petal, centre, 0)
+    for x in range(CW):
+        if any(g[y][x] for y in range(CH - 3, CH)): g[GROUND][x] = GR["o"]
+    return g
+
 
 
 def leaf_cells(angle, length, hw):
@@ -84,74 +230,26 @@ def paint(tile, pal):
     return [[pal[c] if c != "." else None for c in row] for row in tile]
 
 
-def _blade(g, bx, base, height, width, lean, sway):
-    """One tapered blade, lit on the side it leans away from, outlined."""
-    H, W = len(g), len(g[0])
-    flip = lean < 0
-    pts = {}
-    for k in range(height + 1):
-        t = k / height
-        cx = bx + (lean + sway) * (t ** 1.6)
-        w = width * (1 - t) ** 0.9
-        y = base - k
-        for x in range(W):
-            d = x + 0.5 - cx
-            if abs(d) <= w + 0.35 and 0 <= y < H:
-                rel = d / (w + 0.35)
-                lit = rel > 0.1 if flip else rel < -0.1
-                if t > 0.78:
-                    c = "h" if lit else "l"
-                elif lit:
-                    c = "l"
-                elif abs(rel) < 0.45:
-                    c = "m"
-                else:
-                    c = "d"
-                pts[(x, y)] = c
-    for (x, y) in pts:
-        for dx, dy in ((1, 0), (-1, 0), (0, -1)):
-            p = (x + dx, y + dy)
-            if p not in pts and 0 <= p[0] < W and 0 <= p[1] < H:
-                g[p[1]][p[0]] = "o"
-    for (x, y), c in pts.items():
-        g[y][x] = c
+def sheet(frames_):
+    """Frames stacked vertically into one sprite sheet (a list of rows)."""
+    out = []
+    for f in frames_:
+        out += f
+    return out
 
 
-def _grass(blades, height, frame):
-    g = [["."] * SIGN_W for _ in range(height)]
-    for bx, base, h, w, lean, phase in sorted(blades, key=lambda b: -b[2]):   # tall first
-        sway = (1 if (frame + phase) % 2 else 0) * (1 if lean >= 0 else -1)
-        _blade(g, bx, base, h, w, lean, sway)
-    for x in range(SIGN_W):                                  # dark ground line
-        if any(g[y][x] != "." for y in range(height - 3, height)):
-            g[height - 1][x] = "o"
-    return [[SIGN_PAL[c] if c != "." else None for c in row] for row in g]
-
-
-def sign_back():
-    import random
-    rnd = random.Random(7)
-    n, bl = 64, []
-    for i in range(n):
-        lean = rnd.choice([-1, 1]) * rnd.uniform(1.0, 3.2)
-        bl.append(((i + rnd.uniform(0.1, 0.9)) * SIGN_W / n, SIGN_BACK_H - 1 - rnd.randint(0, 2),
-                   rnd.randint(9, 18), rnd.uniform(1.7, 2.7), lean, rnd.randint(0, 1)))
-    return [_grass(bl, SIGN_BACK_H, f) for f in (0, 1)]
-
-
-def sign_front():
-    bl = []
-    for cx, side in ((12, 1), (138, -1)):
-        for i, (dx, h, w, lean) in enumerate(CORNER):
-            bl.append((cx + dx * side, SIGN_FRONT_H - 1, h, w, lean * side, i % 2))
-    for i, (x, h, w, lean) in enumerate(BASE_BLADES):
-        bl.append((x, SIGN_FRONT_H - 1, h, w, lean, i % 2))
-    return [_grass(bl, SIGN_FRONT_H, f) for f in (0, 1)]
-
-
-def frames(fr):
-    """Stack 2 frames vertically into one sprite sheet."""
-    return fr[0] + fr[1]
+def png(colors, path):
+    """Write a colour grid as a PNG with transparency. Small and exact, which
+    matters for the sign: as SVG rects the four-frame grass ran to ~1 MB."""
+    from PIL import Image
+    h, w = len(colors), len(colors[0])
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    px = img.load()
+    for y, row in enumerate(colors):
+        for x, c in enumerate(row):
+            if c:
+                px[x, y] = (int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16), 255)
+    img.save(path, optimize=True)
 
 
 def svg(colors, bg=None, pad=0):
@@ -175,11 +273,19 @@ if __name__ == "__main__":
         ":root {\n"
         f'  --px-grass: url("{uri(svg(paint(t, LOGO)))}");\n'
         f'  --px-grass-dim: url("{uri(svg(paint(t, DIM)))}");\n'
-        f'  --px-sign-back: url("{uri(svg(frames(sign_back())))}");\n'
-        f'  --px-sign-front: url("{uri(svg(frames(sign_front())))}");\n'
+        '  --px-sign-plate: url("./brand/sign-plate.png");\n'
+        '  --px-sign-clouds: url("./brand/sign-clouds.png");\n'
+        '  --px-sign-back: url("./brand/sign-grass-back.png");\n'
+        '  --px-sign-front: url("./brand/sign-grass-front.png");\n'
         "}\n"
     )
+    import os
+    os.makedirs("frontend/brand", exist_ok=True)
+    png(plate(), "frontend/brand/sign-plate.png")
+    png(clouds(), "frontend/brand/sign-clouds.png")
+    png(sheet([back_bed(f) for f in range(FRAMES)]), "frontend/brand/sign-grass-back.png")
+    png(sheet([front(f) for f in range(FRAMES)]), "frontend/brand/sign-grass-front.png")
     open("frontend/brand-art.css", "w").write(css)
     open("frontend/favicon.svg", "w").write(svg(paint(t, LOGO), bg="#121117", pad=2) + "\n")
-    print(f"tuft {len(t[0])}x{len(t)}; sign grass {SIGN_W}x{SIGN_BACK_H} (back), "
-          f"{SIGN_W}x{SIGN_FRONT_H} (front), 2 frames each")
+    print(f"tuft {len(t[0])}x{len(t)}; sign canvas {CW}x{CH}, plate {PW}x{PH} at ({PX0},{PY0}), "
+          f"grass {FRAMES} frames")
