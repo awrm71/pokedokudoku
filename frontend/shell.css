@@ -62,35 +62,35 @@
    A location banner in the spirit of the DS games: a framed plate with a
    small landscape inside (sky, hills, trees, drifting clouds), standing in
    tall grass with a few flowers. Art: brand/*.png, made by
-   scripts/gen_brand_art.py on a 150 x 40 pixel canvas.
+   scripts/gen_brand_art.py on a 164 x 40 pixel canvas.
    --k is the pixel scale: 2 on desktop, 4/3 on phones, so every art pixel
-   lands on whole screen pixels. Motion: the sign drops in once on load, a
-   gust of wind travels through the grass (4 frames), the clouds drift.
-   All of it stops for prefers-reduced-motion. */
+   lands on whole screen pixels. Motion: a gust of wind rolls through the
+   grass (16 frames, ~100ms each) and the clouds drift. The grass tapers off
+   at both ends, so the sign has no hard rectangular edge. All motion stops
+   for prefers-reduced-motion. */
 .route-sign {
   --k: 2;
   position: relative;
   display: block;
-  width: calc(150px * var(--k));
+  width: calc(164px * var(--k));
   height: calc(40px * var(--k));
   margin: 0;
-  animation: rs-drop 420ms steps(6, end) both;
 }
 .rs-grass {
   position: absolute;
   inset: 0;
   background-repeat: no-repeat;
-  background-size: 100% 400%;                /* four frames stacked */
+  background-size: 100% 1600%;               /* sixteen frames stacked */
   image-rendering: pixelated;
   pointer-events: none;
-  animation: rs-wind 2.4s steps(1) infinite;
+  animation: rs-wind 1.6s steps(16, jump-none) infinite;
 }
 .rs-back  { z-index: 0; background-image: var(--px-sign-back); }
 .rs-front { z-index: 3; background-image: var(--px-sign-front); }
 .rs-plate {
   position: absolute;
   z-index: 1;
-  left: calc(10px * var(--k));
+  left: calc(17px * var(--k));
   top: calc(3px * var(--k));
   width: calc(130px * var(--k));
   height: calc(28px * var(--k));
@@ -106,12 +106,12 @@
   overflow: hidden;
   background: var(--px-sign-clouds) 0 0 / calc(122px * var(--k)) 100% repeat-x;
   image-rendering: pixelated;
-  animation: rs-clouds 90s steps(122) infinite;
+  animation: rs-clouds 60s steps(122) infinite;
 }
 .rs-name {
   position: absolute;
   z-index: 2;
-  left: calc(19px * var(--k));
+  left: calc(26px * var(--k));
   top: calc(3px * var(--k));
   height: calc(28px * var(--k));
   display: flex;
@@ -127,18 +127,11 @@
   text-shadow: 0 calc(1px * var(--k)) 0 #f4f8f6;
 }
 @keyframes rs-wind {
-  0%   { background-position: 0 0; }
-  25%  { background-position: 0 33.333%; }
-  50%  { background-position: 0 66.667%; }
-  75%  { background-position: 0 100%; }
+  from { background-position: 0 0; }
+  to   { background-position: 0 100%; }
 }
 @keyframes rs-clouds {
   to { background-position: calc(-122px * var(--k)) 0; }
-}
-@keyframes rs-drop {
-  from { transform: translateY(-110%); opacity: 0; }
-  20%  { opacity: 1; }
-  to   { transform: none; }
 }
 .route-sign + .brand-tag { margin-top: 0.15rem; }
 
@@ -543,7 +536,7 @@ dialog.howto[open] { animation: toast-in 280ms cubic-bezier(.2, .7, .3, 1) both;
   .app-header.topbar { margin-bottom: 0.7rem; gap: 0.6rem; }
   .brand { gap: 0.55rem; }
   .brand h1 { font-size: clamp(1.05rem, 5.4vw, 1.4rem); }
-  .route-sign { --k: 1.3333; }             /* 200 x 53 */
+  .route-sign { --k: 1.3333; }             /* 219 x 53; 4 device px per art px on 3x phones */
   .brand-tag { display: none; }
   .icon-btn { padding: 0; width: 40px; min-width: 40px; min-height: 40px; }
   .icon-btn-label { display: none; }

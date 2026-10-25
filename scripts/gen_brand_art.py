@@ -42,10 +42,10 @@ DIM = {"o": "#3d3a47", "d": "#24222b", "m": "#2a2832", "l": "#34313d"}    # empt
 # landscape (sky, drifting clouds, hills, trees), standing in tall grass with a
 # few flowers. All sizes are art pixels; shell.css shows them at 2x (desktop)
 # and 4/3x (phones). Canvas is CW x CH; the plate sits at (PX0, PY0).
-CW, CH = 150, 40
-PX0, PY0, PW, PH = 10, 3, 130, 28           # plate rect in canvas
+CW, CH = 164, 40                           # room on each side so swaying blades never hit an edge
+PX0, PY0, PW, PH = 17, 3, 130, 28           # plate rect in canvas
 GROUND = CH - 1
-FRAMES = 4
+FRAMES = 16                                 # wind cycle; shown at ~100ms a frame
 
 # ── palettes ───────────────────────────────────────────────────────────────
 OUT = "#0b0a0e"
@@ -140,8 +140,17 @@ def blade(g, pal, bx, base, height, width, lean, sway):
     for (x, y), c in pts.items(): g[y][x] = pal[c]
 
 def wind(x, frame, amp):
-    """Travelling wave: a gust moves left to right across the bed."""
-    return round(amp * math.sin(2 * math.pi * (frame / FRAMES - x / 70)))
+    """Travelling wave: a gust moves left to right across the bed. Every blade
+    at a given x bends the same way, the way a real gust does."""
+    return round(amp * math.sin(2 * math.pi * (frame / FRAMES - x / 80)))
+
+
+def taper(x):
+    """0 at the canvas edges rising to 1 a little way in, so the grass ends in
+    a soft mound instead of being cut off square."""
+    m = min(x, CW - x)
+    t = max(0.0, min(1.0, (m - 5) / 16))
+    return t * t * (3 - 2 * t)
 
 def flower(g, x, y, petal, centre, dy):
     y += dy
@@ -157,34 +166,38 @@ def flower(g, x, y, petal, centre, dy):
 
 def back_bed(frame):
     rnd = random.Random(7); g = grid(CW, CH); bl = []
-    n = 58
+    n, lo, hi = 60, 6, CW - 6
     for i in range(n):
-        x = (i + rnd.uniform(0.1, 0.9)) * CW / n
-        edge = min(x, CW - x) / (CW / 2)            # 0 at the ends, 1 in the middle
-        hmax = int(23 - 15 * edge)                  # taller at the sides: wraps the plate
-        h = rnd.randint(max(5, hmax - 5), hmax)
-        lean = rnd.choice([-1, 1]) * rnd.uniform(1.0, 3.0)
+        x = lo + (i + rnd.uniform(0.1, 0.9)) * (hi - lo) / n
+        edge = abs(x - CW / 2) / (PW / 2)           # 0 mid-sign, 1 at the sign's sides
+        hmax = 8 + 15 * min(1, edge) ** 2           # taller at the sides: wraps the plate
+        h = int(rnd.uniform(0.7, 1.0) * hmax * taper(x))
+        if h < 3:
+            continue
+        lean = rnd.choice([-1, 1]) * rnd.uniform(1.0, 2.6)
+        if min(x, CW - x) < 22:                     # outer blades lean inward
+            lean = abs(lean) if x < CW / 2 else -abs(lean)
         bl.append((x, GROUND - rnd.randint(0, 2), h, rnd.uniform(1.7, 2.7), lean))
     for (x, base, h, w, lean) in sorted(bl, key=lambda b: -b[2]):
-        blade(g, GR_BACK, x, base, h, w, lean, wind(x, frame, 1.2))
+        blade(g, GR_BACK, x, base, h, w, lean, wind(x, frame, 1.5))
     return g
 
 CORNER = [(-7, 14, 2.1, -2.6), (-3, 20, 2.4, -1.4), (1, 16, 2.3, 1.8), (5, 23, 2.5, 2.8),
           (9, 13, 2.0, 2.4), (-10, 10, 1.8, -2.0), (12, 11, 1.8, 2.2), (-5, 8, 1.9, 1.5)]
-BASE = [(30, 8, 1.8, -1.6), (46, 9, 1.9, 1.8), (58, 6, 1.7, -1.4), (75, 7, 1.8, -2.0),
-        (92, 6, 1.7, 1.7), (104, 9, 1.9, -1.6), (120, 7, 1.8, 1.5)]
-FLOWER_SPOTS = [(5, 28, 0), (20, 31, 1), (38, 35, 2), (66, 35, 0), (98, 34, 1), (130, 30, 2), (145, 27, 1)]
+BASE = [(37, 8, 1.8, -1.6), (53, 9, 1.9, 1.8), (65, 6, 1.7, -1.4), (82, 7, 1.8, -2.0),
+        (99, 6, 1.7, 1.7), (111, 9, 1.9, -1.6), (127, 7, 1.8, 1.5)]
+FLOWER_SPOTS = [(12, 30, 0), (27, 31, 1), (45, 35, 2), (73, 35, 0), (105, 34, 1), (137, 30, 2), (152, 30, 1)]
 
 def front(frame):
     g = grid(CW, CH); bl = []
-    for cx, side in ((11, 1), (139, -1)):
+    for cx, side in ((PX0 + 1, 1), (PX0 + PW - 1, -1)):
         for (dx, h, w, lean) in CORNER: bl.append((cx + dx * side, h, w, lean * side))
     bl += BASE
     for (x, h, w, lean) in sorted(bl, key=lambda b: -b[1]):
-        blade(g, GR, x, GROUND, h, w, lean, wind(x, frame, 1.6))
+        blade(g, GR, x, GROUND, h, w, lean, wind(x, frame, 2.0))
     for (x, y, k) in FLOWER_SPOTS:
         petal, centre = FLOWERS[k]
-        flower(g, x + wind(x, frame, 1.0), y, petal, centre, 0)
+        flower(g, x + wind(x, frame, 1.4), y, petal, centre, 0)
     for x in range(CW):
         if any(g[y][x] for y in range(CH - 3, CH)): g[GROUND][x] = GR["o"]
     return g
