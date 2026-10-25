@@ -14,7 +14,7 @@ Writes:
                            frames stacked vertically: a wind gust that travels
                            across the grass)
   frontend/brand/*.png     the route sign layers (PNG: exact pixels, tiny files)
-  frontend/favicon.svg     one tuft on a dark tile
+  (app icons and the share image: scripts/gen_share_art.py)
 
 The tuft is our own drawing in the spirit of route tall grass: seven pointed
 leaves fanning out from a centre, painted back to front with a dark outline per
@@ -299,6 +299,5 @@ if __name__ == "__main__":
     png(sheet([back_bed(f) for f in range(FRAMES)]), "frontend/brand/sign-grass-back.png")
     png(sheet([front(f) for f in range(FRAMES)]), "frontend/brand/sign-grass-front.png")
     open("frontend/brand-art.css", "w").write(css)
-    open("frontend/favicon.svg", "w").write(svg(paint(t, LOGO), bg="#121117", pad=2) + "\n")
     print(f"tuft {len(t[0])}x{len(t)}; sign canvas {CW}x{CH}, plate {PW}x{PH} at ({PX0},{PY0}), "
           f"grass {FRAMES} frames")

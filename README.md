@@ -14,7 +14,8 @@ Run locally from the repo root:
 
 Then open http://127.0.0.1:8000.
 
-Brand art (logo, favicon) and the type icons are generated:
+Brand art (logo sign, app icons, share image) and the type icons are generated:
 
     python scripts/gen_brand_art.py
+    python scripts/gen_share_art.py
     python scripts/gen_type_icons.py
