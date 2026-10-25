@@ -494,6 +494,35 @@ const CLIENT_ID_KEY = "route81_client_id";
     });
   } catch (_) { /* storage blocked: nothing to move */ }
 })();
+// A guest id carried over from the old address (see moveToCanonicalHost).
+// Adopted only when this browser has no id here yet, then cleared from the URL.
+(function adoptCarriedId() {
+  const m = location.hash.match(/(?:^#|&)cid=([A-Za-z0-9-]{8,64})(?:&|$)/);
+  if (!m) return;
+  try {
+    if (!localStorage.getItem(CLIENT_ID_KEY)) localStorage.setItem(CLIENT_ID_KEY, m[1]);
+  } catch (_) { /* storage blocked */ }
+  history.replaceState(null, "", location.pathname + location.search);
+})();
+
+// On the old Railway address, move to the real one once the server says what
+// it is (CANONICAL_HOST). This runs in the page rather than as a server
+// redirect so the guest id in this address's storage can come along.
+(function moveToCanonicalHost() {
+  if (!/\.up\.railway\.app$/i.test(location.hostname)) return;
+  fetch("/site/config")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((cfg) => {
+      const host = cfg && cfg.canonical_host;
+      if (!host || host === location.hostname) return;
+      let id = "";
+      try { id = localStorage.getItem(CLIENT_ID_KEY) || ""; } catch (_) { /* blocked */ }
+      const carry = /^[A-Za-z0-9-]{8,64}$/.test(id) ? `#cid=${id}` : "";
+      location.replace(`https://${host}${location.pathname}${location.search}${carry}`);
+    })
+    .catch(() => { /* stay put */ });
+})();
+
 function getClientId() {
   let id = localStorage.getItem(CLIENT_ID_KEY);
   if (!id) {

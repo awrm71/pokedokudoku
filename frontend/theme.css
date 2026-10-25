@@ -59,10 +59,21 @@ body { background-attachment: scroll; }
 .bg-orb { display: none !important; }            /* blurred glow blobs */
 ::selection { background: rgba(245, 197, 66, 0.35); color: #fff; }
 
-/* One focus style everywhere: the yellow selection outline. */
-:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+/* One focus style for things you press: the yellow selection outline.
+   Text fields are left out on purpose: they show focus with the caret and
+   their own border (or their search wrapper's ring), and the extra yellow
+   box on top of that looked like a glitch. */
+:where(button, a, select, [tabindex]:not(input):not(textarea),
+       input[type="checkbox"], input[type="radio"], input[type="range"]):focus-visible {
   outline: 2px solid var(--focus) !important;
   outline-offset: 2px;
+}
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea):is(:focus, :focus-visible) {
+  outline: none !important;
+}
+/* Bare text fields (no wrapper of their own) get a quiet border change. */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea):focus {
+  border-color: rgba(229, 72, 59, 0.65);
 }
 
 /* ── Logo ──────────────────────────────────────────────────────────────── */
@@ -340,8 +351,6 @@ dialog.howto::backdrop { background: rgba(8, 8, 11, 0.82) !important; }
   font-size: 0.74rem !important;
 }
 
-/* Text fields already show focus with their border; keep the outline tight. */
-input:focus-visible { outline-offset: 0 !important; }
 
 /* Pokémon suggestions: the one picked with the arrow keys. */
 .modal-suggestion-btn.active { border-color: var(--focus) !important; background: var(--card-hover) !important; }

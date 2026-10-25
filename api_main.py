@@ -50,6 +50,15 @@ auth_api.attach(app, find_pokemon=lambda key: _find_pokemon(key))
 import ads_api
 ads_api.attach(app)
 
+# Site address. CANONICAL_HOST (e.g. "route81.app") tells the front end where
+# the site lives; visitors who land on the old *.up.railway.app address are
+# sent there by app.js, which carries their guest id across so a player
+# without an account keeps their Pokédex and Daily progress.
+@app.get("/site/config")
+def site_config():
+    host = os.environ.get("CANONICAL_HOST", "").strip().lower()
+    return {"canonical_host": host or None}
+
 N = 9
 
 class ValidatePickRequest(BaseModel):

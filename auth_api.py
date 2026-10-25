@@ -40,7 +40,7 @@ Settings (environment variables)
   GOOGLE_CLIENT_ID   OAuth "Web application" client id (not a secret).
                      Without it the Google button is hidden.
   RESEND_API_KEY     Resend.com API key, for password-reset emails.
-  MAIL_FROM          Sender, e.g. "Route 81 <hello@yourdomain>"
+  MAIL_FROM          Sender, e.g. "Route 81 <hello@route81.app>"
                      (the domain must be verified in Resend).
                      Without these two, "Forgot password?" is hidden.
 """

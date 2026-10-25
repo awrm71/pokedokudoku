@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://route81.app/sitemap.xml
