@@ -1,0 +1,84 @@
+/* pages.css — the plain reading pages (How to play, About, Terms, Privacy).
+   Same palette and fonts as the game, set for comfortable reading. */
+:root { color-scheme: dark; }
+body {
+  margin: 0;
+  background: #121117;
+  color: #ece6dc;
+  font: 16px/1.65 "IBM Plex Mono", ui-monospace, monospace;
+}
+main { max-width: 720px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding-bottom: 1.1rem;
+  margin-bottom: 1.8rem;
+  border-bottom: 1px solid #2a2832;
+  font-size: 0.85rem;
+}
+.page-nav .home {
+  margin-right: auto;
+  font-family: "Pixelify Sans", "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: #ece6dc;
+  text-decoration: none;
+}
+.page-nav a { color: #a7a1ae; }
+.page-nav a[aria-current="page"] { color: #ece6dc; text-decoration: none; }
+
+h1 { font-size: 1.6rem; color: #fff; margin: 0 0 0.3rem; line-height: 1.25; }
+h2 {
+  font-size: 1.05rem;
+  color: #ece6dc;
+  margin: 2.2rem 0 0.5rem;
+  padding-left: 0.6rem;
+  border-left: 3px solid #e5483b;
+}
+h3 { font-size: 0.95rem; color: #ece6dc; margin: 1.4rem 0 0.3rem; }
+p, li, dd { color: #c9c3cf; }
+a { color: #f5c542; }
+.muted { color: #8a8492; font-size: 0.85rem; }
+.lede { font-size: 1.02rem; color: #ddd7cf; }
+
+/* Category glossary */
+dl.cats { margin: 0.6rem 0 0; }
+dl.cats dt { color: #ece6dc; font-weight: 600; margin-top: 0.8rem; }
+dl.cats dd { margin: 0.1rem 0 0; }
+ul.chips {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+ul.chips li {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid #3a3745;
+  border-radius: 6px;
+  background: #1b1a21;
+  font-size: 0.82rem;
+  color: #ddd7cf;
+}
+table.regions { border-collapse: collapse; margin-top: 0.6rem; width: 100%; font-size: 0.9rem; }
+table.regions th, table.regions td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid #2a2832; }
+table.regions th { color: #a7a1ae; font-weight: 500; }
+table.regions td { color: #c9c3cf; }
+
+.cta {
+  display: inline-block;
+  margin-top: 2rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  background: #e5483b;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  box-shadow: 0 4px 0 #0b0a0e;
+}
+.page-foot { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #2a2832; font-size: 0.8rem; color: #77727f; }
+.page-foot a { color: #a7a1ae; }

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://route81.app/</loc><changefreq>daily</changefreq></url>
+  <url><loc>https://route81.app/how-to-play.html</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://route81.app/about.html</loc><changefreq>monthly</changefreq></url>
   <url><loc>https://route81.app/privacy.html</loc><changefreq>monthly</changefreq></url>
+  <url><loc>https://route81.app/terms.html</loc><changefreq>monthly</changefreq></url>
 </urlset>
