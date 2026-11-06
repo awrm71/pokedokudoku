@@ -38,6 +38,20 @@ app.add_middleware(
 # entries of JSON); a big speed-up on a hosted server, free locally.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Page, script and style files must never be served stale after a deploy.
+# Without a Cache-Control header Cloudflare caches them for 4 hours, so the
+# site kept running old JavaScript. "no-cache" lets browsers and Cloudflare
+# keep a copy but check with us (ETag) before using it.
+@app.middleware("http")
+async def _revalidate_frontend(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if request.method in ("GET", "HEAD") and "cache-control" not in response.headers and (
+        path == "/" or path.endswith((".html", ".js", ".css", ".webmanifest", ".xml", ".txt"))
+    ):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 # Accounts: Sign in with Google + sessions. Its middleware swaps a signed-in
 # player's browser id for their account id on every request (see auth_api.py).
 import auth_api
