@@ -33,7 +33,11 @@
    starts "denied" for visitors in the EEA, UK and Switzerland, so nothing
    is stored until they accept in Google's consent message (the AdSense
    Privacy & messaging CMP updates it). Everyone else is counted normally.
-   Game events: board_won, board_lost, reverse_solved, reverse_lost,
+   Microsoft Clarity loads when CLARITY_PROJECT_ID is set; it is told
+   about consent from Google's consent message (TCF), and records without
+   cookies until then for visitors who need to consent.
+   SUPPORT_URL adds a "Support Route 81" link (footer + win banner).
+   Game events: support_click, board_won, board_lost, reverse_solved, reverse_lost,
    new_board, revive_offered, revive_watched, revive_declined.
 
    Demo mode (ADS_DEMO=1): grey "Ad" boxes and a 5-second stand-in ad, so the
@@ -73,6 +77,8 @@
   async function init() {
     await getConfig();
     if (S.cfg && S.cfg.ga) { loadAnalytics(S.cfg.ga); watchOutcomes(); }
+    if (S.cfg && S.cfg.clarity) loadClarity(S.cfg.clarity);
+    if (S.cfg && S.cfg.support) addSupport(S.cfg.support);
     if (!S.cfg || !S.cfg.enabled) return;
     if (!S.cfg.demo) loadScript();
     placeInline();
@@ -125,6 +131,60 @@
     sc.async = true;
     sc.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`;
     document.head.appendChild(sc);
+  }
+
+  // Microsoft Clarity. Consent comes from Google's CMP through the IAB TCF
+  // API: no GDPR → granted; GDPR → granted only with purpose 1 (storage).
+  function loadClarity(id) {
+    (function (c, l, a, r, i, t, y) {
+      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+      t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+      y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+    })(window, document, "clarity", "script", id);
+    const send = (ok) => window.clarity("consentv2", {
+      analytics_Storage: ok ? "granted" : "denied",
+      ad_Storage: "denied",
+    });
+    let tries = 0;
+    const hook = () => {
+      if (typeof window.__tcfapi !== "function") {
+        if (++tries < 40) setTimeout(hook, 250);      // the CMP loads with Google's ad script
+        return;
+      }
+      window.__tcfapi("addEventListener", 2, (d, ok) => {
+        if (!ok || !d) return;
+        if (d.gdprApplies === false) { send(true); return; }
+        if (d.eventStatus === "useractioncomplete" || d.eventStatus === "tcloaded") {
+          send(!!(d.purpose && d.purpose.consents && d.purpose.consents[1]));
+        }
+      });
+    };
+    hook();
+  }
+
+  // "Support Route 81": footer link, plus a small line on the win banner.
+  function addSupport(url) {
+    const link = (text, cls) => {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.className = cls;
+      a.textContent = text;
+      a.addEventListener("click", () => track("support_click", { where: cls }));
+      return a;
+    };
+    const links = document.querySelector(".site-foot span");
+    if (links && !links.querySelector(".support-foot")) {
+      links.append(" · ", link("Support Route 81", "support-foot"));
+    }
+    const win = document.querySelector("#winBanner .hud-alert-text");
+    if (win && !win.querySelector(".support-win")) {
+      const line = document.createElement("span");
+      line.className = "support-line";
+      line.append("Enjoying Route 81? ", link("Buy me a coffee", "support-win"));
+      win.appendChild(line);
+    }
   }
 
   function track(name, params) {

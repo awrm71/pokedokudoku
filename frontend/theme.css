@@ -354,3 +354,7 @@ dialog.howto::backdrop { background: rgba(8, 8, 11, 0.82) !important; }
 
 /* Pokémon suggestions: the one picked with the arrow keys. */
 .modal-suggestion-btn.active { border-color: var(--focus) !important; background: var(--card-hover) !important; }
+
+/* Support link on the win banner (SUPPORT_URL) */
+.support-line { display: block; margin-top: 0.3rem; font-size: 0.78rem; color: var(--ink-soft); }
+.support-line a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

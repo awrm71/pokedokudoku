@@ -21,6 +21,13 @@ ads until you add them in Railway:
                        Use while checking the layout; turn off when live.
   GA_MEASUREMENT_ID    optional Google Analytics 4 id, "G-XXXXXXX". Counts
                        visits so you can see traffic next to ad earnings.
+  CLARITY_PROJECT_ID   optional Microsoft Clarity project id (heatmaps and
+                       session replays). Visitors in the EEA, UK and
+                       Switzerland are recorded without cookies unless they
+                       consent in Google's consent message.
+  SUPPORT_URL          optional donation page (Ko-fi, Buy Me a Coffee...).
+                       Adds a "Support Route 81" link to the footer and the
+                       win banner.
   ADS_DEMO=1           no Google at all: grey placeholder boxes and a fake
                        5-second "ad" for the revive, so you can see the whole
                        flow before AdSense approves the site.
@@ -46,6 +53,8 @@ REVIVE_LIVES = 1
 
 _PUB_RE = re.compile(r"^ca-pub-\d{10,20}$")
 _GA_RE = re.compile(r"^G-[A-Z0-9]{4,20}$")
+_CLARITY_RE = re.compile(r"^[a-z0-9]{6,20}$")
+_URL_RE = re.compile(r"^https://[A-Za-z0-9.-]+\.[A-Za-z]{2,}(/[A-Za-z0-9._~/-]*)?$")
 
 
 def _flag(name: str) -> bool:
@@ -74,8 +83,12 @@ def config() -> dict:
     client = adsense_client()
     on = bool(client) or demo()
     ga = os.environ.get("GA_MEASUREMENT_ID", "").strip()
+    clarity = os.environ.get("CLARITY_PROJECT_ID", "").strip()
+    support = os.environ.get("SUPPORT_URL", "").strip()
     return {
         "ga": ga if _GA_RE.match(ga) else None,
+        "clarity": clarity if _CLARITY_RE.match(clarity) else None,
+        "support": support if _URL_RE.match(support) else None,
         "enabled": on,
         "demo": demo(),
         "client": client or None,
