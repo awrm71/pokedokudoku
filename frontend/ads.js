@@ -29,7 +29,12 @@
      (adViewed), and the server allows one revive per board per day.
      No ad available (or an ad blocker) means the board simply ends.
 
-   Google Analytics loads too when GA_MEASUREMENT_ID is set.
+   Google Analytics loads too when GA_MEASUREMENT_ID is set. Consent Mode
+   starts "denied" for visitors in the EEA, UK and Switzerland, so nothing
+   is stored until they accept in Google's consent message (the AdSense
+   Privacy & messaging CMP updates it). Everyone else is counted normally.
+   Game events: board_won, board_lost, reverse_solved, reverse_lost,
+   new_board, revive_offered, revive_watched, revive_declined.
 
    Demo mode (ADS_DEMO=1): grey "Ad" boxes and a 5-second stand-in ad, so the
    layout and the revive flow can be checked before AdSense approval.
@@ -67,7 +72,7 @@
 
   async function init() {
     await getConfig();
-    if (S.cfg && S.cfg.ga) loadAnalytics(S.cfg.ga);
+    if (S.cfg && S.cfg.ga) { loadAnalytics(S.cfg.ga); watchOutcomes(); }
     if (!S.cfg || !S.cfg.enabled) return;
     if (!S.cfg.demo) loadScript();
     placeInline();
@@ -100,16 +105,61 @@
     return S.loaded;
   }
 
-  // Optional Google Analytics 4 (GA_MEASUREMENT_ID): page views only.
+  // Optional Google Analytics 4 (GA_MEASUREMENT_ID).
+  const CONSENT_REGIONS = [
+    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU",
+    "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES",
+    "SE", "IS", "LI", "NO", "GB", "CH",
+  ];
   function loadAnalytics(id) {
     window.dataLayer = window.dataLayer || [];
     window.gtag = function () { window.dataLayer.push(arguments); };
+    const denied = { ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "denied" };
+    window.gtag("consent", "default", { ...denied, region: CONSENT_REGIONS, wait_for_update: 500 });
+    window.gtag("consent", "default", {
+      ad_storage: "granted", ad_user_data: "granted", ad_personalization: "granted", analytics_storage: "granted",
+    });
     window.gtag("js", new Date());
     window.gtag("config", id);
     const sc = document.createElement("script");
     sc.async = true;
     sc.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}`;
     document.head.appendChild(sc);
+  }
+
+  function track(name, params) {
+    if (typeof window.gtag === "function") window.gtag("event", name, params || {});
+  }
+
+  function boardKind() {
+    const b = typeof state !== "undefined" && state.board;
+    return b && b.is_daily ? "daily" : "shuffle";
+  }
+
+  // One event each time an end-of-board banner appears.
+  function watchOutcomes() {
+    const seen = {};
+    const check = () => {
+      const g = document.getElementById("gameOverBanner");
+      const w = document.getElementById("winBanner");
+      const r = document.getElementById("revBanner");
+      const now = {
+        board_lost: !!(g && !g.hidden && g.classList.contains("visible")),
+        board_won: !!(w && !w.hidden && w.classList.contains("visible")),
+        reverse_lost: !!(r && !r.hidden && r.classList.contains("hud-alert-dead")),
+        reverse_solved: !!(r && !r.hidden && r.classList.contains("hud-alert-win")),
+      };
+      Object.keys(now).forEach((k) => {
+        if (now[k] && !seen[k]) track(k, k.startsWith("board") ? { board: boardKind() } : {});
+        seen[k] = now[k];
+      });
+    };
+    const obs = new MutationObserver(check);
+    ["gameOverBanner", "winBanner", "revBanner"].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) obs.observe(b, { attributes: true, attributeFilter: ["class", "hidden"] });
+    });
+    check();
   }
 
   // ── Display slots ──────────────────────────────────────────────────────────
@@ -232,6 +282,7 @@
   // ── Between boards ─────────────────────────────────────────────────────────
   // Fire and forget: the new board loads underneath whether or not an ad shows.
   function boardBreak() {
+    track("new_board");
     if (!S.cfg || !S.cfg.interstitial || !S.boardDone) return;
     if (Date.now() - (S.lastBreak || 0) < BREAK_GAP_MS) return;
     S.boardDone = false;
@@ -310,8 +361,9 @@
     if (!S.cfg || !S.cfg.rewarded) { onEnd(); return; }
     if (sheet) return;                              // already showing
     close();
+    track("revive_offered");
     let finished = false;
-    const end = () => { if (finished) return; finished = true; close(); onEnd(); };
+    const end = () => { if (finished) return; finished = true; close(); track("revive_declined"); onEnd(); };
 
     sheet = document.createElement("div");
     sheet.className = "revive";
@@ -367,6 +419,7 @@
 
     async function grant() {
       finished = true;
+      track("revive_watched");
       text.textContent = "Adding a life…";
       try {
         await onRevive();
@@ -386,6 +439,7 @@
   window.PDD_ADS = {
     offerRevive,
     boardBreak,
+    track,
     get reviveOn() { return !!(S.cfg && S.cfg.rewarded); },
   };
 
