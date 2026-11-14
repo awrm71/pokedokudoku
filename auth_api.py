@@ -50,7 +50,6 @@ from __future__ import annotations
 import os
 import time
 from collections import defaultdict, deque
-from http.cookies import SimpleCookie
 from typing import Callable, Optional
 
 from fastapi import HTTPException, Request, Response
@@ -88,13 +87,13 @@ class SessionMiddleware:
         client_id = None
         for k, v in headers:
             if k == b"cookie":
-                try:
-                    c = SimpleCookie()
-                    c.load(v.decode("latin-1"))
-                    if COOKIE in c:
-                        token = c[COOKIE].value
-                except Exception:
-                    pass
+                # Read our cookie by hand: SimpleCookie gives up on the whole
+                # header at the first value it doesn't like (Google's g_state
+                # cookie holds raw JSON), which silently signed people out.
+                for part in v.decode("latin-1").split(";"):
+                    name, sep, value = part.strip().partition("=")
+                    if sep and name == COOKIE and value:
+                        token = value.strip('"')
             elif k == b"x-client-id":
                 client_id = v.decode("latin-1")
 
