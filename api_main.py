@@ -627,6 +627,18 @@ reverse_api.attach(app, reverse_api._Ctx(
     pokedex_store_mod=pokedex_store,
 ))
 
+# The 3×3×3 Cube and the Reverse Cube (cube_engine.py / cube_api.py).
+# Correct Cube answers roll a shiny sighting with Draft-board odds (charms
+# count, no streak); nothing is written to the Pokédex yet.
+import cube_api
+cube_api.attach(app, cube_api.Ctx(
+    df_play=df_play, rules=rules, rule_masks=rule_masks,
+    executor=_board_executor,
+    compact_rule_label=compact_rule_label,
+    roll_shiny_for=lambda cid: roll_shiny(shiny_rolls_for(
+        len(pokedex_store.get_prestige(cid)) if cid else 0, 0)),
+))
+
 @app.get("/sprite/shiny/{pokemon_id}.png")
 def get_shiny_sprite(pokemon_id: int):
     """Shiny version of /sprite/{id}.png: local file if the sprites repo has

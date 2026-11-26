@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08030f" />
+    <title>Cube · Route 81</title>
+    <meta name="description" content="Route 81 Cube: a 3×3×3 Pokémon logic puzzle. 27 squares, each needs a Pokémon that fits its column, its row and its layer. New Cube every day." />
+    <meta property="og:site_name" content="Route 81" />
+    <meta property="og:title" content="Cube · Route 81" />
+    <meta property="og:description" content="27 squares, three rules each. New Cube every day." />
+    <meta property="og:image" content="https://route81.app/brand/og-image.png" />
+    <link rel="canonical" href="https://route81.app/cube.html" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Pixelify+Sans:wght@600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./brand-art.css" />
+    <link rel="stylesheet" href="./type-icons.css" />
+    <link rel="stylesheet" href="./shell.css" />
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./motion.css" />
+    <link rel="stylesheet" href="./cube-tab.css" />
+    <link rel="stylesheet" href="./cube.css" />
+  </head>
+  <body class="cube-page">
+    <main class="app-shell">
+      <header class="app-header topbar">
+        <div class="brand">
+          <div>
+            <a href="./" class="route-sign-link" aria-label="Route 81 home">
+              <h1 class="route-sign" aria-label="Route 81">
+                <span class="rs-grass rs-back" aria-hidden="true"></span>
+                <span class="rs-plate" aria-hidden="true"><span class="rs-sky"></span></span>
+                <span class="rs-name" aria-hidden="true">Route 81</span>
+                <span class="rs-grass rs-front" aria-hidden="true"></span>
+              </h1>
+            </a>
+            <span class="brand-tag">Daily Pokémon logic grids</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" id="cubeHowBtn" class="icon-btn" aria-label="How the Cube works">
+            <span class="icon-btn-q" aria-hidden="true">?</span><span class="icon-btn-label">How to play</span>
+          </button>
+        </div>
+      </header>
+
+      <nav class="mode-tabs" aria-label="Game mode">
+        <a class="mode-tab" data-mode="daily" href="./">
+          <span class="mt-icon" aria-hidden="true"></span>
+          <span class="mt-text"><span class="mt-name">Daily</span><span class="mt-sub">New grid every day</span></span>
+        </a>
+        <a class="mode-tab" data-mode="draft" href="./#draft">
+          <span class="mt-icon" aria-hidden="true"></span>
+          <span class="mt-text"><span class="mt-name">Draft</span><span class="mt-sub">Build your own board</span></span>
+        </a>
+        <a class="mode-tab" data-mode="reverse" href="./#reverse">
+          <span class="mt-icon" aria-hidden="true"></span>
+          <span class="mt-text"><span class="mt-name">Reverse</span><span class="mt-sub">Guess the hidden rules</span></span>
+        </a>
+        <a class="mode-tab active" data-mode="cube" href="./cube.html" aria-current="page">
+          <span class="mt-icon" aria-hidden="true"></span>
+          <span class="mt-text"><span class="mt-name">Cube</span><span class="mt-sub">Three rules per square</span></span>
+        </a>
+      </nav>
+
+      <!-- Console: which Cube, and its lives / progress / hints -->
+      <section class="console cube-console" aria-label="Cube controls">
+        <div class="cc-bar">
+          <div class="cc-switch" role="radiogroup" aria-label="Cube type">
+            <button type="button" role="radio" data-kind="fill" aria-checked="true">Fill</button>
+            <button type="button" role="radio" data-kind="reverse" aria-checked="false">Reverse</button>
+          </div>
+          <div class="cc-switch" role="radiogroup" aria-label="Which Cube">
+            <button type="button" role="radio" data-which="daily" aria-checked="true">Today</button>
+            <button type="button" role="radio" data-which="practice" aria-checked="false">Practice</button>
+          </div>
+          <button type="button" class="ctx-btn" id="ccNew" hidden>New Cube</button>
+          <span class="cc-chip" id="ccChip"></span>
+        </div>
+        <div class="cc-hud" role="status" aria-label="Cube status">
+          <span class="cc-lives" id="ccLives" aria-label="Lives"></span>
+          <span class="cc-progress">
+            <span class="cc-score" id="ccScore">0 / 27</span>
+            <span class="cc-bar-track"><span class="cc-bar-fill" id="ccFill"></span></span>
+          </span>
+          <span class="cc-hints" id="ccHints" aria-label="Hints"></span>
+        </div>
+      </section>
+
+      <div class="cc-banner" id="ccBanner" role="alert" hidden>
+        <span class="cc-banner-text"></span>
+        <button type="button" class="ctx-btn" id="ccBannerBtn"></button>
+      </div>
+
+      <section class="cube-stage" aria-label="Cube">
+        <!-- 3D view: the three layers stacked. Drag to turn it. -->
+        <div class="cv" id="cv">
+          <div class="cv-scene" id="cvScene" aria-hidden="true">
+            <div class="cv-stack" id="cvStack"></div>
+          </div>
+          <div class="cv-tools">
+            <button type="button" class="cv-turn" data-turn="-45" aria-label="Turn the Cube left">⟲</button>
+            <span class="cv-note">Drag to turn it. Tap a layer to open it.</span>
+            <button type="button" class="cv-turn" data-turn="45" aria-label="Turn the Cube right">⟳</button>
+          </div>
+        </div>
+
+        <!-- Flat view: the open layer, where you play -->
+        <div class="lv" id="lv">
+          <div class="lv-tabs" id="lvTabs" role="tablist" aria-label="Layers"></div>
+          <div class="lv-grid" id="lvGrid" role="grid" aria-label="Open layer"></div>
+          <p class="lv-help" id="lvHelp"></p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Fill: pick a Pokémon for one square -->
+    <dialog class="cm" id="cmPick" aria-labelledby="cmPickTitle">
+      <form method="dialog" class="cm-card" id="cmPickForm">
+        <header class="cm-head">
+          <h2 id="cmPickTitle">Fits all three</h2>
+          <button type="button" class="cm-x" data-close aria-label="Close">✕</button>
+        </header>
+        <div class="cm-rules" id="cmRules"></div>
+        <label class="cm-field">
+          <span class="sr-only">Pokémon name</span>
+          <input type="text" id="cmInput" autocomplete="off" spellcheck="false" placeholder="Type a Pokémon" enterkeyhint="go" />
+        </label>
+        <ul class="cm-suggest" id="cmSuggest" role="listbox" aria-label="Matching Pokémon"></ul>
+        <p class="cm-status" id="cmStatus" role="status"></p>
+        <footer class="cm-foot">
+          <span class="cc-lives" id="cmLives" aria-label="Lives"></span>
+          <button type="button" class="ctx-btn cm-hint" id="cmHint">Use a hint</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- Reverse: name the rule one slice shares -->
+    <dialog class="cm cm-wide" id="cmGuess" aria-labelledby="cmGuessTitle">
+      <form method="dialog" class="cm-card">
+        <header class="cm-head">
+          <h2 id="cmGuessTitle">What do these nine share?</h2>
+          <button type="button" class="cm-x" data-close aria-label="Close">✕</button>
+        </header>
+        <div class="cg-slice" id="cgSlice" aria-label="The nine Pokémon in this slice"></div>
+        <label class="cm-field">
+          <span class="sr-only">Search categories</span>
+          <input type="text" id="cgSearch" autocomplete="off" spellcheck="false" placeholder="Search categories" />
+        </label>
+        <div class="cg-groups" id="cgGroups" role="tablist" aria-label="Category groups"></div>
+        <div class="cg-list" id="cgList" role="listbox" aria-label="Categories"></div>
+        <p class="cm-status" id="cgStatus" role="status"></p>
+        <footer class="cm-foot">
+          <span class="cc-lives" id="cgLives" aria-label="Lives"></span>
+          <button type="button" class="ctx-btn" id="cgHint">Reveal this one</button>
+          <button type="button" class="ctx-btn cm-go" id="cgGo" disabled>Guess</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- How the Cube works -->
+    <dialog class="cm" id="cmHow" aria-labelledby="cmHowTitle">
+      <div class="cm-card">
+        <header class="cm-head">
+          <h2 id="cmHowTitle">How the Cube works</h2>
+          <button type="button" class="cm-x" data-close aria-label="Close">✕</button>
+        </header>
+        <div class="how-body">
+          <p>The Cube is three boards stacked on top of each other. Every square sits under a column rule, beside a row rule, and on a layer with its own rule. The Pokémon you put there has to fit all three.</p>
+          <p>Open a layer with the tabs, by tapping it in the 3D view, or by swiping across the board. Each Pokémon can only be used once in the whole Cube.</p>
+          <p><strong>Reverse</strong> flips it: all 27 Pokémon are shown and the nine rules are hidden. Tap a column, row or layer name to guess what its nine Pokémon have in common.</p>
+          <p>You get 3 lives. Today's Cube is the same for everyone and resets at midnight. Practice Cubes are endless.</p>
+        </div>
+        <footer class="cm-foot"><button type="button" class="ctx-btn cm-go" data-close>Play</button></footer>
+      </div>
+    </dialog>
+
+    <div class="cc-toasts" id="ccToasts" aria-live="polite"></div>
+
+    <footer class="site-foot">
+      <span><a href="./how-to-play.html">How to play</a> · <a href="./about.html">About</a> · <a href="./privacy.html">Privacy</a> · <a href="./terms.html">Terms</a></span>
+      <span>A fan-made game. Not affiliated with Nintendo, Game Freak or The Pokémon Company.</span>
+      <span>Sprites: Pokémon Black/White and the <a href="https://www.smogon.com/forums/threads/x-y-sprite-project.3486712/" rel="noopener" target="_blank">Smogon sprite projects</a>, via <a href="https://github.com/PokeAPI/sprites" rel="noopener" target="_blank">PokeAPI</a>.</span>
+    </footer>
+
+    <script src="./motion.js"></script>
+    <script src="./cube.js"></script>
+  </body>
+</html>

@@ -111,7 +111,8 @@
   // ══════════════════════════════════════════════════════════════════════════
   // Mode tabs
   // ══════════════════════════════════════════════════════════════════════════
-  const tabs = Array.from(document.querySelectorAll(".mode-tab"));
+  // Tabs that are links (the Cube has its own page) aren't switched here.
+  const tabs = Array.from(document.querySelectorAll(".mode-tab:not([href])"));
   const panels = Array.from(document.querySelectorAll(".ctx-panel"));
 
   function setMode(mode) {
@@ -138,6 +139,18 @@
   window.PDD_SETMODE = setMode;
   tabs.forEach((t) => t.classList.toggle("active", t.dataset.mode === "daily"));
   panels.forEach((p) => p.classList.toggle("hidden", p.dataset.ctx !== "daily"));
+  // The Cube page links back to a mode as /#draft or /#reverse.
+  {
+    const want = (location.hash || "").slice(1);
+    if (want === "draft" || want === "reverse") {
+      // After every script's own DOMContentLoaded setup (Reverse.js inits there).
+      window.addEventListener("load", () => setMode(want), { once: true });
+    }
+  }
+  window.addEventListener("hashchange", () => {
+    const want = (location.hash || "").slice(1);
+    if (want === "draft" || want === "reverse" || want === "daily") setMode(want);
+  });
 
   // "Configure board" in the Draft context bar: back to the builder, keeping
   // the current draft resumable.
