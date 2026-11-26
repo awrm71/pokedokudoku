@@ -35,7 +35,7 @@
     fairy: ["#E85FAA", "#fff"], poison: ["#8B2BAE", "#fff"], ghost: ["#5B3E7A", "#fff"],
     dragon: ["#3425C8", "#fff"], dark: ["#2E2B3A", "#eee"], steel: ["#6A8FAD", "#fff"],
   };
-  const FACE_NAMES = ["Red face", "Orange face", "Yellow face", "White face", "Green face", "Blue face"];
+  const FACE_NAMES = ["Face 1", "Face 2", "Face 3", "Face 4", "Face 5", "Face 6"];
 
   const $ = (id) => document.getElementById(id);
   const ck = (f, i, j) => `${f},${i},${j}`;
@@ -284,7 +284,16 @@
   const stEls = new Map();    // "f,i,j" -> button
   const faceEls = [];
 
+  // One square's size, from the width the cube has to work with: the cube
+  // plus the row labels to its left have to fit.
+  function fitSize() {
+    const w = $("rkScene").clientWidth || 600;
+    const t = Math.max(46, Math.min(96, Math.floor(w / (w < 520 ? 6 : 5.2))));
+    document.body.style.setProperty("--t", `${t}px`);
+  }
+
   function buildCube() {
+    fitSize();
     const cube = $("rkCube");
     cube.textContent = "";
     stEls.clear();
@@ -297,6 +306,7 @@
       const face = document.createElement("div");
       face.className = `rk-face fc${f}`;
       face.dataset.f = f;
+      face.style.setProperty("--rot", `${faceRot[f]}deg`);
       face.style.transform = `matrix3d(${u[0]},${u[1]},${u[2]},0,${v[0]},${v[1]},${v[2]},0,${n[0]},${n[1]},${n[2]},0,${n[0] * h},${n[1] * h},${n[2] * h},1)`;
       for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
         const [i, j] = gridToCell(f, r, c);
@@ -325,15 +335,23 @@
         b.dataset.k = key;
         b.textContent = "";
         b.className = "st";
+        // Everything on a square sits in one inner frame, turned so it's
+        // upright however the cube is turned (see uprightFaces).
+        const inner = document.createElement("span");
+        inner.className = "st-in";
+        b.appendChild(inner);
         if (o && o.mon) {
-          b.appendChild(spriteImg(o.mon, o.shiny, !o.answer));
+          const pic = document.createElement("span");
+          pic.className = "st-pic";
+          pic.appendChild(spriteImg(o.mon, o.shiny, !o.answer));
+          inner.appendChild(pic);
           b.classList.add(o.answer ? "answer" : "filled");
           if (o.hinted) b.classList.add("hinted");
           if (o.shiny) b.classList.add("shiny");
           if (o.answer) {
-            const c = document.createElement("span"); c.className = "st-count"; c.textContent = `${o.count} fit`; b.appendChild(c);
+            const c = document.createElement("span"); c.className = "st-count"; c.textContent = `${o.count} fit`; inner.appendChild(c);
           } else if (o.pct != null) {
-            const c = document.createElement("span"); c.className = "st-pct"; c.textContent = `${Math.round(o.pct)}%`; b.appendChild(c);
+            const c = document.createElement("span"); c.className = "st-pct"; c.textContent = `${Math.round(o.pct)}%`; inner.appendChild(c);
           }
         }
       }
@@ -369,6 +387,31 @@
 
   function applyQ() {
     $("rkCube").style.transform = css(S.Q);
+    uprightFaces();
+  }
+
+  // Keep every face's Pokémon standing up on screen. Each face can show its
+  // squares four ways (0/90/180/270°); pick the one whose "up" points most
+  // up the screen right now. A little stickiness stops it flickering while
+  // a face is edge-on during a drag.
+  const faceRot = [0, 0, 0, 0, 0, 0];
+  function uprightFaces() {
+    for (let f = 0; f < 6; f++) {
+      const [u, v] = FACE_UV[f];
+      const neg = (a) => a.map((x) => -x);
+      const options = [[neg(v), 0], [u, 90], [v, 180], [neg(u), 270]];
+      let best = faceRot[f];
+      let bestY = Infinity, curY = Infinity;
+      for (const [dir, deg] of options) {
+        const y = app(S.Q, dir)[1];
+        if (deg === faceRot[f]) curY = y;
+        if (y < bestY) { bestY = y; best = deg; }
+      }
+      if (best !== faceRot[f] && bestY < curY - 0.12) {
+        faceRot[f] = best;
+        faceEls[f]?.style.setProperty("--rot", `${best}deg`);
+      }
+    }
   }
 
   // ── Labels for the face toward you ───────────────────────────────────────
@@ -416,6 +459,19 @@
       wireLabel(el, line, `Column ${k + 1}`);
       box.appendChild(el);
     });
+    // Small captions so the labels read as "these are rows / columns".
+    const capRow = document.createElement("span");
+    capRow.className = "rk-cap-lab row";
+    capRow.textContent = "Rows";
+    let [cx, cy] = place([-1.6, -1.72, 1.5]);
+    capRow.style.left = `${cx}px`; capRow.style.top = `${cy}px`;
+    box.appendChild(capRow);
+    const capCol = document.createElement("span");
+    capCol.className = "rk-cap-lab col";
+    capCol.textContent = "Columns";
+    [cx, cy] = place([-1.6, 1.62, 1.5]);
+    capCol.style.left = `${cx}px`; capCol.style.top = `${cy}px`;
+    box.appendChild(capCol);
     rows.forEach((line, k) => {
       const el = document.createElement(reverse ? "button" : "div");
       el.className = "rk-lab row" + (lit.has(line) ? " hl" : "");
@@ -440,13 +496,11 @@
     const f = frontFace();
     const box = $("rkTitle");
     box.textContent = "";
-    box.className = `rk-title fc${f}`;
-    const sw = document.createElement("span");
-    sw.className = "swatch";
-    box.appendChild(sw);
-    const name = document.createElement("span");
-    name.textContent = FACE_NAMES[f];
-    box.appendChild(name);
+    box.className = "rk-title";
+    const cap = document.createElement("span");
+    cap.className = "rk-cap";
+    cap.textContent = `${FACE_NAMES[f]} of 6. Every square on this face:`;
+    box.appendChild(cap);
     if (S.kind === "reverse") {
       const b = document.createElement("button");
       b.type = "button";
@@ -456,7 +510,9 @@
       b.addEventListener("click", () => openGuess(f));
       box.appendChild(b);
     } else if (S.board) {
-      box.appendChild(badge(faceRule(f)));
+      const big = badge(faceRule(f));
+      big.classList.add("rb-big");
+      box.appendChild(big);
     }
   }
 
@@ -468,9 +524,9 @@
       const li = document.createElement("li");
       const b = document.createElement("button");
       b.type = "button";
-      b.className = `fl-item fc${f}`;
+      b.className = "fl-item";
       b.setAttribute("aria-current", String(f === front));
-      const sw = document.createElement("span"); sw.className = "fl-sw";
+      const sw = document.createElement("span"); sw.className = "fl-sw"; sw.textContent = String(f + 1);
       const text = document.createElement("span"); text.className = "fl-text";
       const nm = document.createElement("span"); nm.className = "fl-name"; nm.textContent = FACE_NAMES[f];
       text.append(nm, lineBadge(f));
@@ -726,7 +782,7 @@
     const [fr, r1, r2] = rulesAt(f, i, j);
     const firstIsCol = cols.includes(lineOf(b, i));
     const boxes = [
-      { label: FACE_NAMES[f], rule: fr, face: true },
+      { label: `Whole face (${FACE_NAMES[f]})`, rule: fr, face: true },
       { label: "Column", rule: firstIsCol ? r1 : r2 },
       { label: "Row", rule: firstIsCol ? r2 : r1 },
     ];
@@ -735,7 +791,7 @@
     box.textContent = "";
     for (const x of boxes) {
       const el = document.createElement("div");
-      el.className = "cm-rule" + (x.face ? ` face fc${f}` : "");
+      el.className = "cm-rule" + (x.face ? " face" : "");
       const ax = document.createElement("span"); ax.className = "cm-rule-axis"; ax.textContent = x.label;
       el.append(ax, badge(x.rule));
       box.appendChild(el);
@@ -877,7 +933,7 @@
     }
     S.guess = { line, rule: null };
     let title;
-    if (line < 6) title = `What do all nine on the ${FACE_NAMES[line].toLowerCase()} share?`;
+    if (line < 6) title = `What do all nine on ${FACE_NAMES[line]} share?`;
     else {
       const { cols } = frontLines();
       title = `What do all twelve in this ${cols.includes(line) ? "column" : "row"} ring share?`;
@@ -888,7 +944,6 @@
     for (const [f, i, j] of cellsOf(line)) {
       const o = occupant(f, i, j);
       const fig = document.createElement("figure");
-      fig.className = `fc${f}`;
       const cap = document.createElement("figcaption");
       cap.textContent = o.mon.display_name;
       fig.append(spriteImg(o.mon, false, true), cap);
