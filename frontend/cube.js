@@ -255,9 +255,9 @@
   }
   function revBadge(line) {
     const s = revSolved(line);
-    if (!s) { const el = document.createElement("span"); el.className = "rb rb-hidden"; el.textContent = "Name it"; return el; }
+    if (!s) return window.R81_CAT.hidden(line < 6 ? "Face rule" : "Ring rule");
     const el = badge({ id: s.rule_id, label: s.label });
-    if (s.revealed) el.classList.add("rb-revealed");
+    if (s.revealed) el.classList.add("rc-revealed");
     return el;
   }
   const lineBadge = (line) => {
@@ -275,7 +275,7 @@
   // plus the row labels to its left have to fit.
   function fitSize() {
     const w = $("rkScene").clientWidth || 600;
-    const t = Math.max(46, Math.min(96, Math.floor(w / (w < 520 ? 6 : 5.2))));
+    const t = Math.max(46, Math.min(96, Math.floor(w / (w < 520 ? 6.4 : 5.5))));
     document.body.style.setProperty("--t", `${t}px`);
   }
 

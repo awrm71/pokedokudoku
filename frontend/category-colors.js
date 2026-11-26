@@ -110,9 +110,9 @@
     fork: ["#...#...#", "#...#...#", ".#..#..#.", "..#.#.#..", "...###...", "....#....", "....#....", "....#....", "....#...."],
     crown: [".........", "#...#...#", "##.###.##", "#########", "#########", "#########", ".........", "#########", "........."],
     star: ["....#....", "....#....", "...###...", "#########", ".#######.", "..#####..", ".###.###.", ".##...##.", ".#.....#."],
-    stage1: [".........", ".........", ".........", ".........", ".........", ".........", "###......", "###......", "###......"],
-    stage2: [".........", ".........", ".........", "...###...", "...###...", "...###...", "######...", "######...", "######..."],
-    stage3: ["......###", "......###", "......###", "...######", "...######", "...######", "#########", "#########", "#########"],
+    stage1: [".........", ".........", "......##.", ".........", "...##.##.", ".........", "##.##.##.", "##.......", "##.##.##."],
+    stage2: [".........", ".........", "......##.", ".........", "...##.##.", "...##....", "##.##.##.", "##.##....", "##.##.##."],
+    stage3: [".........", "......##.", "......##.", "......##.", "...##.##.", "...##.##.", "##.##.##.", "##.##.##.", "##.##.##."],
     stop: [".........", ".........", ".........", "#########", "#########", "#########", ".........", ".........", "........."],
     egg: ["...###...", "..#####..", ".#######.", ".#######.", "#########", "#########", "#########", ".#######.", "..#####.."],
     one: [".........", "...###...", "..#####..", ".#######.", ".#######.", ".#######.", "..#####..", "...###...", "........."],
@@ -167,27 +167,72 @@
     return { color: "#7d8aa8", ink: "#ffffff", icon: null, typeIcon: null, outline: false, family: "other" };
   }
 
-  /** A rule badge element: icon + name, coloured by family. */
+  // Each rule reads as "kind" + "name": Region / Galar, Learns / Surf,
+  // Evolves by / Trade. The kind line tells a new player what sort of
+  // rule it is; the name is the part to remember.
+  const KIND_NAME = {
+    evo_start: ["Stage", "Base stage"], evo_middle: ["Stage", "Middle stage"], evo_final: ["Stage", "Final form"],
+    evo_none: ["Stage", "Doesn't evolve"], baby: ["Stage", "Baby"], evo_premature: ["Stage", "Baby"],
+    evolves_by_levelup: ["Evolves by", "Level up"], evolves_by_item: ["Evolves by", "Item"],
+    evolves_by_trade: ["Evolves by", "Trade"], evolves_by_friendship: ["Evolves by", "Friendship"],
+    branched: ["Evolution", "Branched"],
+    single_type: ["Typing", "Single type"], dual_type: ["Typing", "Dual type"],
+    legendary: ["Status", "Legendary"], mythical: ["Status", "Mythical"], ultra_beast: ["Status", "Ultra Beast"],
+    paradox: ["Status", "Paradox"], starter: ["Status", "Starter"], fossil: ["Status", "Fossil"],
+    mega: ["Form", "Mega Evolution"], gmax: ["Form", "Gigantamax"], regional_form: ["Form", "Regional form"],
+  };
+  function kindName(rule) {
+    const rid = String(rule.id || "");
+    const label = String(rule.label || "");
+    if (KIND_NAME[rid]) return KIND_NAME[rid];
+    if (rid.startsWith("type_")) return ["Type", label];
+    if (rid.startsWith("region_")) return ["Region", label];
+    if (rid.startsWith("move_")) return ["Learns", label.replace(/^Learns\s+/i, "")];
+    if (rid.startsWith("ability_")) return ["Ability", label.replace(/^Ability:\s*/i, "")];
+    return ["Rule", label];
+  }
+
+  /** A rule chip: a coloured icon tile, then the kind of rule and its name. */
   function badge(rule, extraClass) {
     const el = document.createElement("span");
-    el.className = "rb rb-cat" + (extraClass ? ` ${extraClass}` : "");
+    el.className = "rb rc" + (extraClass ? ` ${extraClass}` : "");
     if (!rule) return el;
     const s = style(rule.id);
+    const [kind, name] = kindName(rule);
     el.style.setProperty("--rc", s.color);
     el.style.setProperty("--ri", s.ink);
-    if (s.outline) el.classList.add("rb-outline");
+    el.dataset.family = s.family;
+    if (s.outline) el.classList.add("rc-outline");
+    const tile = document.createElement("span");
+    tile.className = "rc-tile";
+    tile.setAttribute("aria-hidden", "true");
     const ic = document.createElement("span");
-    ic.setAttribute("aria-hidden", "true");
-    if (s.typeIcon) {
-      ic.className = `px-ti px-ti-${s.typeIcon}`;
-    } else if (s.icon) {
-      ic.className = "rb-ic";
-      ic.style.setProperty("--ic", s.icon);
-    }
-    if (s.typeIcon || s.icon) el.appendChild(ic);
-    el.appendChild(document.createTextNode(rule.label));
+    if (s.typeIcon) ic.className = `px-ti px-ti-${s.typeIcon}`;
+    else if (s.icon) { ic.className = "rc-ic"; ic.style.setProperty("--ic", s.icon); }
+    tile.appendChild(ic);
+    const text = document.createElement("span");
+    text.className = "rc-text";
+    const k = document.createElement("span"); k.className = "rc-kind"; k.textContent = kind;
+    const n = document.createElement("span"); n.className = "rc-name"; n.textContent = name;
+    text.append(k, n);
+    el.append(tile, text);
+    el.title = `${kind}: ${name}`;
     return el;
   }
 
-  window.R81_CAT = { style, badge };
+  /** A chip for a rule that's still hidden (Reverse). */
+  function hidden(kind) {
+    const el = document.createElement("span");
+    el.className = "rb rc rc-hidden";
+    const tile = document.createElement("span"); tile.className = "rc-tile"; tile.textContent = "?";
+    tile.setAttribute("aria-hidden", "true");
+    const text = document.createElement("span"); text.className = "rc-text";
+    const k = document.createElement("span"); k.className = "rc-kind"; k.textContent = kind || "Hidden";
+    const n = document.createElement("span"); n.className = "rc-name"; n.textContent = "Name it";
+    text.append(k, n);
+    el.append(tile, text);
+    return el;
+  }
+
+  window.R81_CAT = { style, badge, hidden, kindName };
 })();

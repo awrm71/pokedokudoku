@@ -89,8 +89,6 @@
   text-align: center;
 }
 .rk-cap { font-size: 0.82rem; color: var(--ink-soft); }
-.rk-title .rb-big { font-size: 1.05rem; padding: 0.45em 0.9em; border-radius: 6px; gap: 0.45em; }
-.rk-title .rb-big.rb-outline { box-shadow: inset 0 0 0 3px var(--rc-lit); }
 .rk-cap-lab {
   position: absolute;
   font-size: 0.7rem;
@@ -212,11 +210,10 @@
   text-align: center;
   box-sizing: border-box;
 }
-.rk-lab.col { transform: translate(-50%, 0); width: calc(var(--t) * 1.05); }
-.rk-lab.row { transform: translate(-100%, -50%); width: calc(var(--t) * 1.25); }
+.rk-lab.col { transform: translate(-50%, 0); width: calc(var(--t) * 1.0); }
+.rk-lab.row { transform: translate(-100%, -50%); width: calc(var(--t) * 1.45); }
 .rk-lab.hl { border-color: var(--focus); }
 button.rk-lab { cursor: pointer; border-color: var(--line-strong); background: var(--bg-2); box-shadow: 0 3px 0 var(--edge); }
-.rk-lab .rb { font-size: 0.7rem; }
 button.rk-lab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .rk-pad { display: flex; gap: 0.4rem; }
@@ -231,36 +228,81 @@ button.rk-lab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2
 .rk-turn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .rk-help { margin: 0; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.5; max-width: 62ch; text-align: center; }
 
-/* Rule badges */
-.rb {
-  display: inline-flex; align-items: center; gap: 0.3em;
-  max-width: 100%;
-  font-family: var(--pixel-font); font-size: 0.64rem; letter-spacing: 0.02em; line-height: 1.25;
+/* Rule chips (category-colors.js): a coloured icon tile, then a small line
+   saying what kind of rule it is and the rule's name. One shape for every
+   category, so a type reads the same way as a region or an evolution rule. */
+.rb { max-width: 100%; }
+.rc {
+  --rc-lit: color-mix(in srgb, var(--rc) 70%, #ffffff);
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--rc) 20%, #17161d);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rc) 85%, #ffffff 0%);
   color: var(--ink);
-  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.15;
+  overflow: hidden;
+  font-size: 0.72rem;
 }
-.rb-cat {
-  background: var(--rc); color: var(--ri);
-  padding: 0.24em 0.5em; border-radius: 4px;
-  overflow-wrap: normal;
+.rc-tile {
+  flex: none;
+  display: grid; place-items: center;
+  width: 2.1em;
+  background: var(--rc);
+  color: var(--ri);
+  font-family: var(--pixel-font);
 }
-.rb-cat.rb-outline {
-  --rc-lit: color-mix(in srgb, var(--rc) 72%, #ffffff);
-  background: color-mix(in srgb, var(--rc) 14%, #17161d); color: var(--ink);
-  box-shadow: inset 0 0 0 2px var(--rc-lit);
-}
-.rb-cat.rb-outline .rb-ic { background-color: var(--rc-lit); }
-.rb-ic {
-  display: inline-block; flex: none;
-  width: 1em; height: 1em;
+.rc-tile .px-ti, .rc-ic { width: 1.15em; height: 1.15em; }
+.rc-ic {
+  display: inline-block;
   background-color: currentColor;
   -webkit-mask: var(--ic) center / contain no-repeat;
           mask: var(--ic) center / contain no-repeat;
-  vertical-align: -0.12em;
 }
-.rb-hidden { color: var(--ink-faint); }
-.rb-hidden::before { content: "?"; font-size: 1.2em; color: var(--cube); margin-right: 0.15em; }
-.rb-revealed { color: var(--err); }
+.rc-text {
+  display: grid;
+  gap: 0.12em;
+  align-content: center;
+  padding: 0.32em 0.6em 0.36em 0.5em;
+  min-width: 0;
+}
+.rc-kind {
+  font-size: 0.78em;
+  color: color-mix(in srgb, var(--rc-lit) 55%, var(--ink-soft));
+  white-space: nowrap;
+}
+.rc-name {
+  font-family: var(--pixel-font);
+  font-size: 1em;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+/* Moves and abilities: a lighter frame, so "Learns Surf" never passes for the Water type. */
+.rc-outline { background: #17161d; box-shadow: inset 0 0 0 2px var(--rc-lit); }
+.rc-outline .rc-tile { background: color-mix(in srgb, var(--rc) 35%, #17161d); color: var(--rc-lit); }
+/* Hidden (Reverse) */
+.rc-hidden { --rc: #5c8fd6; background: #17161d; box-shadow: inset 0 0 0 2px #3a3745; }
+.rc-hidden .rc-tile { background: #26252e; color: var(--cube); font-size: 1.1em; }
+.rc-hidden .rc-name { color: var(--ink-soft); }
+.rc-revealed { box-shadow: inset 0 0 0 2px var(--err); }
+.rc-revealed .rc-kind::after { content: " (missed)"; color: var(--err); }
+
+/* Sizes */
+.rk-title .rb-big { font-size: 1rem; }
+.rk-title .rb-big .rc-text { padding: 0.45em 0.9em 0.5em 0.7em; }
+.rk-title .rb-big .rc-tile { width: 2.4em; }
+.rk-lab .rc { font-size: 0.74rem; width: 100%; }
+/* Column chips sit under narrow columns, so they stack: colour band with
+   the icon on top, kind and name centred below. */
+.rk-lab.col .rc { flex-direction: column; align-items: stretch; }
+.rk-lab.col .rc .rc-tile { width: auto; height: 1.5em; }
+.rk-lab.col .rc .rc-text { text-align: center; justify-items: center; padding: 0.3em 0.35em 0.4em; }
+.fl-text > .rc { justify-self: start; font-size: 0.68rem; }
+.cm-rule .rc { font-size: 0.68rem; }
 
 /* ── Face list ───────────────────────────────────────────────────────────── */
 .fl {
@@ -386,7 +428,13 @@ dialog.cm::backdrop { background: rgba(8, 7, 12, 0.72); }
   .rk { padding: 0.6rem 0.4rem; }
   .rk-lab { padding: 0.2rem; min-height: 28px; }
   .rk-lab.row { width: calc(var(--t) * 1.2); }
-  .rb { font-size: 0.56rem; }
+  /* Phones: ring chips stack (colour band with icon on top, name below)
+     so the name gets the full width and never gets cut off. */
+  .rk-lab .rc { font-size: 0.56rem; flex-direction: column; align-items: stretch; }
+  .rk-lab .rc .rc-tile { width: auto; height: 1.6em; }
+  .rk-lab .rc .rc-kind { display: none; }
+  .rk-lab .rc .rc-text { padding: 0.3em 0.3em 0.35em; text-align: center; }
+  .rk-lab .rc .rc-name { overflow-wrap: anywhere; }
   .cc-chip { margin-left: 0; width: 100%; }
   .cg-slice { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .fl-list { grid-template-columns: 1fr 1fr; }
@@ -398,7 +446,6 @@ dialog.cm::backdrop { background: rgba(8, 7, 12, 0.72); }
   .cc-bar-fill { transition: none; }
   .st.err, .st.pop img { animation: none; }
 }
-.fl-text > .rb { justify-self: start; }
 
 /* styles.css gives every button a red hover and a press-down; squares keep their own look. */
 .st:hover, .st:active { transform: none; background: color-mix(in srgb, var(--fc-lit) 46%, #17161d); }
