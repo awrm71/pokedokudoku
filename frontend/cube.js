@@ -504,7 +504,9 @@
       const b = document.createElement("button");
       b.type = "button";
       b.className = "rk-name";
-      b.appendChild(revBadge(f));
+      const chip = revBadge(f);
+      chip.classList.add("rb-big");
+      b.appendChild(chip);
       b.setAttribute("aria-label", `${FACE_NAMES[f]}: ${revSolved(f)?.label || "not named yet"}`);
       b.addEventListener("click", () => openGuess(f));
       box.appendChild(b);

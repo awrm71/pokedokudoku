@@ -10,9 +10,9 @@
    • Families, not 150 separate colours. People can keep about six to eight
      colours apart at a glance, so related rules share a family look:
        Types        the type colours players already know, solid badge.
-       Moves        outlined in the colour of the move's own type, with a
-                    disc icon, so "Learns Surf" reads as watery but is
-                    clearly not the Water type.
+       Moves        one seafoam family with a striped tile and disc icon, so
+                    "Learns Knock Off" never passes for the Dark type and a
+                    move face never looks like an empty board.
        Regions      one invented colour each, taken from the place's feel
                     (Hoenn's sea, Sinnoh's snow, Alola's sunsets), pin icon.
        Stages       an ordered green ramp: Base light, Middle mid, Final
@@ -22,7 +22,8 @@
                     friendship).
        Status       gold for Legendary and purple for Mythical, the rarity
                     colours most games use; others get their own hue + icon.
-       Abilities    one lavender family, outlined, spark icon.
+       Abilities    one lavender family, striped tile, spark icon. The stripes
+                    mark "something a Pokémon has or learns", not what it is.
    • These hues are this site's own, not taken from any game's palette.
    ============================================================================ */
 (function () {
@@ -99,6 +100,7 @@
     dual_type: ["#9fa9d6", "two"],
   };
   const ABILITY_COLOR = "#b48fd6";
+  const MOVE_COLOR = "#5fc2ae";
 
   // 9×9 pixel icons, "#" = filled.
   const BITMAPS = {
@@ -152,11 +154,10 @@
       return { color: c, ink: ink(c), icon: null, typeIcon: t, outline: false, family: "type" };
     }
     if (rid.startsWith("move_")) {
-      const t = MOVE_TYPE[rid.slice(5)] || "normal";
-      return { color: TYPE[t], ink: "#ece6dc", icon: iconUrl.disc, typeIcon: null, outline: true, family: "move" };
+      return { color: MOVE_COLOR, ink: ink(MOVE_COLOR), icon: iconUrl.disc, typeIcon: null, outline: false, family: "move" };
     }
     if (rid.startsWith("ability_")) {
-      return { color: ABILITY_COLOR, ink: "#ece6dc", icon: iconUrl.spark, typeIcon: null, outline: true, family: "ability" };
+      return { color: ABILITY_COLOR, ink: ink(ABILITY_COLOR), icon: iconUrl.spark, typeIcon: null, outline: false, family: "ability" };
     }
     if (rid.startsWith("region_")) {
       const c = REGION[rid.slice(7)] || "#7d8aa8";

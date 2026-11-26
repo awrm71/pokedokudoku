@@ -98,11 +98,6 @@
 }
 .rk-cap-lab.row { transform: translate(-100%, -50%); }
 .rk-cap-lab.col { transform: translate(-100%, 0.6em); }
-.rk-title button.rk-name {
-  font: inherit; color: inherit; cursor: pointer;
-  border: 2px solid var(--line-strong); border-radius: 6px; background: var(--card);
-  box-shadow: 0 3px 0 var(--edge); padding: 0.35rem 0.6rem;
-}
 
 .rk-scene {
   position: relative;
@@ -212,9 +207,6 @@
 }
 .rk-lab.col { transform: translate(-50%, 0); width: calc(var(--t) * 1.0); }
 .rk-lab.row { transform: translate(-100%, -50%); width: calc(var(--t) * 1.45); }
-.rk-lab.hl { border-color: var(--focus); }
-button.rk-lab { cursor: pointer; border-color: var(--line-strong); background: var(--bg-2); box-shadow: 0 3px 0 var(--edge); }
-button.rk-lab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .rk-pad { display: flex; gap: 0.4rem; }
 .rk-turn {
@@ -281,15 +273,33 @@ button.rk-lab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2
   overflow-wrap: normal;
   text-wrap: balance;
 }
-/* Moves and abilities: a lighter frame, so "Learns Surf" never passes for the Water type. */
-.rc-outline { background: #17161d; box-shadow: inset 0 0 0 2px var(--rc-lit); }
-.rc-outline .rc-tile { background: color-mix(in srgb, var(--rc) 35%, #17161d); color: var(--rc-lit); }
-/* Hidden (Reverse) */
-.rc-hidden { --rc: #5c8fd6; background: #17161d; box-shadow: inset 0 0 0 2px #3a3745; }
-.rc-hidden .rc-tile { background: #26252e; color: var(--cube); font-size: 1.1em; }
-.rc-hidden .rc-name { color: var(--ink-soft); }
+/* Moves and abilities: their own colours plus a striped tile, so they read as
+   "learns / has" rather than as a type. */
+.rc[data-family="move"] .rc-tile, .rc[data-family="ability"] .rc-tile {
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.28) 0 2px, transparent 2px 6px);
+}
+/* Hidden (Reverse): one dashed outline, nothing else. */
+.rc-hidden {
+  --rc: #5c8fd6;
+  background: transparent;
+  box-shadow: none;
+  border: 2px dashed #4a4858;
+}
+.rc-hidden .rc-tile { background: transparent; color: var(--cube, #5c8fd6); font-size: 1.15em; width: 1.8em; }
+.rc-hidden .rc-text { padding-left: 0.1em; }
+.rc-hidden .rc-name { color: var(--ink); }
 .rc-revealed { box-shadow: inset 0 0 0 2px var(--err); }
 .rc-revealed .rc-kind::after { content: " (missed)"; color: var(--err); }
+
+/* In Reverse the chip is the button: no second frame around it. */
+button.rk-lab, .rk-title button.rk-name {
+  border: 0; background: none; box-shadow: none; padding: 0; cursor: pointer;
+}
+.rk-title button.rk-name { font: inherit; color: inherit; }
+button.rk-lab:hover .rc-hidden, .rk-title button.rk-name:hover .rc-hidden { border-color: var(--cube, #5c8fd6); background: rgba(92,143,214,0.08); }
+button.rk-lab:focus-visible, .rk-title button.rk-name:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 8px; }
+.rk-lab.hl { border-color: transparent; }
+.rk-lab.hl .rc { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* Sizes */
 .rk-title .rb-big { font-size: 1rem; }
@@ -451,7 +461,8 @@ dialog.cm::backdrop { background: rgba(8, 7, 12, 0.72); }
 .st:hover, .st:active { transform: none; background: color-mix(in srgb, var(--fc-lit) 46%, #17161d); }
 .st.filled:hover, .st.filled:active { background: color-mix(in srgb, var(--fc-lit) 26%, #131218); }
 .rk-face.dim .st:hover { background: #24232c; }
-.rk-lab:hover, .rk-lab:active, .fl-item:hover, .fl-item:active { background: var(--bg-2); transform: none; }
+.rk-lab:hover, .rk-lab:active { background: none; transform: none; }
+.fl-item:hover, .fl-item:active { background: var(--bg-2); transform: none; }
 .fl-item:hover { background: var(--card-hover); }
 .rk-turn:hover, .cv-turn:hover { background: var(--card-hover); }
 .cm-x:hover, .cg-list button:hover, .cg-groups button:hover, .cc-switch button:hover { background: var(--card-hover); }
