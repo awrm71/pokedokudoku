@@ -89,14 +89,8 @@
   text-align: center;
 }
 .rk-cap { font-size: 0.82rem; color: var(--ink-soft); }
-.rk-title .rb-big {
-  font-size: 1rem;
-  padding: 0.4em 0.8em;
-  border: 2px solid var(--fc);
-  border-radius: 6px;
-  background: var(--bg-2);
-}
-.rk-title .rb-big.rb-type { border-color: transparent; }
+.rk-title .rb-big { font-size: 1.05rem; padding: 0.45em 0.9em; border-radius: 6px; gap: 0.45em; }
+.rk-title .rb-big.rb-outline { box-shadow: inset 0 0 0 3px var(--rc-lit); }
 .rk-cap-lab {
   position: absolute;
   font-size: 0.7rem;
@@ -132,6 +126,8 @@
 .rk-cube { position: absolute; transform-style: preserve-3d; }
 
 .rk-face {
+  --face-c: #45434f;
+  --fc-lit: color-mix(in srgb, var(--face-c) 82%, #9a98ac);   /* lifts very dark colours (Dark, Ghost) */          /* neutral until it's the face toward you (cube.js sets it) */
   position: absolute;
   left: calc(var(--t) * -1.5);
   top: calc(var(--t) * -1.5);
@@ -141,44 +137,40 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  gap: calc(var(--t) * 0.06);
-  padding: calc(var(--t) * 0.06);
-  background: var(--plastic);
-  border-radius: calc(var(--t) * 0.12);
+  gap: 2px;                   /* thin grid lines, drawn by the face showing through */
+  padding: 2px;
+  background: var(--fc-lit);
   backface-visibility: hidden;
+  transition: background 200ms ease;
 }
-.rk-face.dim .st { filter: brightness(0.72); }
 
-/* A square. Empty: a coloured sticker. Filled: a dark tile rimmed in the face colour. */
+/* A square: flat, no bevel or shadow. Tinted by its face's colour. */
 .st {
   position: relative;
   border: 0;
   padding: 0;
   margin: 0;
-  border-radius: calc(var(--t) * 0.09);
-  background: var(--sticker);
-  box-shadow: inset 0 calc(var(--t) * -0.05) 0 rgba(0, 0, 0, 0.28), inset 0 calc(var(--t) * 0.035) 0 var(--sticker-hi);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--fc-lit) 36%, #17161d);
+  box-shadow: none;
   cursor: pointer;
   overflow: hidden;
   color: inherit;
   font: inherit;
-  display: grid;
-  place-items: center;
+  transition: background 200ms ease;
 }
+.rk-face.dim .st { background: #1d1c24; }
+.rk-face.dim { background: #34323d; }
 .st:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
-.st.filled {
-  background: var(--tile);
-  box-shadow: inset 0 0 0 calc(var(--t) * 0.045) #3a3745;
-}
-.rk-face:not(.dim) .st.filled { box-shadow: inset 0 0 0 calc(var(--t) * 0.045) var(--fc); }
+.st.filled { background: color-mix(in srgb, var(--fc-lit) 20%, #131218); }
+.rk-face.dim .st.filled { background: #18171e; }
 /* Upright frame: cube.js turns each face's frames (--rot) so Pokémon stand up. */
 .st-in {
   position: absolute; inset: 0;
   transform: rotate(var(--rot, 0deg));
   pointer-events: none;
 }
-/* The sprite always fits inside the square, whatever size the animation is. */
-.st-pic { position: absolute; inset: 8%; overflow: hidden; }
+.st-pic { position: absolute; inset: 7%; overflow: hidden; }
 .st-pic img {
   width: 100%; height: 100%;
   object-fit: contain;
@@ -186,10 +178,9 @@
   image-rendering: pixelated;
   display: block;
 }
-.st.hinted { box-shadow: inset 0 0 0 calc(var(--t) * 0.045) #4a4656; }
-.st.hinted .st-in { opacity: 0.85; }
-.st.shiny, .rk-face:not(.dim) .st.shiny { box-shadow: inset 0 0 0 calc(var(--t) * 0.045) var(--accent-2); }
-.st.answer { background: #201f27; box-shadow: inset 0 0 0 calc(var(--t) * 0.03) #3a3745; }
+.st.hinted .st-in { opacity: 0.8; }
+.st.shiny::after { content: ""; position: absolute; left: 6%; top: 6%; width: 8%; height: 8%; background: var(--accent-2); }
+.st.answer { background: #1a1920; }
 .st.answer .st-pic { opacity: 0.5; }
 .st .st-count {
   position: absolute; right: 7%; bottom: 5%;
@@ -199,11 +190,10 @@
   position: absolute; right: 8%; top: 6%;
   font-size: calc(var(--t) * 0.12); color: var(--ink-faint);
 }
-/* The rings through the square you're pointing at, all the way around. */
 .st.ring { outline: 3px solid var(--focus); outline-offset: -3px; }
 .st.err { animation: st-shake 300ms steps(4, end) 1; }
 @keyframes st-shake { 25% { transform: translateX(-4%); } 75% { transform: translateX(4%); } }
-.st.pop img { animation: st-pop 380ms steps(3, end) 1; }
+.st.pop .st-pic { animation: st-pop 380ms steps(3, end) 1; }
 @keyframes st-pop { 0% { transform: scale(0.4); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
 /* Ring labels beside the face toward you */
@@ -214,9 +204,9 @@
   pointer-events: auto;
   display: grid; place-items: center;
   min-height: 32px;
-  padding: 0.25rem 0.4rem;
-  border: 2px solid var(--line-strong); border-radius: 6px;
-  background: var(--bg-2);
+  padding: 0.2rem;
+  border: 2px solid transparent; border-radius: 6px;
+  background: transparent;
   color: var(--ink);
   font: inherit;
   text-align: center;
@@ -225,7 +215,8 @@
 .rk-lab.col { transform: translate(-50%, 0); width: calc(var(--t) * 1.05); }
 .rk-lab.row { transform: translate(-100%, -50%); width: calc(var(--t) * 1.25); }
 .rk-lab.hl { border-color: var(--focus); }
-button.rk-lab { cursor: pointer; box-shadow: 0 3px 0 var(--edge); }
+button.rk-lab { cursor: pointer; border-color: var(--line-strong); background: var(--bg-2); box-shadow: 0 3px 0 var(--edge); }
+.rk-lab .rb { font-size: 0.7rem; }
 button.rk-lab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .rk-pad { display: flex; gap: 0.4rem; }
@@ -248,7 +239,25 @@ button.rk-lab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-.rb-type { background: var(--tb); color: var(--tf); padding: 0.22em 0.5em; border-radius: 4px; overflow-wrap: normal; }
+.rb-cat {
+  background: var(--rc); color: var(--ri);
+  padding: 0.24em 0.5em; border-radius: 4px;
+  overflow-wrap: normal;
+}
+.rb-cat.rb-outline {
+  --rc-lit: color-mix(in srgb, var(--rc) 72%, #ffffff);
+  background: color-mix(in srgb, var(--rc) 14%, #17161d); color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--rc-lit);
+}
+.rb-cat.rb-outline .rb-ic { background-color: var(--rc-lit); }
+.rb-ic {
+  display: inline-block; flex: none;
+  width: 1em; height: 1em;
+  background-color: currentColor;
+  -webkit-mask: var(--ic) center / contain no-repeat;
+          mask: var(--ic) center / contain no-repeat;
+  vertical-align: -0.12em;
+}
 .rb-hidden { color: var(--ink-faint); }
 .rb-hidden::before { content: "?"; font-size: 1.2em; color: var(--cube); margin-right: 0.15em; }
 .rb-revealed { color: var(--err); }
@@ -392,10 +401,9 @@ dialog.cm::backdrop { background: rgba(8, 7, 12, 0.72); }
 .fl-text > .rb { justify-self: start; }
 
 /* styles.css gives every button a red hover and a press-down; squares keep their own look. */
-.st:hover, .st:active { background: var(--sticker); transform: none; }
-.st.filled:hover, .st.filled:active { background: var(--tile); }
-.st.answer:hover { background: #201f27; }
-.st:hover:not(.filled):not(.answer) { filter: brightness(1.08); }
+.st:hover, .st:active { transform: none; background: color-mix(in srgb, var(--fc-lit) 46%, #17161d); }
+.st.filled:hover, .st.filled:active { background: color-mix(in srgb, var(--fc-lit) 26%, #131218); }
+.rk-face.dim .st:hover { background: #24232c; }
 .rk-lab:hover, .rk-lab:active, .fl-item:hover, .fl-item:active { background: var(--bg-2); transform: none; }
 .fl-item:hover { background: var(--card-hover); }
 .rk-turn:hover, .cv-turn:hover { background: var(--card-hover); }

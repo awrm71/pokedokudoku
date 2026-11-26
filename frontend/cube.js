@@ -198,22 +198,9 @@
     }
     return el;
   }
+  // Rule badges come from category-colors.js: a colour family, an icon and the name.
   function badge(rule) {
-    const el = document.createElement("span");
-    el.className = "rb";
-    if (!rule) return el;
-    const t = rule.id && rule.id.startsWith("type_") ? rule.id.slice(5) : null;
-    if (t && TYPE_CONFIG[t]) {
-      el.classList.add("rb-type");
-      el.style.setProperty("--tb", TYPE_CONFIG[t][0]);
-      el.style.setProperty("--tf", TYPE_CONFIG[t][1]);
-      const ic = document.createElement("span");
-      ic.className = `px-ti px-ti-${t}`;
-      ic.setAttribute("aria-hidden", "true");
-      el.appendChild(ic);
-    }
-    el.appendChild(document.createTextNode(rule.label));
-    return el;
+    return window.R81_CAT ? window.R81_CAT.badge(rule) : document.createTextNode(rule ? rule.label : "");
   }
   function pips(el, total, left, cls) {
     el.textContent = "";
@@ -360,7 +347,19 @@
       b.tabIndex = f === front ? 0 : -1;
       b.classList.toggle("ring", rings.some((line) => inLine(line, f, i, j)));
     }
-    faceEls.forEach((el, f) => el.classList.toggle("dim", f !== front));
+    faceEls.forEach((el, f) => {
+      el.classList.toggle("dim", f !== front);
+      // Only the face toward you takes its rule's colour; the rest stay neutral.
+      const rid = f === front ? faceRuleId(f) : null;
+      if (rid && window.R81_CAT) el.style.setProperty("--face-c", window.R81_CAT.style(rid).color);
+      else el.style.removeProperty("--face-c");
+    });
+  }
+
+  // The rule id that colours face f: the face rule (Fill), or the named one (Reverse).
+  function faceRuleId(f) {
+    if (S.kind === "reverse") { const x = revSolved(f); return x ? x.rule_id : null; }
+    return S.board ? S.board.faces[f].id : null;
   }
 
   function labelsFor(f, i, j) {
@@ -527,6 +526,12 @@
       b.className = "fl-item";
       b.setAttribute("aria-current", String(f === front));
       const sw = document.createElement("span"); sw.className = "fl-sw"; sw.textContent = String(f + 1);
+      const frid = faceRuleId(f);
+      if (frid && window.R81_CAT) {
+        const st = window.R81_CAT.style(frid);
+        sw.style.background = st.color;
+        sw.style.color = st.ink;
+      }
       const text = document.createElement("span"); text.className = "fl-text";
       const nm = document.createElement("span"); nm.className = "fl-name"; nm.textContent = FACE_NAMES[f];
       text.append(nm, lineBadge(f));
