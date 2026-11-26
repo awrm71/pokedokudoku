@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08030f" />
     <title>Cube · Route 81</title>
-    <meta name="description" content="Route 81 Cube: a 3×3×3 Pokémon logic puzzle. 27 squares, each needs a Pokémon that fits its column, its row and its layer. New Cube every day." />
+    <meta name="description" content="Route 81 Cube: a Pokémon logic puzzle on a cube. 54 squares over six faces; each needs a Pokémon that fits its face and the two rings that wrap around the cube through it. New Cube every day." />
     <meta property="og:site_name" content="Route 81" />
     <meta property="og:title" content="Cube · Route 81" />
-    <meta property="og:description" content="27 squares, three rules each. New Cube every day." />
+    <meta property="og:description" content="Six faces, 54 squares, three rules each. New Cube every day." />
     <meta property="og:image" content="https://route81.app/brand/og-image.png" />
     <link rel="canonical" href="https://route81.app/cube.html" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
@@ -23,7 +23,6 @@
     <link rel="stylesheet" href="./type-icons.css" />
     <link rel="stylesheet" href="./shell.css" />
     <link rel="stylesheet" href="./theme.css" />
-    <link rel="stylesheet" href="./motion.css" />
     <link rel="stylesheet" href="./cube-tab.css" />
     <link rel="stylesheet" href="./cube.css" />
   </head>
@@ -65,11 +64,10 @@
         </a>
         <a class="mode-tab active" data-mode="cube" href="./cube.html" aria-current="page">
           <span class="mt-icon" aria-hidden="true"></span>
-          <span class="mt-text"><span class="mt-name">Cube</span><span class="mt-sub">Three rules per square</span></span>
+          <span class="mt-text"><span class="mt-name">Cube</span><span class="mt-sub">Six faces, 54 squares</span></span>
         </a>
       </nav>
 
-      <!-- Console: which Cube, and its lives / progress / hints -->
       <section class="console cube-console" aria-label="Cube controls">
         <div class="cc-bar">
           <div class="cc-switch" role="radiogroup" aria-label="Cube type">
@@ -86,7 +84,7 @@
         <div class="cc-hud" role="status" aria-label="Cube status">
           <span class="cc-lives" id="ccLives" aria-label="Lives"></span>
           <span class="cc-progress">
-            <span class="cc-score" id="ccScore">0 / 27</span>
+            <span class="cc-score" id="ccScore">0 / 54</span>
             <span class="cc-bar-track"><span class="cc-bar-fill" id="ccFill"></span></span>
           </span>
           <span class="cc-hints" id="ccHints" aria-label="Hints"></span>
@@ -99,24 +97,30 @@
       </div>
 
       <section class="cube-stage" aria-label="Cube">
-        <!-- 3D view: the three layers stacked. Drag to turn it. -->
-        <div class="cv" id="cv">
-          <div class="cv-scene" id="cvScene" aria-hidden="true">
-            <div class="cv-stack" id="cvStack"></div>
+        <div class="rk">
+          <!-- The face toward you: its name and rule -->
+          <div class="rk-title" id="rkTitle"></div>
+          <div class="rk-scene" id="rkScene">
+            <div class="rk-origin">
+              <div class="rk-cube" id="rkCube"></div>
+            </div>
+            <!-- Ring rules for the front face's columns and rows, placed by cube.js -->
+            <div class="rk-labels" id="rkLabels"></div>
           </div>
-          <div class="cv-tools">
-            <button type="button" class="cv-turn" data-turn="-45" aria-label="Turn the Cube left">⟲</button>
-            <span class="cv-note">Drag to turn it. Tap a layer to open it.</span>
-            <button type="button" class="cv-turn" data-turn="45" aria-label="Turn the Cube right">⟳</button>
+          <div class="rk-pad" role="group" aria-label="Turn the Cube">
+            <button type="button" class="rk-turn" data-turn="left" aria-label="Turn the Cube left">◀</button>
+            <button type="button" class="rk-turn" data-turn="up" aria-label="Turn the Cube up">▲</button>
+            <button type="button" class="rk-turn" data-turn="down" aria-label="Turn the Cube down">▼</button>
+            <button type="button" class="rk-turn" data-turn="right" aria-label="Turn the Cube right">▶</button>
           </div>
+          <p class="rk-help" id="rkHelp"></p>
         </div>
 
-        <!-- Flat view: the open layer, where you play -->
-        <div class="lv" id="lv">
-          <div class="lv-tabs" id="lvTabs" role="tablist" aria-label="Layers"></div>
-          <div class="lv-grid" id="lvGrid" role="grid" aria-label="Open layer"></div>
-          <p class="lv-help" id="lvHelp"></p>
-        </div>
+        <aside class="fl" aria-label="Faces">
+          <h2 class="fl-head">Faces</h2>
+          <ul class="fl-list" id="flList"></ul>
+          <p class="fl-note">Every column and row wraps all the way around the cube, so a ring's rule follows its squares onto the next face.</p>
+        </aside>
       </section>
     </main>
 
@@ -141,14 +145,14 @@
       </form>
     </dialog>
 
-    <!-- Reverse: name the rule one slice shares -->
+    <!-- Reverse: name the rule a face or ring shares -->
     <dialog class="cm cm-wide" id="cmGuess" aria-labelledby="cmGuessTitle">
       <form method="dialog" class="cm-card">
         <header class="cm-head">
-          <h2 id="cmGuessTitle">What do these nine share?</h2>
+          <h2 id="cmGuessTitle">What do these share?</h2>
           <button type="button" class="cm-x" data-close aria-label="Close">✕</button>
         </header>
-        <div class="cg-slice" id="cgSlice" aria-label="The nine Pokémon in this slice"></div>
+        <div class="cg-slice" id="cgSlice" aria-label="The Pokémon in this face or ring"></div>
         <label class="cm-field">
           <span class="sr-only">Search categories</span>
           <input type="text" id="cgSearch" autocomplete="off" spellcheck="false" placeholder="Search categories" />
@@ -164,7 +168,6 @@
       </form>
     </dialog>
 
-    <!-- How the Cube works -->
     <dialog class="cm" id="cmHow" aria-labelledby="cmHowTitle">
       <div class="cm-card">
         <header class="cm-head">
@@ -172,9 +175,11 @@
           <button type="button" class="cm-x" data-close aria-label="Close">✕</button>
         </header>
         <div class="how-body">
-          <p>The Cube is three boards stacked on top of each other. Every square sits under a column rule, beside a row rule, and on a layer with its own rule. The Pokémon you put there has to fit all three.</p>
-          <p>Open a layer with the tabs, by tapping it in the 3D view, or by swiping across the board. Each Pokémon can only be used once in the whole Cube.</p>
-          <p><strong>Reverse</strong> flips it: all 27 Pokémon are shown and the nine rules are hidden. Tap a column, row or layer name to guess what its nine Pokémon have in common.</p>
+          <p>The Cube has six faces of nine squares. Each face has its own rule, written above the cube when that face is toward you.</p>
+          <p>Every column and row is a ring that wraps all the way around the cube, like a slice of a puzzle cube. Its rule is written beside the face toward you, and it carries on to every face the ring passes over.</p>
+          <p>So each square needs a Pokémon that fits three rules: its face, its column and its row. Each Pokémon goes on the cube only once.</p>
+          <p>Drag the cube or use the arrows to turn it. Tap a square on the face toward you to answer it; tap a square on another face to turn that face toward you.</p>
+          <p><strong>Reverse</strong> flips it: all 54 Pokémon are shown and the 15 rules are hidden. Tap a face name or a ring name to guess what its Pokémon share.</p>
           <p>You get 3 lives. Today's Cube is the same for everyone and resets at midnight. Practice Cubes are endless.</p>
         </div>
         <footer class="cm-foot"><button type="button" class="ctx-btn cm-go" data-close>Play</button></footer>
@@ -189,7 +194,6 @@
       <span>Sprites: Pokémon Black/White and the <a href="https://www.smogon.com/forums/threads/x-y-sprite-project.3486712/" rel="noopener" target="_blank">Smogon sprite projects</a>, via <a href="https://github.com/PokeAPI/sprites" rel="noopener" target="_blank">PokeAPI</a>.</span>
     </footer>
 
-    <script src="./motion.js"></script>
     <script src="./cube.js"></script>
   </body>
 </html>

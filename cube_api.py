@@ -1,33 +1,34 @@
 """
-cube_api.py — endpoints for the 3×3×3 Cube (cube_engine.py), mounted onto the
-main app the same way reverse_api.py is:
+cube_api.py — endpoints for the Cube (cube_engine.py), mounted onto the main
+app the same way reverse_api.py is:
 
     import cube_api
     cube_api.attach(app, cube_api.Ctx(...))
 
-Cube (fill the squares)
-  GET  /cube/board?seed=         today's Daily Cube, or a practice Cube for any other seed
+A square is (f, i, j): face 0-5, then its coordinates along the face's two
+axes (see cube_engine.py). A "line" is a face (0-5) or a ring (6-14).
+
+Cube (fill the 54 squares)
+  GET  /cube/board?seed=         today's Cube, or a practice Cube for any other seed
   POST /cube/validate            check one square
   POST /cube/hint                reveal a Pokémon for one square
   POST /cube/finish              end today's Cube early (to see the answers)
   GET  /cube/solution?seed=      one answer and the count of answers per square
 
-Reverse Cube (name the nine hidden rules)
+Reverse Cube (name the 15 hidden rules)
   GET  /cube/reverse/daily       today's Reverse Cube
   POST /cube/reverse             a practice Reverse Cube {difficulty}
-  POST /cube/reverse/validate    guess one slice's rule
-  POST /cube/reverse/hint        reveal one slice's rule (one per Cube)
+  POST /cube/reverse/validate    guess one line's rule
+  POST /cube/reverse/hint        reveal one line's rule
 
-Daily runs (lives, answers, hints) are saved with daily_store under their own
-seeds, "cube:YYYY-MM-DD" and "rcube:YYYY-MM-DD", so they never mix with the
-flat Daily Board and a reload can't reset them. In those rows a square is
-stored as row_i = layer*3 + row, col_j = column; a Reverse slice as
-row_i = axis, col_j = index, pokemon_key = the rule id that solved it.
+Daily runs are saved with daily_store under "cube54:YYYY-MM-DD" and
+"rcube54:YYYY-MM-DD", apart from the flat Daily Board, so a reload can't reset
+lives. A square is stored as row_i = face, col_j = i*3 + j; a Reverse line as
+row_i = line, col_j = 0, pokemon_key = the rule that solved it.
 
-Each day's Cube is pinned the first time it's made (daily_store.save_pin),
-like the Daily Board, so a later data fix can't reshuffle a Cube people are
-already playing. The Cube doesn't write to the Pokédex yet: correct answers
-can still roll a shiny sighting, the way Draft boards do.
+Each day's Cube is pinned the first time it's made (daily_store.save_pin).
+The Cube doesn't write to the Pokédex yet: a correct answer can still roll a
+shiny sighting, the way Draft boards do.
 """
 
 from __future__ import annotations
@@ -46,11 +47,13 @@ import cube_engine as ce
 import daily_store
 
 CUBE_LIVES = 3
-CUBE_HINTS = 2
+CUBE_HINTS = 3
 REVERSE_LIVES = 3
-REVERSE_HINTS = 1
+REVERSE_HINTS = 2
 _TIMEOUT = 25.0
 _CACHE_MAX = 40
+FILL_PREFIX = "cube54"
+REV_PREFIX = "rcube54"
 
 
 class Ctx:
@@ -71,11 +74,6 @@ class RuleOut(BaseModel):
     label: str
 
 
-class AxisOut(BaseModel):
-    axis: str                     # "col" | "row" | "layer"
-    rules: List[RuleOut]
-
-
 class MonOut(BaseModel):
     key: str
     display_name: str
@@ -83,12 +81,10 @@ class MonOut(BaseModel):
 
 
 class PickOut(BaseModel):
-    z: int
-    y: int
-    x: int
-    key: str
-    display_name: str
-    pokemon_id: Optional[int] = None
+    f: int
+    i: int
+    j: int
+    mon: MonOut
     hinted: bool = False
     shiny: bool = False
     pct: Optional[float] = None
@@ -104,8 +100,8 @@ class CubeRun(BaseModel):
 class CubeBoardOut(BaseModel):
     seed: str
     is_daily: bool
-    size: int = 3
-    axes: List[AxisOut]
+    faces: List[RuleOut]                   # 6
+    rings: List[List[RuleOut]]             # 3 axes × 3
     lives: int = CUBE_LIVES
     hints: int = CUBE_HINTS
     run: Optional[CubeRun] = None          # Daily only; practice runs live in the browser
@@ -113,9 +109,9 @@ class CubeBoardOut(BaseModel):
 
 class CellIn(BaseModel):
     seed: str
-    z: int
-    y: int
-    x: int
+    f: int
+    i: int
+    j: int
     used_keys: List[str] = []
 
 
@@ -124,14 +120,14 @@ class ValidateIn(CellIn):
 
 
 class FilledIn(BaseModel):
-    z: int
-    y: int
-    x: int
+    f: int
+    i: int
+    j: int
     key: str
 
 
 class HintIn(CellIn):
-    filled: List[FilledIn] = []            # practice: what the browser has placed
+    filled: List[FilledIn] = []
 
 
 class ValidateOut(BaseModel):
@@ -142,7 +138,7 @@ class ValidateOut(BaseModel):
     lives_left: Optional[int] = None
     pct: Optional[float] = None
     finished: bool = False
-    stranded: bool = False                 # the empty squares can no longer all be filled
+    stranded: bool = False
 
 
 class HintOut(BaseModel):
@@ -154,9 +150,9 @@ class HintOut(BaseModel):
 
 
 class SolutionCell(BaseModel):
-    z: int
-    y: int
-    x: int
+    f: int
+    i: int
+    j: int
     count: int
     example: MonOut
 
@@ -170,15 +166,14 @@ class SeedIn(BaseModel):
 
 
 class RevCell(BaseModel):
-    z: int
-    y: int
-    x: int
+    f: int
+    i: int
+    j: int
     mon: MonOut
 
 
 class RevSolved(BaseModel):
-    axis: int
-    index: int
+    line: int
     rule_id: str
     label: str
     hinted: bool = False
@@ -190,7 +185,7 @@ class RevRun(BaseModel):
     finished: bool
     won: bool = False
     solved: List[RevSolved] = []
-    reveal: List[RevSolved] = []           # the intended rules for unsolved slices, once finished
+    reveal: List[RevSolved] = []
 
 
 class RevBoardOut(BaseModel):
@@ -210,8 +205,7 @@ class RevNewIn(BaseModel):
 
 class RevGuessIn(BaseModel):
     board_id: str
-    axis: int
-    index: int
+    line: int
     rule_id: str = ""
 
 
@@ -235,7 +229,7 @@ def attach(app, ctx: Ctx) -> None:
         mons[k] = MonOut(key=k, display_name=n, pokemon_id=int(pid) if pd.notna(pid) else None)
 
     boards: Dict[str, ce.CubeBoard] = {}
-    rev_boards: Dict[str, dict] = {}       # board_id -> {"rc", "difficulty", "daily", state for practice}
+    rev_boards: Dict[str, dict] = {}
     lock = threading.Lock()
 
     def today() -> str:
@@ -256,30 +250,8 @@ def attach(app, ctx: Ctx) -> None:
                 store.pop(next(iter(store)))
             store[key] = val
 
-    # ── Boards ────────────────────────────────────────────────────────────────
-
-    def get_board(seed: str) -> ce.CubeBoard:
-        with lock:
-            if seed in boards:
-                return boards[seed]
-        board = None
-        pin_key = f"cube:{seed}" if dated(seed) else None
-        if pin_key:
-            pin = daily_store.get_pin(pin_key)
-            if pin:
-                board = ce.board_from_ids(df, ctx.rule_masks, seed, pin["cols"], pin["rows"], pin["layers"], masks=masks)
-        if board is None:
-            board = ce.generate_cube(df, ctx.rule_masks, seed, masks=masks)
-            if board is None:
-                raise HTTPException(status_code=503, detail="Couldn't build that Cube. Try another one.")
-            if pin_key:
-                kept = daily_store.save_pin(pin_key, {"cols": list(board.cols), "rows": list(board.rows),
-                                                      "layers": list(board.layers)})
-                if list(kept["cols"]) != list(board.cols):     # another worker pinned first
-                    board = ce.board_from_ids(df, ctx.rule_masks, seed, kept["cols"], kept["rows"],
-                                              kept["layers"], masks=masks) or board
-        remember(boards, seed, board)
-        return board
+    def rule_out(rid: str) -> RuleOut:
+        return RuleOut(id=rid, label=ctx.label(rid))
 
     async def off_thread(fn):
         loop = asyncio.get_event_loop()
@@ -288,42 +260,61 @@ def attach(app, ctx: Ctx) -> None:
         except asyncio.TimeoutError:
             raise HTTPException(status_code=503, detail="The Cube took too long to build. Try again.")
 
-    def axes_out(board: ce.CubeBoard) -> List[AxisOut]:
-        return [AxisOut(axis=name, rules=[RuleOut(id=r, label=ctx.label(r)) for r in ids])
-                for name, ids in zip(ce.AXES, board.axes)]
+    # ── Boards ────────────────────────────────────────────────────────────────
 
-    def cell_ok(z, y, x):
-        if not all(0 <= v < 3 for v in (z, y, x)):
+    def get_board(seed: str) -> ce.CubeBoard:
+        with lock:
+            if seed in boards:
+                return boards[seed]
+        board = None
+        pin_key = f"{FILL_PREFIX}:{seed}" if dated(seed) else None
+        if pin_key:
+            pin = daily_store.get_pin(pin_key)
+            if pin:
+                board = ce.board_from_ids(df, ctx.rule_masks, seed, pin["rings"], pin["faces"], masks=masks)
+        if board is None:
+            board = ce.generate_cube(df, ctx.rule_masks, seed, masks=masks)
+            if board is None:
+                raise HTTPException(status_code=503, detail="Couldn't build that Cube. Try another one.")
+            if pin_key:
+                kept = daily_store.save_pin(pin_key, {"rings": [list(a) for a in board.rings],
+                                                      "faces": list(board.faces)})
+                if list(kept["faces"]) != list(board.faces):     # another worker pinned first
+                    board = ce.board_from_ids(df, ctx.rule_masks, seed, kept["rings"], kept["faces"],
+                                              masks=masks) or board
+        remember(boards, seed, board)
+        return board
+
+    def cell_ok(f, i, j):
+        if not (0 <= f < 6 and 0 <= i < 3 and 0 <= j < 3):
             raise HTTPException(status_code=400, detail="That square isn't on the Cube.")
 
-    def daily_seed(seed: str) -> str:
-        return f"cube:{seed}"
+    def ds_fill(seed: str) -> str:
+        return f"{FILL_PREFIX}:{seed}"
 
     def picks_map(run) -> Dict[Tuple[int, int, int], dict]:
-        return {(p["row_i"] // 3, p["row_i"] % 3, p["col_j"]): p for p in run["picks"]}
+        return {(p["row_i"], p["col_j"] // 3, p["col_j"] % 3): p for p in run["picks"]}
 
     def run_status(run) -> Tuple[int, int, bool]:
         lives = max(0, CUBE_LIVES - run["misses"])
         hints = max(0, CUBE_HINTS - run["hints_used"])
-        finished = run["finished"] or lives <= 0 or len(run["picks"]) >= 27
+        finished = run["finished"] or lives <= 0 or len(run["picks"]) >= len(ce.CELLS)
         return lives, hints, finished
 
-    def pct(ds: str, z, y, x, key) -> Optional[float]:
-        same, total = daily_store.cell_share(ds, z * 3 + y, x, key)
+    def pct(ds: str, f, i, j, key) -> Optional[float]:
+        same, total = daily_store.cell_share(ds, f, i * 3 + j, key)
         return round(100.0 * same / total, 1) if total else None
 
     def run_out(client_id: str, seed: str) -> CubeRun:
-        ds = daily_seed(seed)
+        ds = ds_fill(seed)
         run = daily_store.get_run(client_id, ds)
         lives, hints, finished = run_status(run)
         picks = []
-        for (z, y, x), p in picks_map(run).items():
+        for (f, i, j), p in picks_map(run).items():
             m = mons.get(p["pokemon_key"])
-            if not m:
-                continue
-            picks.append(PickOut(z=z, y=y, x=x, key=m.key, display_name=m.display_name,
-                                 pokemon_id=m.pokemon_id, hinted=p["hinted"], shiny=p["shiny"],
-                                 pct=None if p["hinted"] else pct(ds, z, y, x, m.key)))
+            if m:
+                picks.append(PickOut(f=f, i=i, j=j, mon=m, hinted=p["hinted"], shiny=p["shiny"],
+                                     pct=None if p["hinted"] else pct(ds, f, i, j, m.key)))
         return CubeRun(lives_left=lives, hints_left=hints, finished=finished, picks=picks)
 
     @app.get("/cube/board", response_model=CubeBoardOut)
@@ -332,16 +323,20 @@ def attach(app, ctx: Ctx) -> None:
         s = (seed or today()).strip()[:64]
         board = await off_thread(lambda: get_board(s))
         daily = is_today(s)
-        return CubeBoardOut(seed=s, is_daily=daily, axes=axes_out(board),
-                            run=run_out(x_client_id, s) if (daily and x_client_id) else None)
+        return CubeBoardOut(
+            seed=s, is_daily=daily,
+            faces=[rule_out(r) for r in board.faces],
+            rings=[[rule_out(r) for r in ax] for ax in board.rings],
+            run=run_out(x_client_id, s) if (daily and x_client_id) else None,
+        )
 
     @app.post("/cube/validate", response_model=ValidateOut)
     def cube_validate(body: ValidateIn, x_client_id: Optional[str] = Header(default=None, alias="X-Client-Id")):
-        cell_ok(body.z, body.y, body.x)
+        cell_ok(body.f, body.i, body.j)
         board = get_board(body.seed)
         used = set(body.used_keys)
         daily = is_today(body.seed) and bool(x_client_id)
-        ds = daily_seed(body.seed)
+        ds = ds_fill(body.seed)
         run = None
         filled: Dict[Tuple[int, int, int], str] = {}
         if daily:
@@ -350,12 +345,12 @@ def attach(app, ctx: Ctx) -> None:
             if finished:
                 return ValidateOut(ok=False, reason="board_locked", lives_left=lives, finished=True)
             saved = picks_map(run)
-            if (body.z, body.y, body.x) in saved:
+            if (body.f, body.i, body.j) in saved:
                 return ValidateOut(ok=False, reason="already_filled", lives_left=lives)
             filled = {c: p["pokemon_key"] for c, p in saved.items()}
             used |= set(filled.values())
 
-        reason = ce.validate(masks, board, body.z, body.y, body.x, body.pokemon_key, used)
+        reason = ce.validate(masks, board, body.f, body.i, body.j, body.pokemon_key, used)
         if reason != "ok":
             if daily and reason in ("does_not_match", "duplicate"):
                 misses = daily_store.add_miss(x_client_id, ds)
@@ -369,26 +364,25 @@ def attach(app, ctx: Ctx) -> None:
         shiny = bool(ctx.roll_shiny_for(x_client_id))
         if not daily:
             return ValidateOut(ok=True, reason="ok", mon=mon, shiny=shiny)
-
-        cols, rows, layers = board.cols, board.rows, board.layers
-        daily_store.record_pick(x_client_id, ds, body.z * 3 + body.y, body.x,
-                                f"{cols[body.x]}|{rows[body.y]}", layers[body.z],
+        face_rule, r1, r2 = board.rules_at(body.f, body.i, body.j)
+        daily_store.record_pick(x_client_id, ds, body.f, body.i * 3 + body.j, f"{r1}|{r2}", face_rule,
                                 body.pokemon_key, hinted=False, shiny=shiny)
-        filled[(body.z, body.y, body.x)] = body.pokemon_key
-        done = len(filled) >= 27
+        filled[(body.f, body.i, body.j)] = body.pokemon_key
+        done = len(filled) >= len(ce.CELLS)
         if done:
             daily_store.finish(x_client_id, ds)
-        lives = max(0, CUBE_LIVES - run["misses"])
-        return ValidateOut(ok=True, reason="ok", mon=mon, shiny=shiny, lives_left=lives,
-                           pct=pct(ds, body.z, body.y, body.x, body.pokemon_key), finished=done,
+        return ValidateOut(ok=True, reason="ok", mon=mon, shiny=shiny,
+                           lives_left=max(0, CUBE_LIVES - run["misses"]),
+                           pct=pct(ds, body.f, body.i, body.j, body.pokemon_key), finished=done,
                            stranded=not done and not ce.still_solvable(masks, board, filled))
 
     @app.post("/cube/hint", response_model=HintOut)
     def cube_hint(body: HintIn, x_client_id: Optional[str] = Header(default=None, alias="X-Client-Id")):
-        cell_ok(body.z, body.y, body.x)
+        cell_ok(body.f, body.i, body.j)
         board = get_board(body.seed)
         daily = is_today(body.seed) and bool(x_client_id)
-        ds = daily_seed(body.seed)
+        ds = ds_fill(body.seed)
+        hints = None
         if daily:
             run = daily_store.get_run(x_client_id, ds)
             _, hints, finished = run_status(run)
@@ -397,21 +391,21 @@ def attach(app, ctx: Ctx) -> None:
             if hints <= 0:
                 return HintOut(ok=False, reason="no_hints", hints_left=0)
             saved = picks_map(run)
-            if (body.z, body.y, body.x) in saved:
+            if (body.f, body.i, body.j) in saved:
                 return HintOut(ok=False, reason="already_filled", hints_left=hints)
             filled = {c: p["pokemon_key"] for c, p in saved.items()}
         else:
-            filled = {(f.z, f.y, f.x): f.key for f in body.filled}
+            filled = {(x.f, x.i, x.j): x.key for x in body.filled}
         used = set(body.used_keys) | set(filled.values())
-        key = ce.hint_for(masks, board, body.z, body.y, body.x, used, filled)
+        key = ce.hint_for(masks, board, body.f, body.i, body.j, used, filled)
         if key is None:
             return HintOut(ok=False, reason="no_answer_left")
         if not daily:
             return HintOut(ok=True, mon=mons[key])
-        daily_store.record_pick(x_client_id, ds, body.z * 3 + body.y, body.x,
-                                f"{board.cols[body.x]}|{board.rows[body.y]}", board.layers[body.z],
+        face_rule, r1, r2 = board.rules_at(body.f, body.i, body.j)
+        daily_store.record_pick(x_client_id, ds, body.f, body.i * 3 + body.j, f"{r1}|{r2}", face_rule,
                                 key, hinted=True)
-        done = len(filled) + 1 >= 27
+        done = len(filled) + 1 >= len(ce.CELLS)
         if done:
             daily_store.finish(x_client_id, ds)
         return HintOut(ok=True, mon=mons[key], hints_left=hints - 1, finished=done)
@@ -420,39 +414,36 @@ def attach(app, ctx: Ctx) -> None:
     def cube_finish(body: SeedIn, x_client_id: Optional[str] = Header(default=None, alias="X-Client-Id")):
         if not (is_today(body.seed) and x_client_id):
             raise HTTPException(status_code=400, detail="Only today's Cube is saved.")
-        daily_store.finish(x_client_id, daily_seed(body.seed))
+        daily_store.finish(x_client_id, ds_fill(body.seed))
         return run_out(x_client_id, body.seed)
 
     @app.get("/cube/solution", response_model=SolutionOut)
     def cube_solution(seed: str, x_client_id: Optional[str] = Header(default=None, alias="X-Client-Id")):
         if is_today(seed):
-            run = daily_store.get_run(x_client_id, daily_seed(seed)) if x_client_id else None
+            run = daily_store.get_run(x_client_id, ds_fill(seed)) if x_client_id else None
             if not run or not run_status(run)[2]:
                 raise HTTPException(status_code=403, detail="Finish today's Cube to see the answers.")
         board = get_board(seed)
-        cells = []
-        for z, y, x in ce.CELLS:
-            n = int(ce.cell_mask(masks, board, z, y, x).sum())
-            cells.append(SolutionCell(z=z, y=y, x=x, count=n, example=mons[board.solution_at(z, y, x)]))
+        cells = [SolutionCell(f=f, i=i, j=j, count=int(ce.cell_mask(masks, board, f, i, j).sum()),
+                              example=mons[board.solution_at(f, i, j)]) for f, i, j in ce.CELLS]
         return SolutionOut(cells=cells)
 
     # ── Reverse Cube ──────────────────────────────────────────────────────────
 
-    def rev_daily_board(seed: str) -> ce.ReverseCube:
-        pin_key = f"rcube:{seed}"
+    def rev_daily_board(day: str) -> ce.ReverseCube:
+        pin_key = f"{REV_PREFIX}:{day}"
         pin = daily_store.get_pin(pin_key)
         if pin:
-            rc = ce.reverse_from_saved(df, ctx.rule_masks, seed, pin["cols"], pin["rows"], pin["layers"], pin["grid"])
+            rc = ce.reverse_from_saved(df, ctx.rule_masks, day, pin["rings"], pin["faces"], pin["grid"])
             if rc is not None:
                 return rc
-        rc = ce.generate_reverse_cube(df, ctx.rule_masks, seed, "hard")
+        rc = ce.generate_reverse_cube(df, ctx.rule_masks, day, "hard")
         if rc is None:
             raise HTTPException(status_code=503, detail="Couldn't build today's Reverse Cube.")
-        kept = daily_store.save_pin(pin_key, {"cols": list(rc.board.cols), "rows": list(rc.board.rows),
-                                              "layers": list(rc.board.layers), "grid": list(rc.grid)})
+        kept = daily_store.save_pin(pin_key, {"rings": [list(a) for a in rc.board.rings],
+                                              "faces": list(rc.board.faces), "grid": list(rc.grid)})
         if list(kept["grid"]) != list(rc.grid):
-            rc = ce.reverse_from_saved(df, ctx.rule_masks, seed, kept["cols"], kept["rows"],
-                                       kept["layers"], kept["grid"]) or rc
+            rc = ce.reverse_from_saved(df, ctx.rule_masks, day, kept["rings"], kept["faces"], kept["grid"]) or rc
         return rc
 
     def rev_get(board_id: str) -> dict:
@@ -460,20 +451,24 @@ def attach(app, ctx: Ctx) -> None:
             entry = rev_boards.get(board_id)
         if entry:
             return entry
-        if board_id.startswith("rcube:") and is_today(board_id[6:]):
-            rc = rev_daily_board(board_id[6:])
-            entry = {"rc": rc, "difficulty": "hard", "daily": True, "day": board_id[6:]}
+        prefix = f"{REV_PREFIX}:"
+        if board_id.startswith(prefix) and is_today(board_id[len(prefix):]):
+            day = board_id[len(prefix):]
+            entry = {"rc": rev_daily_board(day), "difficulty": "hard", "daily": True, "day": day}
             remember(rev_boards, board_id, entry)
             return entry
         raise HTTPException(status_code=404, detail="That Reverse Cube has expired. Start a new one.")
 
+    def rev_ds(entry) -> str:
+        return f"{REV_PREFIX}:{entry['day']}"
+
     def rev_state(entry: dict, client_id: Optional[str]) -> dict:
-        """{misses, hints_used, solved: {(axis, i): (rule_id, hinted)}, finished}"""
+        """{misses, hints_used, solved: {line: (rule_id, hinted)}, finished}"""
         if entry["daily"]:
             if not client_id:
                 return {"misses": 0, "hints_used": 0, "solved": {}, "finished": False}
-            run = daily_store.get_run(client_id, f"rcube:{entry['day']}")
-            solved = {(p["row_i"], p["col_j"]): (p["pokemon_key"], p["hinted"]) for p in run["picks"]}
+            run = daily_store.get_run(client_id, rev_ds(entry))
+            solved = {p["row_i"]: (p["pokemon_key"], p["hinted"]) for p in run["picks"]}
             return {"misses": run["misses"], "hints_used": run["hints_used"], "solved": solved,
                     "finished": run["finished"]}
         return entry["state"]
@@ -481,30 +476,29 @@ def attach(app, ctx: Ctx) -> None:
     def rev_run_out(entry: dict, st: dict) -> RevRun:
         rc: ce.ReverseCube = entry["rc"]
         lives = max(0, REVERSE_LIVES - st["misses"])
-        won = len(st["solved"]) >= 9
+        won = len(st["solved"]) >= ce.N_LINES
         finished = st["finished"] or lives <= 0 or won
-        solved = [RevSolved(axis=a, index=i, rule_id=r, label=ctx.label(r), hinted=h)
-                  for (a, i), (r, h) in sorted(st["solved"].items())]
+        solved = [RevSolved(line=l, rule_id=r, label=ctx.label(r), hinted=h)
+                  for l, (r, h) in sorted(st["solved"].items())]
         reveal = []
         if finished:
-            for a in range(3):
-                for i in range(3):
-                    if (a, i) not in st["solved"]:
-                        r = rc.board.axes[a][i]
-                        reveal.append(RevSolved(axis=a, index=i, rule_id=r, label=ctx.label(r)))
+            for l in range(ce.N_LINES):
+                if l not in st["solved"]:
+                    r = rc.board.line_rule(l)
+                    reveal.append(RevSolved(line=l, rule_id=r, label=ctx.label(r)))
         return RevRun(lives_left=lives, hints_left=max(0, REVERSE_HINTS - st["hints_used"]),
                       finished=finished, won=won, solved=solved, reveal=reveal)
 
     def rev_board_out(board_id: str, entry: dict, client_id: Optional[str]) -> RevBoardOut:
         rc: ce.ReverseCube = entry["rc"]
-        cells = [RevCell(z=z, y=y, x=x, mon=mons[rc.key_at(z, y, x)]) for z, y, x in ce.CELLS]
+        cells = [RevCell(f=f, i=i, j=j, mon=mons[rc.key_at(f, i, j)]) for f, i, j in ce.CELLS]
         return RevBoardOut(board_id=board_id, seed=entry.get("day") or board_id, is_daily=entry["daily"],
                            difficulty=entry["difficulty"], cells=cells,
                            run=rev_run_out(entry, rev_state(entry, client_id)))
 
     @app.get("/cube/reverse/daily", response_model=RevBoardOut)
     async def rev_daily(x_client_id: Optional[str] = Header(default=None, alias="X-Client-Id")):
-        board_id = f"rcube:{today()}"
+        board_id = f"{REV_PREFIX}:{today()}"
         entry = await off_thread(lambda: rev_get(board_id))
         return rev_board_out(board_id, entry, x_client_id)
 
@@ -520,50 +514,48 @@ def attach(app, ctx: Ctx) -> None:
         remember(rev_boards, board_id, entry)
         return rev_board_out(board_id, entry, None)
 
-    def rev_slice_ok(axis: int, index: int):
-        if not (0 <= axis < 3 and 0 <= index < 3):
-            raise HTTPException(status_code=400, detail="That slice isn't on the Cube.")
+    def line_ok(line: int):
+        if not 0 <= line < ce.N_LINES:
+            raise HTTPException(status_code=400, detail="That face or ring isn't on the Cube.")
 
     @app.post("/cube/reverse/validate", response_model=RevGuessOut)
     def rev_validate(body: RevGuessIn, x_client_id: Optional[str] = Header(default=None, alias="X-Client-Id")):
-        rev_slice_ok(body.axis, body.index)
+        line_ok(body.line)
         entry = rev_get(body.board_id)
         rc: ce.ReverseCube = entry["rc"]
         st = rev_state(entry, x_client_id)
         run = rev_run_out(entry, st)
         if run.finished:
             return RevGuessOut(ok=False, reason="board_locked", run=run)
-        if (body.axis, body.index) in st["solved"]:
+        if body.line in st["solved"]:
             return RevGuessOut(ok=False, reason="already_solved", run=run)
         if body.rule_id not in ctx.rules:
             return RevGuessOut(ok=False, reason="unknown_rule", run=run)
-        # A rule may name two slices if both really share it: blocking reuse
-        # could strand a slice whose only answer was spent elsewhere.
-        right = body.rule_id in rc.answers[body.axis][body.index]
-        daily = entry["daily"] and bool(x_client_id)
-        ds = f"rcube:{entry.get('day')}"
-        if right:
-            if daily:
-                daily_store.record_pick(x_client_id, ds, body.axis, body.index, "", "", body.rule_id)
-            elif not entry["daily"]:
-                st["solved"][(body.axis, body.index)] = (body.rule_id, False)
-        else:
-            if daily:
+        if entry["daily"] and not x_client_id:
+            return RevGuessOut(ok=False, reason="no_player", run=run)
+        # A rule may name two lines if both really share it (blocking reuse
+        # could strand a line whose only answer was spent elsewhere).
+        right = body.rule_id in rc.answers[body.line]
+        if entry["daily"]:
+            ds = rev_ds(entry)
+            if right:
+                daily_store.record_pick(x_client_id, ds, body.line, 0, "", "", body.rule_id)
+            else:
                 daily_store.add_miss(x_client_id, ds)
-            elif not entry["daily"]:
-                st["misses"] += 1
-        st = rev_state(entry, x_client_id) if daily else st
-        if not entry["daily"] or daily:
-            out = rev_run_out(entry, st)
-            if out.finished and daily:
+            out = rev_run_out(entry, rev_state(entry, x_client_id))
+            if out.finished:
                 daily_store.finish(x_client_id, ds)
         else:
-            out = run
+            if right:
+                st["solved"][body.line] = (body.rule_id, False)
+            else:
+                st["misses"] += 1
+            out = rev_run_out(entry, st)
         return RevGuessOut(ok=right, reason="ok" if right else "wrong", label=ctx.label(body.rule_id), run=out)
 
     @app.post("/cube/reverse/hint", response_model=RevGuessOut)
     def rev_hint(body: RevGuessIn, x_client_id: Optional[str] = Header(default=None, alias="X-Client-Id")):
-        rev_slice_ok(body.axis, body.index)
+        line_ok(body.line)
         entry = rev_get(body.board_id)
         rc: ce.ReverseCube = entry["rc"]
         st = rev_state(entry, x_client_id)
@@ -572,21 +564,19 @@ def attach(app, ctx: Ctx) -> None:
             return RevGuessOut(ok=False, reason="board_locked", run=run)
         if run.hints_left <= 0:
             return RevGuessOut(ok=False, reason="no_hints", run=run)
-        if (body.axis, body.index) in st["solved"]:
+        if body.line in st["solved"]:
             return RevGuessOut(ok=False, reason="already_solved", run=run)
-        rid = rc.board.axes[body.axis][body.index]
-        daily = entry["daily"] and bool(x_client_id)
-        if daily:
-            ds = f"rcube:{entry.get('day')}"
-            daily_store.record_pick(x_client_id, ds, body.axis, body.index, "", "", rid, hinted=True)
-            st = rev_state(entry, x_client_id)
-            out = rev_run_out(entry, st)
+        if entry["daily"] and not x_client_id:
+            return RevGuessOut(ok=False, reason="no_player", run=run)
+        rid = rc.board.line_rule(body.line)
+        if entry["daily"]:
+            ds = rev_ds(entry)
+            daily_store.record_pick(x_client_id, ds, body.line, 0, "", "", rid, hinted=True)
+            out = rev_run_out(entry, rev_state(entry, x_client_id))
             if out.finished:
                 daily_store.finish(x_client_id, ds)
-        elif not entry["daily"]:
-            st["solved"][(body.axis, body.index)] = (rid, True)
+        else:
+            st["solved"][body.line] = (rid, True)
             st["hints_used"] += 1
             out = rev_run_out(entry, st)
-        else:
-            out = run
         return RevGuessOut(ok=True, reason="ok", label=ctx.label(rid), run=out)

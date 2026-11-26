@@ -317,21 +317,26 @@ If handing this project to another chatbot/assistant, key constraints/assumption
 
 ---
 
-## 13) The Cube (3×3×3 mode)
+## 13) The Cube (6 faces, 54 squares)
 
 Files: `cube_engine.py` (generator, solver, Reverse Cube), `cube_api.py` (endpoints,
 mounted from `api_main.py`), `frontend/cube.html|css|js`, `frontend/cube-tab.css`
-(the fourth mode tab, also loaded by `index.html`), `tests/test_cube.py`.
+(the fourth mode tab, also loaded by `index.html`), `tests/test_cube.py`, and
+`run_local.py` (starts the server and opens the Cube page).
 
-- 27 squares: 3 column rules × 3 row rules × 3 layer rules. Each square needs a
-  Pokémon that fits all three; each Pokémon is used once per Cube.
-- Each axis is one family so the Cube reads at a glance (e.g. columns = types,
-  rows = regions, layers = traits). Templates and weights are at the top of
-  `cube_engine.py`.
-- Every generated Cube is checked for: ≥2 answers per square (Daily), a full
-  27-Pokémon distinct solution, every rule narrowing every square it touches,
-  and no rule contained in a rule on another axis. `python -m pytest tests/test_cube.py`
-  builds 150 Cubes and plays both modes through the API.
-- Daily runs are saved with `daily_store` under `cube:YYYY-MM-DD` / `rcube:YYYY-MM-DD`
+- A puzzle cube: 6 faces × 9 squares. Each face has its own rule; each column and
+  row is a ring that wraps around the cube (like a Rubik's cube slice), 9 rings in all.
+  A square needs a Pokémon that fits its face, its column ring and its row ring.
+  Each Pokémon is used once per Cube (54 different Pokémon).
+- Each axis is one family (e.g. types / regions / traits): an axis's 3 rings and its
+  2 faces come from the same family, so every square needs one of each.
+- Every generated Cube is checked for: ≥2 answers per square, a full distinct
+  54-Pokémon solution, every rule narrowing every square it touches, and no rule
+  contained in another rule it meets. `python -m pytest tests/test_cube.py`.
+- Reverse Cube: 54 Pokémon shown, 15 hidden rules (6 faces of 9, 9 rings of 12).
+- Daily runs are saved with `daily_store` under `cube54:YYYY-MM-DD` / `rcube54:YYYY-MM-DD`
   and each day's Cube is pinned, like the Daily Board.
+- Front end: CSS 3D cube (no libraries), drag to turn, settles face-forward; the face
+  toward you shows its rule above, column rings below, row rings on the left.
+  Placed Pokémon play their Black/White animated sprites on the cube.
 - Not yet: Pokédex registration, answer stats page, revives/ads, leaderboard.

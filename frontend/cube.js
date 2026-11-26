@@ -1,27 +1,31 @@
 /* ============================================================================
-   cube.js — the 3×3×3 Cube page (cube.html, cube.css; server: cube_api.py).
+   cube.js — the Cube page (cube.html, cube.css; server: cube_api.py).
 
-   Two views of the same 27 squares:
-     • The 3D view: three platforms stacked, Pokémon standing on them. Drag
-       or use the turn buttons to look around it; tap a platform to open it.
-     • The flat layer: the open platform as a 3×3 board with its column and
-       row rules, plus the layer's own rule in the corner. This is where you
-       play. Swipe across it (or press PageUp / PageDown) for the next layer.
+   A 3D puzzle cube: six faces of nine squares. Each face has a rule; each
+   column and row is a ring that wraps all the way around the cube. A square
+   needs a Pokémon that fits its face, its column and its row.
 
-   Fill:    put a Pokémon in every square that fits its column, row and layer.
-   Reverse: all 27 are shown; name the rule each column, row and layer shares.
+   • Drag to turn the cube freely; let go and it settles with one face toward
+     you. The arrows (or arrow keys) turn it a quarter at a time.
+   • The face toward you is the one you answer on. Its rule is shown above the
+     cube, its column rings below it and its row rings to the left.
+   • Tap a square on that face to answer it. Tap a square on another face to
+     turn that face toward you.
+   • Placed Pokémon play their Black/White animations on the cube.
 
-   Today's Cube keeps lives and answers on the server (a reload can't reset
-   them). A practice Cube keeps them in this browser.
+   Geometry matches cube_engine.py: axes x (right), y (down), z (toward you);
+   face f has normal axis f>>1, positive for even f. Square (f, i, j) has
+   coordinate i on the lower of the face's two axes and j on the higher one.
    ============================================================================ */
 (function () {
   "use strict";
 
   const CDN = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
-  const CLIENT_ID_KEY = "route81_client_id";          // same id as the rest of the site
-  const PRACTICE_KEY = "route81.cube.practice";
+  const ANIM = `${CDN}/versions/generation-v/black-white/animated`;
+  const CLIENT_ID_KEY = "route81_client_id";
+  const PRACTICE_KEY = "route81.cube54.practice";
   const PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect x="36" y="36" width="24" height="24" fill="#3a3745"/></svg>');
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect x="40" y="40" width="16" height="16" fill="#3a3745"/></svg>');
 
   const TYPE_CONFIG = {
     normal: ["#888888", "#fff"], fire: ["#E84000", "#fff"], fighting: ["#B81414", "#fff"],
@@ -31,33 +35,120 @@
     fairy: ["#E85FAA", "#fff"], poison: ["#8B2BAE", "#fff"], ghost: ["#5B3E7A", "#fff"],
     dragon: ["#3425C8", "#fff"], dark: ["#2E2B3A", "#eee"], steel: ["#6A8FAD", "#fff"],
   };
-  const AXIS = ["Column", "Row", "Layer"];
-  const LAYER = ["Top layer", "Middle layer", "Bottom layer"];
-  const CELLS = [];
-  for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) CELLS.push([z, y, x]);
+  const FACE_NAMES = ["Red face", "Orange face", "Yellow face", "White face", "Green face", "Blue face"];
 
   const $ = (id) => document.getElementById(id);
-  const ck = (z, y, x) => `${z},${y},${x}`;
+  const ck = (f, i, j) => `${f},${i},${j}`;
   const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  const calm = () => !!reduced?.matches;
+
+  // ── Geometry ───────────────────────────────────────────────────────────────
+  const axisOf = (f) => f >> 1;
+  const others = (f) => [0, 1, 2].filter((a) => a !== axisOf(f));
+  const unit = (a, s = 1) => { const v = [0, 0, 0]; v[a] = s; return v; };
+  const normal = (f) => unit(axisOf(f), f % 2 ? -1 : 1);
+  // Each face element's own right (u) and down (v) directions, in cube space.
+  const FACE_UV = [
+    [[0, 0, -1], [0, 1, 0]],  // +x
+    [[0, 0, 1], [0, 1, 0]],   // -x
+    [[1, 0, 0], [0, 0, -1]],  // +y
+    [[1, 0, 0], [0, 0, 1]],   // -y
+    [[1, 0, 0], [0, 1, 0]],   // +z
+    [[-1, 0, 0], [0, 1, 0]],  // -z
+  ];
+  const CELLS = [];
+  for (let f = 0; f < 6; f++) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) CELLS.push([f, i, j]);
+
+  // Grid spot (row r, col c) on face f -> (i, j).
+  function gridToCell(f, r, c) {
+    const [u, v] = FACE_UV[f];
+    const n = normal(f);
+    const p = [0, 1, 2].map((k) => (c - 1) * u[k] + (r - 1) * v[k] + n[k]);
+    const [b, cc] = others(f);
+    return [p[b] + 1, p[cc] + 1];
+  }
+  function lineOf(axis, k) { return 6 + axis * 3 + k; }
+  function cellsOf(line) {
+    if (line < 6) return CELLS.filter((c) => c[0] === line);
+    const axis = Math.floor((line - 6) / 3), k = (line - 6) % 3;
+    return CELLS.filter(([f, i, j]) => { const [b, c] = others(f); return (b === axis && i === k) || (c === axis && j === k); });
+  }
+
+  // 3×3 matrices (row-major arrays of rows).
+  const mul = (A, B) => A.map((r) => [0, 1, 2].map((j) => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+  const tr = (A) => [0, 1, 2].map((i) => [A[0][i], A[1][i], A[2][i]]);
+  const app = (A, v) => A.map((r) => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
+  const rx = (a) => { const c = Math.cos(a), s = Math.sin(a); return [[1, 0, 0], [0, c, -s], [0, s, c]]; };
+  const ry = (a) => { const c = Math.cos(a), s = Math.sin(a); return [[c, 0, s], [0, 1, 0], [-s, 0, c]]; };
+  const trace = (A, B) => { let t = 0; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) t += A[i][j] * B[i][j]; return t; };
+  const round = (A) => A.map((r) => r.map((x) => Math.round(x)));
+  const css = (M) => `matrix3d(${M[0][0]},${M[1][0]},${M[2][0]},0,${M[0][1]},${M[1][1]},${M[2][1]},0,${M[0][2]},${M[1][2]},${M[2][2]},0,0,0,0,1)`;
+
+  // The 24 ways a cube can sit (signed permutation matrices with det +1).
+  const ROTS = (() => {
+    const out = [];
+    const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    for (const p of perms) for (let s = 0; s < 8; s++) {
+      const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      for (let r = 0; r < 3; r++) M[r][p[r]] = (s >> r) & 1 ? -1 : 1;
+      const det = M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+      if (det === 1) out.push(M);
+    }
+    return out;
+  })();
+  // A resting tilt so the top and right faces show around the front one.
+  const TILT = mul(rx(-0.36), ry(-0.42));
+
+  // Quaternions, for a smooth settle between orientations.
+  function toQ(m) {
+    const t = m[0][0] + m[1][1] + m[2][2];
+    let w, x, y, z;
+    if (t > 0) { const s = Math.sqrt(t + 1) * 2; w = s / 4; x = (m[2][1] - m[1][2]) / s; y = (m[0][2] - m[2][0]) / s; z = (m[1][0] - m[0][1]) / s; }
+    else if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) { const s = Math.sqrt(1 + m[0][0] - m[1][1] - m[2][2]) * 2; w = (m[2][1] - m[1][2]) / s; x = s / 4; y = (m[0][1] + m[1][0]) / s; z = (m[0][2] + m[2][0]) / s; }
+    else if (m[1][1] > m[2][2]) { const s = Math.sqrt(1 + m[1][1] - m[0][0] - m[2][2]) * 2; w = (m[0][2] - m[2][0]) / s; x = (m[0][1] + m[1][0]) / s; y = s / 4; z = (m[1][2] + m[2][1]) / s; }
+    else { const s = Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]) * 2; w = (m[1][0] - m[0][1]) / s; x = (m[0][2] + m[2][0]) / s; y = (m[1][2] + m[2][1]) / s; z = s / 4; }
+    return [w, x, y, z];
+  }
+  function fromQ([w, x, y, z]) {
+    return [
+      [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+      [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+      [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+    ];
+  }
+  function slerp(a, b, t) {
+    let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+    if (d < 0) { b = b.map((x) => -x); d = -d; }
+    if (d > 0.9995) {
+      const r = a.map((x, k) => x + (b[k] - x) * t);
+      const n = Math.hypot(...r);
+      return r.map((x) => x / n);
+    }
+    const th = Math.acos(d), s = Math.sin(th);
+    return a.map((x, k) => (x * Math.sin((1 - t) * th) + b[k] * Math.sin(t * th)) / s);
+  }
 
   // ── State ────────────────────────────────────────────────────────────────
   const S = {
-    kind: "fill",            // "fill" | "reverse"
-    which: "daily",          // "daily" | "practice"
-    layer: 0,
-    sel: null,               // [z, y, x] being answered
-    // Fill
+    kind: "fill", which: "daily",
     board: null,
-    picks: new Map(),        // "z,y,x" -> {mon, hinted, shiny, pct}
-    answers: new Map(),      // "z,y,x" -> {mon, count} once a Cube is over
-    lives: 3, hints: 2, maxLives: 3, maxHints: 2,
+    picks: new Map(),        // "f,i,j" -> {mon, hinted, shiny, pct}
+    answers: new Map(),
+    lives: 3, hints: 3, maxLives: 3, maxHints: 3,
     finished: false,
-    // Reverse
-    rev: null,               // server board
-    revRun: null,
-    revPractice: null,       // the practice board, kept for this visit
-    guess: null,             // {axis, index, rule}
+    rev: null, revRun: null, revPractice: null,
+    guess: null,             // {line, rule}
     catalog: null,
+    sel: null,               // [f, i, j] being answered
+    G: ROTS.find((M) => trace(M, [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) === 3),
+    Q: null,                 // orientation on screen right now
+    hover: null,             // "f,i,j" under the pointer
+  };
+  S.Q = mul(TILT, S.G);
+
+  const frontFace = () => {
+    for (let f = 0; f < 6; f++) { const n = app(S.G, normal(f)); if (n[2] === 1) return f; }
+    return 4;
   };
 
   // ── Server ───────────────────────────────────────────────────────────────
@@ -70,7 +161,6 @@
     }
     return id;
   }
-
   async function api(path, body) {
     const opts = { headers: { "X-Client-Id": clientId() } };
     if (body !== undefined) {
@@ -86,26 +176,26 @@
     }
     return res.json();
   }
-
-  function store(key, val) {
-    try { val === null ? localStorage.removeItem(key) : localStorage.setItem(key, JSON.stringify(val)); } catch (_) { /* ignore */ }
-  }
-  function recall(key) {
-    try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (_) { return null; }
-  }
+  function store(key, val) { try { val === null ? localStorage.removeItem(key) : localStorage.setItem(key, JSON.stringify(val)); } catch (_) { /* ignore */ } }
+  function recall(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (_) { return null; } }
 
   // ── Small pieces ─────────────────────────────────────────────────────────
-  function sprite(mon, shiny) {
-    if (!mon || !mon.pokemon_id) return PLACEHOLDER;
-    return `${CDN}/${shiny ? "shiny/" : ""}${mon.pokemon_id}.png`;
-  }
-  function img(mon, shiny, cls) {
+  const missingAnim = new Set();
+  function spriteImg(mon, shiny, animated) {
     const el = document.createElement("img");
-    el.alt = mon ? mon.display_name : "";
+    el.alt = "";
     el.decoding = "async";
-    if (cls) el.className = cls;
-    el.onerror = () => { el.onerror = null; el.src = PLACEHOLDER; };
-    el.src = sprite(mon, shiny);
+    el.draggable = false;
+    if (!mon || !mon.pokemon_id) { el.src = PLACEHOLDER; return el; }
+    const still = `${CDN}/${shiny ? "shiny/" : ""}${mon.pokemon_id}.png`;
+    const anim = `${ANIM}/${shiny ? "shiny/" : ""}${mon.pokemon_id}.gif`;
+    if (animated && !calm() && !missingAnim.has(anim)) {
+      el.onerror = () => { missingAnim.add(anim); el.onerror = () => { el.onerror = null; el.src = PLACEHOLDER; }; el.src = still; };
+      el.src = anim;
+    } else {
+      el.onerror = () => { el.onerror = null; el.src = PLACEHOLDER; };
+      el.src = still;
+    }
     return el;
   }
   function badge(rule) {
@@ -127,9 +217,9 @@
   }
   function pips(el, total, left, cls) {
     el.textContent = "";
-    for (let i = 0; i < total; i++) {
+    for (let k = 0; k < total; k++) {
       const p = document.createElement("span");
-      p.className = cls + (i >= left ? " spent" : "");
+      p.className = cls + (k >= left ? " spent" : "");
       el.appendChild(p);
     }
     el.setAttribute("aria-label", `${left} of ${total} left`);
@@ -142,141 +232,23 @@
     while ($("ccToasts").children.length > 3) $("ccToasts").firstChild.remove();
     setTimeout(() => t.remove(), tone === "err" ? 4800 : 3000);
   }
-  function animate(still, mon, shiny, ms) {
-    if (still && mon && mon.pokemon_id) window.PDD_MOTION?.play(still, mon.pokemon_id, !!shiny, ms);
-  }
   function prettyDate(iso) {
     const d = new Date(`${iso}T12:00:00`);
     return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
+  function show(d) { if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", ""); }
+  function hide(d) { if (typeof d.close === "function") d.close(); else d.removeAttribute("open"); }
+  function setStatus(id, text, tone) { const el = $(id); el.textContent = text; el.className = "cm-status" + (tone ? ` ${tone}` : ""); }
 
-  // Rules for one square / one slice.
-  function rulesAt(z, y, x) {
-    const a = S.board.axes;
-    return [a[0].rules[x], a[1].rules[y], a[2].rules[z]];
-  }
-  function sliceCells(axis, index) {
-    return CELLS.filter(([z, y, x]) => (axis === 0 ? x : axis === 1 ? y : z) === index);
-  }
+  // Rules, for either kind of Cube.
+  function faceRule(f) { return S.board ? S.board.faces[f] : null; }
+  function ringRule(axis, k) { return S.board ? S.board.rings[axis][k] : null; }
+  function rulesAt(f, i, j) { const [b, c] = others(f); return [faceRule(f), ringRule(b, i), ringRule(c, j)]; }
 
-  // ── Loading ──────────────────────────────────────────────────────────────
-  async function load() {
-    $("ccNew").hidden = S.which !== "practice";
-    $("lvGrid").setAttribute("aria-busy", "true");
-    try {
-      if (S.kind === "fill") await loadFill(); else await loadReverse();
-    } catch (e) {
-      toast(e.message || "Couldn't load the Cube.", "err");
-    }
-    $("lvGrid").removeAttribute("aria-busy");
-    render();
-  }
-
-  function newPracticeSeed() {
-    return `p-${Math.random().toString(36).slice(2, 10)}`;
-  }
-
-  async function loadFill(fresh) {
-    S.answers = new Map();
-    S.picks = new Map();
-    let seed;
-    let saved = null;
-    if (S.which === "practice") {
-      saved = fresh ? null : recall(PRACTICE_KEY);
-      seed = saved?.seed || newPracticeSeed();
-    }
-    const b = await api(`/cube/board${seed ? `?seed=${encodeURIComponent(seed)}` : ""}`);
-    S.board = b;
-    S.maxLives = b.lives;
-    S.maxHints = b.hints;
-    if (b.run) {
-      S.lives = b.run.lives_left;
-      S.hints = b.run.hints_left;
-      S.finished = b.run.finished;
-      for (const p of b.run.picks) {
-        S.picks.set(ck(p.z, p.y, p.x), {
-          mon: { key: p.key, display_name: p.display_name, pokemon_id: p.pokemon_id },
-          hinted: p.hinted, shiny: p.shiny, pct: p.pct,
-        });
-      }
-    } else if (saved && saved.seed === b.seed) {
-      S.lives = saved.lives; S.hints = saved.hints; S.finished = saved.finished;
-      for (const [k, v] of saved.picks) S.picks.set(k, v);
-    } else {
-      S.lives = b.lives; S.hints = b.hints; S.finished = false;
-    }
-    if (S.which === "practice") savePractice();
-    if (S.finished) await loadAnswers();
-    if (!S.finished) S.layer = firstOpenLayer();
-  }
-
-  function savePractice() {
-    if (S.which !== "practice" || !S.board) return;
-    store(PRACTICE_KEY, { seed: S.board.seed, lives: S.lives, hints: S.hints, finished: S.finished,
-                          picks: Array.from(S.picks.entries()) });
-  }
-
-  function firstOpenLayer() {
-    for (let z = 0; z < 3; z++) {
-      for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) if (!S.picks.has(ck(z, y, x))) return z;
-    }
-    return 0;
-  }
-
-  async function loadAnswers() {
-    try {
-      const sol = await api(`/cube/solution?seed=${encodeURIComponent(S.board.seed)}`);
-      S.answers = new Map(sol.cells.map((c) => [ck(c.z, c.y, c.x), { mon: c.example, count: c.count }]));
-    } catch (_) {
-      S.answers = new Map();
-    }
-  }
-
-  async function loadReverse(fresh) {
-    if (S.which === "daily") {
-      S.rev = await api("/cube/reverse/daily");
-    } else {
-      if (fresh || !S.revPractice) S.revPractice = await api("/cube/reverse", { difficulty: "medium" });
-      S.rev = S.revPractice;
-    }
-    S.revRun = S.rev.run;
-  }
-
-  // ── Render ───────────────────────────────────────────────────────────────
-  function render() {
-    renderConsole();
-    renderStack();
-    renderLayer();
-    renderBanner();
-  }
-
-  function renderConsole() {
-    document.querySelectorAll("[data-kind]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.kind === S.kind)));
-    document.querySelectorAll("[data-which]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.which === S.which)));
-    const chip = $("ccChip");
-    if (S.kind === "fill") {
-      const n = S.picks.size;
-      $("ccScore").textContent = `${n} / 27`;
-      $("ccFill").style.width = `${(n / 27) * 100}%`;
-      pips($("ccLives"), S.maxLives, S.lives, "pip-life");
-      pips($("ccHints"), S.maxHints, S.hints, "pip-hint");
-      chip.textContent = S.board ? (S.board.is_daily ? `Today's Cube, ${prettyDate(S.board.seed)}` : "Practice Cube") : "";
-    } else {
-      const run = S.revRun;
-      const n = run ? run.solved.length : 0;
-      $("ccScore").textContent = `${n} / 9`;
-      $("ccFill").style.width = `${(n / 9) * 100}%`;
-      pips($("ccLives"), S.rev ? S.rev.lives : 3, run ? run.lives_left : 3, "pip-life");
-      pips($("ccHints"), S.rev ? S.rev.hints : 1, run ? run.hints_left : 1, "pip-hint");
-      chip.textContent = S.rev ? (S.rev.is_daily ? `Today's Reverse Cube, ${prettyDate(S.rev.seed)}` : "Practice Reverse Cube") : "";
-    }
-  }
-
-  // What stands on a square, for either kind of Cube.
-  function occupant(z, y, x) {
-    const k = ck(z, y, x);
+  function occupant(f, i, j) {
+    const k = ck(f, i, j);
     if (S.kind === "reverse") {
-      const c = S.rev?.cells.find((c) => c.z === z && c.y === y && c.x === x);
+      const c = S.rev?.cells.find((x) => x.f === f && x.i === i && x.j === j);
       return c ? { mon: c.mon } : null;
     }
     const p = S.picks.get(k);
@@ -285,360 +257,489 @@
     return a ? { mon: a.mon, answer: true, count: a.count } : null;
   }
 
-  function highlighted() {
-    // Squares to light up in the 3D view: the slice being guessed, or the square being answered.
-    const out = new Set();
-    if (S.guess) sliceCells(S.guess.axis, S.guess.index).forEach((c) => out.add(ck(...c)));
-    return out;
-  }
-
-  function renderStack() {
-    const stack = $("cvStack");
-    stack.textContent = "";
-    if (!(S.kind === "fill" ? S.board : S.rev)) return;
-    const hl = highlighted();
-    const sel = S.sel ? ck(...S.sel) : null;
-    for (let z = 0; z < 3; z++) {
-      const plate = document.createElement("div");
-      plate.className = "cv-plate" + (z === S.layer ? " open" : "");
-      plate.dataset.z = z;
-      // Back rows first so nearer Pokémon are drawn over farther ones.
-      for (let y = 0; y < 3; y++) {
-        for (let x = 0; x < 3; x++) {
-          const k = ck(z, y, x);
-          const tile = document.createElement("div");
-          tile.className = "cv-tile";
-          tile.dataset.k = k;
-          if (hl.has(k)) tile.classList.add("hl");
-          if (k === sel) tile.classList.add("sel");
-          const o = occupant(z, y, x);
-          if (o && o.mon) {
-            const sh = document.createElement("span");
-            sh.className = "cv-shadow";
-            tile.appendChild(sh);
-            const st = document.createElement("span");
-            st.className = "cv-stand" + (o.hinted ? " hint" : "");
-            st.appendChild(img(o.mon, o.shiny));
-            if (o.answer) st.style.opacity = "0.45";
-            tile.appendChild(st);
-          } else {
-            tile.classList.add("empty");
-          }
-          plate.appendChild(tile);
-        }
-      }
-      stack.appendChild(plate);
-    }
-  }
-
-  function renderLayer() {
-    const z = S.layer;
-    const tabs = $("lvTabs");
-    const grid = $("lvGrid");
-    tabs.textContent = "";
-    grid.textContent = "";
-    const ready = S.kind === "fill" ? S.board : S.rev;
-    if (!ready) return;
-
-    // Layer tabs
-    for (let i = 0; i < 3; i++) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "lv-tab";
-      b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", String(i === z));
-      const name = document.createElement("span");
-      name.className = "lv-tab-name";
-      name.textContent = LAYER[i].split(" ")[0];
-      const word = document.createElement("span");
-      word.className = "lv-word";
-      word.textContent = " layer";
-      name.appendChild(word);
-      if (S.kind === "fill") {
-        let n = 0;
-        for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) if (S.picks.has(ck(i, y, x))) n++;
-        const c = document.createElement("span");
-        c.className = "lv-tab-count";
-        c.textContent = `${n}/9`;
-        name.appendChild(c);
-        b.append(name, badge(S.board.axes[2].rules[i]));
-      } else {
-        b.append(name, revBadge(2, i));
-      }
-      b.addEventListener("click", () => openLayer(i));
-      tabs.appendChild(b);
-    }
-
-    // Corner: the open layer's own rule (the third rule of every square here).
-    const corner = document.createElement(S.kind === "reverse" ? "button" : "div");
-    corner.className = S.kind === "reverse" ? "lv-head" : "lv-corner";
-    if (S.kind === "fill") {
-      const cap = document.createElement("span");
-      cap.textContent = "On this layer";
-      corner.append(cap, badge(S.board.axes[2].rules[z]));
-      corner.title = `Every square on the ${LAYER[z].toLowerCase()} also needs this`;
-    } else {
-      corner.type = "button";
-      corner.append(revBadge(2, z));
-      corner.setAttribute("aria-label", `${LAYER[z]}: ${revLabel(2, z)}`);
-      corner.addEventListener("click", () => openGuess(2, z));
-    }
-    grid.appendChild(corner);
-
-    // Column heads
-    for (let x = 0; x < 3; x++) grid.appendChild(head(0, x));
-    // Rows
-    for (let y = 0; y < 3; y++) {
-      grid.appendChild(head(1, y));
-      for (let x = 0; x < 3; x++) grid.appendChild(cell(z, y, x));
-    }
-
-    if (S.kind === "fill") {
-      const r = S.board.axes[2].rules[z];
-      $("lvHelp").textContent = `Each square needs a Pokémon that fits its column and its row, and every square on the ${LAYER[z].toLowerCase()} adds a third rule: ${r.label}.`;
-    } else {
-      $("lvHelp").textContent = "Tap a column, row or layer name and guess what its nine Pokémon share. A column or row runs through all three layers, so check the 3D view.";
-    }
-  }
-
-  function head(axis, index) {
-    const reverse = S.kind === "reverse";
-    const el = document.createElement(reverse ? "button" : "div");
-    el.className = "lv-head";
-    if (S.guess && S.guess.axis === axis && S.guess.index === index) el.classList.add("hl");
-    if (reverse) {
-      el.type = "button";
-      el.append(revBadge(axis, index));
-      el.setAttribute("aria-label", `${AXIS[axis]} ${index + 1}: ${revLabel(axis, index)}`);
-      el.addEventListener("click", () => openGuess(axis, index));
-    } else {
-      el.append(badge(S.board.axes[axis].rules[index]));
-      el.setAttribute("role", axis === 0 ? "columnheader" : "rowheader");
-    }
-    return el;
-  }
-
-  function cell(z, y, x) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "lv-cell";
-    b.dataset.z = z; b.dataset.y = y; b.dataset.x = x;
-    b.setAttribute("role", "gridcell");
-    const o = occupant(z, y, x);
-    if (S.sel && ck(...S.sel) === ck(z, y, x)) b.classList.add("sel");
-    if (o && o.mon) {
-      const im = img(o.mon, o.shiny);
-      b.appendChild(im);
-      const n = document.createElement("span");
-      n.className = "lv-name";
-      n.textContent = o.mon.display_name;
-      b.appendChild(n);
-      if (o.answer) {
-        b.classList.add("answer");
-        const c = document.createElement("span");
-        c.className = "lv-pct";
-        c.textContent = `${o.count} fit`;
-        b.appendChild(c);
-        b.setAttribute("aria-label", `One answer: ${o.mon.display_name}. ${o.count} Pokémon fit this square.`);
-      } else {
-        if (S.kind === "fill") b.classList.add("filled");
-        if (o.hinted) b.classList.add("hinted");
-        if (o.shiny) b.classList.add("shiny");
-        if (o.pct != null) {
-          const c = document.createElement("span");
-          c.className = "lv-pct";
-          c.textContent = `${Math.round(o.pct)}%`;
-          c.title = "Players who picked the same Pokémon here";
-          b.appendChild(c);
-        }
-        b.setAttribute("aria-label", `${o.mon.display_name}${o.shiny ? ", shiny" : ""}`);
-      }
-      b.addEventListener("mouseenter", () => animate(im, o.mon, o.shiny, 0));
-      b.addEventListener("mouseleave", () => window.PDD_MOTION?.stop(im));
-    } else {
-      const p = document.createElement("span");
-      p.className = "lv-plus";
-      p.setAttribute("aria-hidden", "true");
-      b.appendChild(p);
-      const [c, r, l] = rulesAt(z, y, x);
-      b.setAttribute("aria-label", `Empty: ${c.label}, ${r.label}, ${l.label}`);
-    }
-    b.addEventListener("click", () => {
-      if (swiped) return;
-      const im = b.querySelector("img");
-      if (o && o.mon) animate(im, o.mon, o.shiny, 2600);
-      else if (S.kind === "fill") openPick(z, y, x);
-    });
-    return b;
-  }
-
-  // Reverse headers: solved, revealed, or still hidden.
-  function revSlice(axis, index) {
+  // Reverse: a line's state.
+  function revSolved(line) {
     const run = S.revRun;
     if (!run) return null;
-    return run.solved.find((s) => s.axis === axis && s.index === index)
-      || run.reveal.find((s) => s.axis === axis && s.index === index && (s.revealed = true));
+    const s = run.solved.find((x) => x.line === line);
+    if (s) return { ...s, revealed: false };
+    const r = run.reveal.find((x) => x.line === line);
+    return r ? { ...r, revealed: true } : null;
   }
-  function revLabel(axis, index) {
-    const s = revSlice(axis, index);
-    return s ? s.label : "not named yet";
-  }
-  function revBadge(axis, index) {
-    const s = revSlice(axis, index);
-    if (!s) {
-      const el = document.createElement("span");
-      el.className = "rb rb-hidden";
-      el.textContent = "Name it";
-      return el;
-    }
+  function revBadge(line) {
+    const s = revSolved(line);
+    if (!s) { const el = document.createElement("span"); el.className = "rb rb-hidden"; el.textContent = "Name it"; return el; }
     const el = badge({ id: s.rule_id, label: s.label });
-    el.classList.add(s.revealed ? "rb-revealed" : "rb-solved");
+    if (s.revealed) el.classList.add("rb-revealed");
     return el;
+  }
+  const lineBadge = (line) => {
+    if (S.kind === "reverse") return revBadge(line);
+    if (line < 6) return badge(faceRule(line));
+    const axis = Math.floor((line - 6) / 3);
+    return badge(ringRule(axis, (line - 6) % 3));
+  };
+
+  // ── Building the cube ────────────────────────────────────────────────────
+  const stEls = new Map();    // "f,i,j" -> button
+  const faceEls = [];
+
+  function buildCube() {
+    const cube = $("rkCube");
+    cube.textContent = "";
+    stEls.clear();
+    faceEls.length = 0;
+    const t = parseFloat(getComputedStyle(document.body).getPropertyValue("--t")) || 92;
+    const h = t * 1.5;
+    for (let f = 0; f < 6; f++) {
+      const [u, v] = FACE_UV[f];
+      const n = normal(f);
+      const face = document.createElement("div");
+      face.className = `rk-face fc${f}`;
+      face.dataset.f = f;
+      face.style.transform = `matrix3d(${u[0]},${u[1]},${u[2]},0,${v[0]},${v[1]},${v[2]},0,${n[0]},${n[1]},${n[2]},0,${n[0] * h},${n[1] * h},${n[2] * h},1)`;
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        const [i, j] = gridToCell(f, r, c);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "st";
+        b.dataset.f = f; b.dataset.i = i; b.dataset.j = j;
+        face.appendChild(b);
+        stEls.set(ck(f, i, j), b);
+      }
+      cube.appendChild(face);
+      faceEls.push(face);
+    }
+    applyQ();
+  }
+
+  function paintStickers() {
+    const front = frontFace();
+    const rings = hoverRings();
+    for (const [f, i, j] of CELLS) {
+      const b = stEls.get(ck(f, i, j));
+      if (!b) continue;
+      const o = occupant(f, i, j);
+      const key = o && o.mon ? `${o.mon.key}:${o.shiny ? 1 : 0}:${o.answer ? 1 : 0}` : "";
+      if (b.dataset.k !== key) {
+        b.dataset.k = key;
+        b.textContent = "";
+        b.className = "st";
+        if (o && o.mon) {
+          b.appendChild(spriteImg(o.mon, o.shiny, !o.answer));
+          b.classList.add(o.answer ? "answer" : "filled");
+          if (o.hinted) b.classList.add("hinted");
+          if (o.shiny) b.classList.add("shiny");
+          if (o.answer) {
+            const c = document.createElement("span"); c.className = "st-count"; c.textContent = `${o.count} fit`; b.appendChild(c);
+          } else if (o.pct != null) {
+            const c = document.createElement("span"); c.className = "st-pct"; c.textContent = `${Math.round(o.pct)}%`; b.appendChild(c);
+          }
+        }
+      }
+      const [r0, r1, r2] = S.board || S.kind === "reverse" ? labelsFor(f, i, j) : ["", "", ""];
+      b.setAttribute("aria-label", o && o.mon ? `${o.mon.display_name}${o.answer ? ` (one answer, ${o.count} fit)` : ""}` : `Empty square: ${r0}, ${r1}, ${r2}`);
+      b.tabIndex = f === front ? 0 : -1;
+      b.classList.toggle("ring", rings.some((line) => inLine(line, f, i, j)));
+    }
+    faceEls.forEach((el, f) => el.classList.toggle("dim", f !== front));
+  }
+
+  function labelsFor(f, i, j) {
+    if (S.kind === "reverse" || !S.board) return ["face", "column", "row"];
+    return rulesAt(f, i, j).map((r) => r.label);
+  }
+
+  function inLine(line, f, i, j) {
+    if (line < 6) return line === f;
+    const axis = Math.floor((line - 6) / 3), k = (line - 6) % 3;
+    const [b, c] = others(f);
+    return (b === axis && i === k) || (c === axis && j === k);
+  }
+
+  // The two rings to light up: the square under the pointer, or the line being guessed.
+  function hoverRings() {
+    if (S.guess) return [S.guess.line];
+    const k = S.hover || (S.sel ? ck(...S.sel) : null);
+    if (!k) return [];
+    const [f, i, j] = k.split(",").map(Number);
+    const [b, c] = others(f);
+    return [lineOf(b, i), lineOf(c, j)];
+  }
+
+  function applyQ() {
+    $("rkCube").style.transform = css(S.Q);
+  }
+
+  // ── Labels for the face toward you ───────────────────────────────────────
+  // Which ring each screen column / row of the front face belongs to.
+  function frontLines() {
+    const Gt = tr(S.G);
+    const hAxis = app(Gt, [1, 0, 0]).findIndex((x) => Math.abs(x) > 0.5);
+    const vAxis = app(Gt, [0, 1, 0]).findIndex((x) => Math.abs(x) > 0.5);
+    const cols = [0, 1, 2].map((k) => lineOf(hAxis, Math.round(app(Gt, [k - 1, 0, 1])[hAxis]) + 1));
+    const rows = [0, 1, 2].map((k) => lineOf(vAxis, Math.round(app(Gt, [0, k - 1, 1])[vAxis]) + 1));
+    return { cols, rows };
+  }
+
+  function project(p, t, P, w, hgt) {
+    const q = app(S.Q, [p[0] * t, p[1] * t, p[2] * t]);
+    const s = P / (P - q[2]);
+    return [w / 2 + q[0] * s + originShift().x, hgt * 0.46 + q[1] * s];
+  }
+  function originShift() {
+    const t = tile();
+    return { x: t * 0.45 };
+  }
+  function tile() { return parseFloat(getComputedStyle(document.body).getPropertyValue("--t")) || 92; }
+
+  function renderLabels() {
+    const box = $("rkLabels");
+    box.textContent = "";
+    if (!(S.kind === "fill" ? S.board : S.rev)) return;
+    const scene = $("rkScene");
+    const w = scene.clientWidth, h = scene.clientHeight;
+    const t = tile();
+    const P = 1400;
+    const { cols, rows } = frontLines();
+    const lit = new Set(hoverRings());
+    const reverse = S.kind === "reverse";
+    // Front face in its untilted spot spans [-1.5t, 1.5t]; we project through the tilt.
+    const untilt = tr(S.G);   // so that S.Q · (G^T · p) = TILT · p
+    const place = (p) => { const cube = app(untilt, p); return project(cube, t, P, w, h); };
+    cols.forEach((line, k) => {
+      const el = document.createElement(reverse ? "button" : "div");
+      el.className = "rk-lab col" + (lit.has(line) ? " hl" : "");
+      const [x, y] = place([k - 1, 1.62, 1.5]);
+      el.style.left = `${x}px`; el.style.top = `${y}px`;
+      el.appendChild(lineBadge(line));
+      wireLabel(el, line, `Column ${k + 1}`);
+      box.appendChild(el);
+    });
+    rows.forEach((line, k) => {
+      const el = document.createElement(reverse ? "button" : "div");
+      el.className = "rk-lab row" + (lit.has(line) ? " hl" : "");
+      const [x, y] = place([-1.6, k - 1, 1.5]);
+      el.style.left = `${x}px`; el.style.top = `${y}px`;
+      el.appendChild(lineBadge(line));
+      wireLabel(el, line, `Row ${k + 1}`);
+      box.appendChild(el);
+    });
+  }
+  function wireLabel(el, line, name) {
+    if (el.tagName === "BUTTON") {
+      el.type = "button";
+      el.setAttribute("aria-label", `${name}: ${revSolved(line)?.label || "not named yet"}`);
+      el.addEventListener("click", () => openGuess(line));
+    } else {
+      el.setAttribute("aria-label", `${name} ring: ${el.textContent}`);
+    }
+  }
+
+  function renderTitle() {
+    const f = frontFace();
+    const box = $("rkTitle");
+    box.textContent = "";
+    box.className = `rk-title fc${f}`;
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    box.appendChild(sw);
+    const name = document.createElement("span");
+    name.textContent = FACE_NAMES[f];
+    box.appendChild(name);
+    if (S.kind === "reverse") {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "rk-name";
+      b.appendChild(revBadge(f));
+      b.setAttribute("aria-label", `${FACE_NAMES[f]}: ${revSolved(f)?.label || "not named yet"}`);
+      b.addEventListener("click", () => openGuess(f));
+      box.appendChild(b);
+    } else if (S.board) {
+      box.appendChild(badge(faceRule(f)));
+    }
+  }
+
+  function renderFaceList() {
+    const ul = $("flList");
+    ul.textContent = "";
+    const front = frontFace();
+    for (let f = 0; f < 6; f++) {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `fl-item fc${f}`;
+      b.setAttribute("aria-current", String(f === front));
+      const sw = document.createElement("span"); sw.className = "fl-sw";
+      const text = document.createElement("span"); text.className = "fl-text";
+      const nm = document.createElement("span"); nm.className = "fl-name"; nm.textContent = FACE_NAMES[f];
+      text.append(nm, lineBadge(f));
+      const count = document.createElement("span"); count.className = "fl-count";
+      if (S.kind === "fill") {
+        let n = 0;
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (S.picks.has(ck(f, i, j))) n++;
+        count.textContent = `${n}/9`;
+      }
+      b.append(sw, text, count);
+      b.addEventListener("click", () => turnToFace(f));
+      li.appendChild(b);
+      ul.appendChild(li);
+    }
+  }
+
+  function renderConsole() {
+    document.querySelectorAll("[data-kind]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.kind === S.kind)));
+    document.querySelectorAll("[data-which]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.which === S.which)));
+    const chip = $("ccChip");
+    if (S.kind === "fill") {
+      const n = S.picks.size;
+      $("ccScore").textContent = `${n} / 54`;
+      $("ccFill").style.width = `${(n / 54) * 100}%`;
+      pips($("ccLives"), S.maxLives, S.lives, "pip-life");
+      pips($("ccHints"), S.maxHints, S.hints, "pip-hint");
+      chip.textContent = S.board ? (S.board.is_daily ? `Today's Cube, ${prettyDate(S.board.seed)}` : "Practice Cube") : "";
+    } else {
+      const run = S.revRun;
+      const n = run ? run.solved.length : 0;
+      $("ccScore").textContent = `${n} / 15`;
+      $("ccFill").style.width = `${(n / 15) * 100}%`;
+      pips($("ccLives"), S.rev ? S.rev.lives : 3, run ? run.lives_left : 3, "pip-life");
+      pips($("ccHints"), S.rev ? S.rev.hints : 2, run ? run.hints_left : 2, "pip-hint");
+      chip.textContent = S.rev ? (S.rev.is_daily ? `Today's Reverse Cube, ${prettyDate(S.rev.seed)}` : "Practice Reverse Cube") : "";
+    }
+    $("rkHelp").textContent = S.kind === "fill"
+      ? "Tap a square on the face toward you. Each one needs a Pokémon that fits the face, its column and its row."
+      : "Tap the face name or a column or row name to guess what all its Pokémon share. Rings carry on around the cube.";
   }
 
   function renderBanner() {
     const bn = $("ccBanner");
-    const text = bn.querySelector(".cc-banner-text");
-    const btn = $("ccBannerBtn");
     let msg = null, lost = false;
     if (S.kind === "fill" && S.board && S.finished) {
-      if (S.picks.size >= 27) msg = S.board.is_daily ? "Cube complete. Come back tomorrow for a new one." : "Cube complete.";
+      if (S.picks.size >= 54) msg = S.board.is_daily ? "Cube complete. Come back tomorrow for a new one." : "Cube complete.";
       else { msg = "Out of lives. The open squares show one Pokémon that fit."; lost = true; }
     }
     if (S.kind === "reverse" && S.revRun && S.revRun.finished) {
-      if (S.revRun.won) msg = "All nine rules named.";
+      if (S.revRun.won) msg = "All 15 rules named.";
       else { msg = "Out of lives. The rules you missed are shown in red."; lost = true; }
     }
     bn.hidden = !msg;
     bn.classList.toggle("lost", lost);
     if (!msg) return;
-    text.textContent = msg;
+    bn.querySelector(".cc-banner-text").textContent = msg;
     const daily = S.kind === "fill" ? S.board.is_daily : S.rev.is_daily;
-    btn.textContent = daily ? "Play a practice Cube" : "New Cube";
+    $("ccBannerBtn").textContent = daily ? "Play a practice Cube" : "New Cube";
   }
 
-  // ── Opening a layer (tabs, the 3D view, swipes, keys) ────────────────────
-  function openLayer(z) {
-    if (z < 0 || z > 2) return;
-    S.layer = z;
-    renderStack();
-    renderLayer();
+  function render() {
+    renderConsole();
+    renderTitle();
+    paintStickers();
+    renderLabels();
+    renderFaceList();
+    renderBanner();
+  }
+  function renderView() {       // after turning: only what depends on the front face
+    renderTitle();
+    paintStickers();
+    renderLabels();
+    renderFaceList();
   }
 
-  // ── 3D view: drag to turn ────────────────────────────────────────────────
-  const view = { spin: -38, tilt: 58 };
-  function setView() {
-    document.body.style.setProperty("--spin", `${view.spin}deg`);
-    document.body.style.setProperty("--tilt", `${view.tilt}deg`);
+  // ── Turning ──────────────────────────────────────────────────────────────
+  let anim = 0;
+  function settleTo(G) {
+    S.G = G;
+    const target = mul(TILT, G);
+    cancelAnimationFrame(anim);
+    $("rkLabels").classList.add("hidden");
+    if (calm()) { S.Q = target; applyQ(); $("rkLabels").classList.remove("hidden"); renderView(); return; }
+    const a = toQ(S.Q), b = toQ(target);
+    const t0 = performance.now(), dur = 320;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      S.Q = fromQ(slerp(a, b, e));
+      applyQ();
+      if (k < 1) anim = requestAnimationFrame(step);
+      else { S.Q = target; applyQ(); $("rkLabels").classList.remove("hidden"); renderView(); }
+    };
+    anim = requestAnimationFrame(step);
+    paintStickers();
+    renderTitle();
+    renderFaceList();
   }
-  function setupStack() {
-    const scene = $("cvScene");
+  function nearest(Q, filter) {
+    let best = null, bestT = -Infinity;
+    for (const M of ROTS) {
+      if (filter && !filter(M)) continue;
+      const t = trace(Q, mul(TILT, M));
+      if (t > bestT) { bestT = t; best = M; }
+    }
+    return best;
+  }
+  function turn(dir) {
+    const q = Math.PI / 2;
+    const R = { left: ry(-q), right: ry(q), up: rx(q), down: rx(-q) }[dir];
+    settleTo(round(mul(R, S.G)));
+  }
+  function turnToFace(f) {
+    const n = normal(f);
+    const G = nearest(mul(TILT, S.G), (M) => app(M, n)[2] === 1);
+    if (G) settleTo(G);
+  }
+
+  function setupDrag() {
+    const scene = $("rkScene");
     let drag = null;
-    let moved = false;
     scene.addEventListener("pointerdown", (e) => {
-      if (e.button !== 0) return;
-      drag = { x: e.clientX, y: e.clientY, spin: view.spin, tilt: view.tilt, touch: e.pointerType !== "mouse" };
-      moved = false;
-      scene.classList.remove("settle");
+      if (e.button !== 0 || e.target.closest(".rk-lab")) return;
+      drag = { x: e.clientX, y: e.clientY, Q: S.Q, moved: false, id: e.pointerId, target: e.target };
+      cancelAnimationFrame(anim);
     });
     window.addEventListener("pointermove", (e) => {
-      if (!drag) return;
+      if (!drag || e.pointerId !== drag.id) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 6) { moved = true; scene.classList.add("dragging"); }
-      if (!moved) return;
-      view.spin = drag.spin + dx * 0.45;
-      if (!drag.touch) view.tilt = Math.max(30, Math.min(78, drag.tilt - dy * 0.3));
-      setView();
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      if (!drag.moved) { drag.moved = true; scene.classList.add("dragging"); $("rkLabels").classList.add("hidden"); }
+      const k = 0.0085;
+      S.Q = mul(mul(ry(dx * k), rx(-dy * k)), drag.Q);
+      applyQ();
     });
-    const end = () => { drag = null; scene.classList.remove("dragging"); };
+    const end = (e) => {
+      if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.id)) return;
+      const d = drag;
+      drag = null;
+      scene.classList.remove("dragging");
+      if (d.moved) {
+        suppressClick = true;
+        setTimeout(() => { suppressClick = false; }, 0);
+        settleTo(nearest(S.Q));
+      }
+    };
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
-    scene.addEventListener("click", (e) => {
-      if (moved) { moved = false; return; }
-      const plate = e.target.closest(".cv-plate");
-      if (!plate) return;
-      const z = Number(plate.dataset.z);
-      const tile = e.target.closest(".cv-tile");
-      openLayer(z);
-      if (tile && S.kind === "fill") {
-        const [tz, ty, tx] = tile.dataset.k.split(",").map(Number);
-        if (!occupant(tz, ty, tx)) openPick(tz, ty, tx);
-      }
-    });
-    scene.addEventListener("dblclick", () => { turnTo(-38, 58); });
-    document.querySelectorAll(".cv-turn").forEach((b) => b.addEventListener("click", () => turnTo(view.spin + Number(b.dataset.turn), view.tilt)));
-    setView();
-  }
-  function turnTo(spin, tilt) {
-    const scene = $("cvScene");
-    if (!reduced?.matches) scene.classList.add("settle");
-    view.spin = spin; view.tilt = tilt;
-    setView();
-  }
 
-  // ── Flat layer: swipe for the next layer, arrow keys between squares ─────
-  let swiped = false;
-  function setupGrid() {
-    const grid = $("lvGrid");
-    let start = null;
-    grid.addEventListener("pointerdown", (e) => { start = { x: e.clientX, y: e.clientY }; swiped = false; });
-    grid.addEventListener("pointerup", (e) => {
-      if (!start) return;
-      const dx = e.clientX - start.x, dy = e.clientY - start.y;
-      start = null;
-      if (Math.abs(dx) > 60 && Math.abs(dy) < 45) {
-        swiped = true;
-        openLayer(S.layer + (dx < 0 ? 1 : -1));
-        setTimeout(() => { swiped = false; }, 0);
+    scene.addEventListener("click", (e) => {
+      if (suppressClick) return;
+      const st = e.target.closest(".st");
+      if (!st) return;
+      const f = Number(st.dataset.f), i = Number(st.dataset.i), j = Number(st.dataset.j);
+      if (f !== frontFace()) { turnToFace(f); return; }
+      if (S.kind === "fill") {
+        const o = occupant(f, i, j);
+        if (!o) openPick(f, i, j);
       }
     });
-    grid.addEventListener("keydown", (e) => {
-      const c = e.target.closest(".lv-cell");
-      if (e.key === "PageDown" || e.key === "PageUp") {
-        e.preventDefault();
-        const pos = c ? [Number(c.dataset.y), Number(c.dataset.x)] : [0, 0];
-        openLayer(S.layer + (e.key === "PageDown" ? 1 : -1));
-        focusCell(pos[0], pos[1]);
-        return;
-      }
-      if (!c) return;
-      let y = Number(c.dataset.y), x = Number(c.dataset.x);
-      if (e.key === "ArrowRight") x = Math.min(2, x + 1);
-      else if (e.key === "ArrowLeft") x = Math.max(0, x - 1);
-      else if (e.key === "ArrowDown") y = Math.min(2, y + 1);
-      else if (e.key === "ArrowUp") y = Math.max(0, y - 1);
-      else return;
+    scene.addEventListener("pointerover", (e) => {
+      if (e.pointerType !== "mouse" || drag) return;
+      const st = e.target.closest(".st");
+      const k = st && Number(st.dataset.f) === frontFace() ? ck(st.dataset.f, st.dataset.i, st.dataset.j) : null;
+      if (k !== S.hover) { S.hover = k; paintStickers(); renderLabels(); }
+    });
+    scene.addEventListener("pointerleave", () => { if (S.hover) { S.hover = null; paintStickers(); renderLabels(); } });
+    scene.addEventListener("focusin", (e) => {
+      const st = e.target.closest(".st");
+      if (st) { S.hover = ck(st.dataset.f, st.dataset.i, st.dataset.j); paintStickers(); renderLabels(); }
+    });
+    document.querySelectorAll(".rk-turn").forEach((b) => b.addEventListener("click", () => turn(b.dataset.turn)));
+    document.addEventListener("keydown", (e) => {
+      if (document.querySelector("dialog[open]")) return;
+      if (e.target.matches?.("input, textarea")) return;
+      const dir = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" }[e.key];
+      if (!dir) return;
       e.preventDefault();
-      focusCell(y, x);
+      turn(dir);
     });
+    window.addEventListener("resize", () => { buildCube(); paintStickersForce(); renderLabels(); });
   }
-  function focusCell(y, x) {
-    $("lvGrid").querySelector(`.lv-cell[data-y="${y}"][data-x="${x}"]`)?.focus();
+  let suppressClick = false;
+  function paintStickersForce() { stEls.forEach((b) => { delete b.dataset.k; }); paintStickers(); }
+
+  // ── Loading ──────────────────────────────────────────────────────────────
+  async function load(fresh) {
+    $("ccNew").hidden = S.which !== "practice";
+    try {
+      if (S.kind === "fill") await loadFill(fresh); else await loadReverse(fresh);
+    } catch (e) {
+      toast(e.message || "Couldn't load the Cube.", "err");
+    }
+    paintStickersForce();
+    render();
+  }
+  const newPracticeSeed = () => `p-${Math.random().toString(36).slice(2, 10)}`;
+
+  async function loadFill(fresh) {
+    S.answers = new Map();
+    S.picks = new Map();
+    S.rev = null; S.revRun = null;
+    let seed, saved = null;
+    if (S.which === "practice") {
+      saved = fresh ? null : recall(PRACTICE_KEY);
+      seed = saved?.seed || newPracticeSeed();
+    }
+    const b = await api(`/cube/board${seed ? `?seed=${encodeURIComponent(seed)}` : ""}`);
+    S.board = b;
+    S.maxLives = b.lives; S.maxHints = b.hints;
+    if (b.run) {
+      S.lives = b.run.lives_left; S.hints = b.run.hints_left; S.finished = b.run.finished;
+      for (const p of b.run.picks) S.picks.set(ck(p.f, p.i, p.j), { mon: p.mon, hinted: p.hinted, shiny: p.shiny, pct: p.pct });
+    } else if (saved && saved.seed === b.seed) {
+      S.lives = saved.lives; S.hints = saved.hints; S.finished = saved.finished;
+      for (const [k, v] of saved.picks) S.picks.set(k, v);
+    } else {
+      S.lives = b.lives; S.hints = b.hints; S.finished = false;
+    }
+    savePractice();
+    if (S.finished) await loadAnswers();
+  }
+  function savePractice() {
+    if (S.which !== "practice" || !S.board || S.kind !== "fill") return;
+    store(PRACTICE_KEY, { seed: S.board.seed, lives: S.lives, hints: S.hints, finished: S.finished, picks: Array.from(S.picks.entries()) });
+  }
+  async function loadAnswers() {
+    try {
+      const sol = await api(`/cube/solution?seed=${encodeURIComponent(S.board.seed)}`);
+      S.answers = new Map(sol.cells.map((c) => [ck(c.f, c.i, c.j), { mon: c.example, count: c.count }]));
+    } catch (_) { S.answers = new Map(); }
+  }
+  async function loadReverse(fresh) {
+    S.board = null;
+    if (S.which === "daily") S.rev = await api("/cube/reverse/daily");
+    else {
+      if (fresh || !S.revPractice) S.revPractice = await api("/cube/reverse", { difficulty: "medium" });
+      S.rev = S.revPractice;
+    }
+    S.revRun = S.rev.run;
   }
 
   // ── Fill: choosing a Pokémon ─────────────────────────────────────────────
-  let suggestTimer = 0;
-  let suggestions = [];
-  let active = -1;
+  let suggestTimer = 0, suggestions = [], active = -1, submitting = false;
+  const usedKeys = () => Array.from(S.picks.values()).map((p) => p.mon.key);
 
-  function usedKeys() {
-    return Array.from(S.picks.values()).map((p) => p.mon.key);
-  }
-
-  function openPick(z, y, x) {
+  function openPick(f, i, j) {
     if (S.finished || S.kind !== "fill") return;
-    S.sel = [z, y, x];
-    const rules = $("cmRules");
-    rules.textContent = "";
-    rulesAt(z, y, x).forEach((r, i) => {
-      const box = document.createElement("div");
-      box.className = "cm-rule";
-      const ax = document.createElement("span");
-      ax.className = "cm-rule-axis";
-      ax.textContent = i === 2 ? LAYER[z] : AXIS[i];
-      box.append(ax, badge(r));
-      rules.appendChild(box);
-    });
+    S.sel = [f, i, j];
+    // Name the two rings the way they sit on screen right now.
+    const { cols } = frontLines();
+    const [b, c] = others(f);
+    const [fr, r1, r2] = rulesAt(f, i, j);
+    const firstIsCol = cols.includes(lineOf(b, i));
+    const boxes = [
+      { label: FACE_NAMES[f], rule: fr, face: true },
+      { label: "Column", rule: firstIsCol ? r1 : r2 },
+      { label: "Row", rule: firstIsCol ? r2 : r1 },
+    ];
+    void c;
+    const box = $("cmRules");
+    box.textContent = "";
+    for (const x of boxes) {
+      const el = document.createElement("div");
+      el.className = "cm-rule" + (x.face ? ` face fc${f}` : "");
+      const ax = document.createElement("span"); ax.className = "cm-rule-axis"; ax.textContent = x.label;
+      el.append(ax, badge(x.rule));
+      box.appendChild(el);
+    }
     $("cmInput").value = "";
     $("cmSuggest").textContent = "";
     suggestions = []; active = -1;
@@ -646,23 +747,9 @@
     pips($("cmLives"), S.maxLives, S.lives, "pip-life");
     $("cmHint").disabled = S.hints <= 0;
     $("cmHint").textContent = S.hints > 0 ? `Use a hint (${S.hints} left)` : "No hints left";
-    renderStack();
-    renderLayer();
+    paintStickers(); renderLabels();
     show($("cmPick"));
     setTimeout(() => $("cmInput").focus(), 30);
-  }
-
-  function setStatus(id, text, tone) {
-    const el = $(id);
-    el.textContent = text;
-    el.className = "cm-status" + (tone ? ` ${tone}` : "");
-  }
-
-  function show(dlg) {
-    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
-  }
-  function hide(dlg) {
-    if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open");
   }
 
   async function suggest() {
@@ -679,15 +766,15 @@
     const ul = $("cmSuggest");
     ul.textContent = "";
     const used = new Set(usedKeys());
-    suggestions.forEach((m, i) => {
+    suggestions.forEach((m, k) => {
       const li = document.createElement("li");
       const b = document.createElement("button");
       b.type = "button";
       b.setAttribute("role", "option");
-      if (i === active) b.classList.add("active");
-      b.append(img(m, false));
+      if (k === active) b.classList.add("active");
+      b.append(spriteImg(m, false, false));
       const t = document.createElement("span");
-      t.textContent = m.display_name + (used.has(m.key) ? " (already used)" : "");
+      t.textContent = m.display_name + (used.has(m.key) ? " (already on the cube)" : "");
       b.appendChild(t);
       b.addEventListener("click", () => submitPick(m));
       li.appendChild(b);
@@ -695,24 +782,23 @@
     });
   }
 
-  let submitting = false;
   async function submitPick(mon) {
     if (submitting || !S.sel) return;
     submitting = true;
-    const [z, y, x] = S.sel;
+    const [f, i, j] = S.sel;
     try {
-      const r = await api("/cube/validate", { seed: S.board.seed, z, y, x, pokemon_key: mon.key, used_keys: usedKeys() });
+      const r = await api("/cube/validate", { seed: S.board.seed, f, i, j, pokemon_key: mon.key, used_keys: usedKeys() });
       if (r.ok) {
-        S.picks.set(ck(z, y, x), { mon: r.mon, hinted: false, shiny: r.shiny, pct: r.pct });
+        S.picks.set(ck(f, i, j), { mon: r.mon, hinted: false, shiny: r.shiny, pct: r.pct });
+        if (r.lives_left != null) S.lives = r.lives_left;
         hide($("cmPick"));
-        S.sel = null;
         if (r.shiny) toast(`A shiny ${r.mon.display_name}!`, "ok");
         if (r.stranded) toast("Heads up: with the Pokémon used so far, not every open square can still be filled.", "err");
-        afterAnswer(z, y, x, r);
+        await afterAnswer(f, i, j, r.finished);
       } else {
         const msgs = {
           does_not_match: `${mon.display_name} doesn't fit all three rules.`,
-          duplicate: `${mon.display_name} is already on this Cube. Each Pokémon goes in once.`,
+          duplicate: `${mon.display_name} is already on the cube. Each Pokémon goes on once.`,
           unknown_pokemon: "Pick a Pokémon from the list.",
           already_filled: "That square is already filled.",
           board_locked: "This Cube is finished.",
@@ -721,20 +807,13 @@
         if (r.reason === "does_not_match" || r.reason === "duplicate") {
           S.lives = r.lives_left != null ? r.lives_left : Math.max(0, S.lives - 1);
           pips($("cmLives"), S.maxLives, S.lives, "pip-life");
-          const cellEl = $("lvGrid").querySelector(`.lv-cell[data-z="${z}"][data-y="${y}"][data-x="${x}"]`);
-          cellEl?.classList.add("err");
-          if (S.lives <= 0) {
-            S.finished = true;
-            hide($("cmPick"));
-            S.sel = null;
-            await loadAnswers();
-          }
+          const el = stEls.get(ck(f, i, j));
+          el?.classList.remove("err"); void el?.offsetWidth; el?.classList.add("err");
+          if (S.lives <= 0) { S.finished = true; hide($("cmPick")); await loadAnswers(); }
         }
         if (r.reason === "board_locked") { S.finished = true; hide($("cmPick")); await loadAnswers(); }
-        renderConsole();
-        renderBanner();
-        if (S.finished) { renderStack(); renderLayer(); }
         savePractice();
+        render();
       }
     } catch (e) {
       setStatus("cmStatus", e.message, "err");
@@ -742,58 +821,35 @@
     submitting = false;
   }
 
-  async function afterAnswer(z, y, x, r) {
-    if (r && r.lives_left != null) S.lives = r.lives_left;
-    if (S.picks.size >= 27 || (r && r.finished)) {
+  async function afterAnswer(f, i, j, finished) {
+    S.sel = null;
+    if (S.picks.size >= 54 || finished) {
       S.finished = true;
-      if (S.picks.size < 27) await loadAnswers();
+      if (S.picks.size < 54) await loadAnswers();
     }
     savePractice();
     render();
-    // The new Pokémon moves for a moment, in both views.
-    const k = ck(z, y, x);
-    $("cvStack").querySelector(`.cv-tile[data-k="${k}"]`)?.classList.add("ok-flash");
-    const cellEl = $("lvGrid").querySelector(`.lv-cell[data-z="${z}"][data-y="${y}"][data-x="${x}"]`);
-    const p = S.picks.get(k);
-    if (cellEl && p) setTimeout(() => animate(cellEl.querySelector("img"), p.mon, p.shiny, 2600), 120);
-    // Done with this layer? Open the next one with space left.
-    if (!S.finished && cellEl) {
-      let full = true;
-      for (let yy = 0; yy < 3; yy++) for (let xx = 0; xx < 3; xx++) if (!S.picks.has(ck(z, yy, xx))) full = false;
-      if (full) setTimeout(() => openLayer(firstOpenLayer()), 900);
-      else cellEl.focus();
-    }
+    const el = stEls.get(ck(f, i, j));
+    if (el) { el.classList.add("pop"); setTimeout(() => el.classList.remove("pop"), 500); el.focus({ preventScroll: true }); }
   }
 
   async function useHint() {
     if (!S.sel || S.hints <= 0) return;
-    const [z, y, x] = S.sel;
-    const filled = Array.from(S.picks.entries()).map(([k, v]) => {
-      const [a, b, c] = k.split(",").map(Number);
-      return { z: a, y: b, x: c, key: v.mon.key };
-    });
+    const [f, i, j] = S.sel;
+    const filled = Array.from(S.picks.entries()).map(([k, v]) => { const [a, b, c] = k.split(",").map(Number); return { f: a, i: b, j: c, key: v.mon.key }; });
     try {
-      const r = await api("/cube/hint", { seed: S.board.seed, z, y, x, used_keys: usedKeys(), filled });
-      if (!r.ok) {
-        setStatus("cmStatus", r.reason === "no_hints" ? "No hints left." : "No hint for this square.", "err");
-        return;
-      }
+      const r = await api("/cube/hint", { seed: S.board.seed, f, i, j, used_keys: usedKeys(), filled });
+      if (!r.ok) { setStatus("cmStatus", r.reason === "no_hints" ? "No hints left." : "No hint for this square.", "err"); return; }
       S.hints = r.hints_left != null ? r.hints_left : S.hints - 1;
-      S.picks.set(ck(z, y, x), { mon: r.mon, hinted: true, shiny: false, pct: null });
+      S.picks.set(ck(f, i, j), { mon: r.mon, hinted: true, shiny: false, pct: null });
       hide($("cmPick"));
-      S.sel = null;
-      afterAnswer(z, y, x, { finished: r.finished });
-    } catch (e) {
-      setStatus("cmStatus", e.message, "err");
-    }
+      await afterAnswer(f, i, j, r.finished);
+    } catch (e) { setStatus("cmStatus", e.message, "err"); }
   }
 
   function setupPick() {
     const input = $("cmInput");
-    input.addEventListener("input", () => {
-      clearTimeout(suggestTimer);
-      suggestTimer = setTimeout(suggest, 120);
-    });
+    input.addEventListener("input", () => { clearTimeout(suggestTimer); suggestTimer = setTimeout(suggest, 120); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         if (!suggestions.length) return;
@@ -807,44 +863,45 @@
     });
     $("cmPickForm").addEventListener("submit", (e) => e.preventDefault());
     $("cmHint").addEventListener("click", useHint);
-    $("cmPick").addEventListener("close", () => { S.sel = null; renderStack(); renderLayer(); });
+    $("cmPick").addEventListener("close", () => { S.sel = null; paintStickers(); renderLabels(); });
   }
 
-  // ── Reverse: guessing a slice ────────────────────────────────────────────
+  // ── Reverse: guessing a face or ring ─────────────────────────────────────
   let groupFilter = "all";
   const GROUP_NAMES = { all: "All", type: "Types", region: "Regions", evolution: "Evolution", move: "Moves", ability: "Abilities", other: "Other" };
 
-  async function openGuess(axis, index) {
-    if (!S.revRun || S.revRun.finished || revSlice(axis, index)) return;
+  async function openGuess(line) {
+    if (!S.revRun || S.revRun.finished || revSolved(line)) return;
     if (!S.catalog) {
       try { S.catalog = await api("/rules/catalog"); } catch (e) { toast(e.message, "err"); return; }
     }
-    S.guess = { axis, index, rule: null };
-    if (axis === 2) S.layer = index;
-    $("cmGuessTitle").textContent = axis === 2
-      ? `What do all nine on the ${LAYER[index].toLowerCase()} share?`
-      : `What do all nine in ${AXIS[axis].toLowerCase()} ${index + 1} share?`;
+    S.guess = { line, rule: null };
+    let title;
+    if (line < 6) title = `What do all nine on the ${FACE_NAMES[line].toLowerCase()} share?`;
+    else {
+      const { cols } = frontLines();
+      title = `What do all twelve in this ${cols.includes(line) ? "column" : "row"} ring share?`;
+    }
+    $("cmGuessTitle").textContent = title;
     const slice = $("cgSlice");
     slice.textContent = "";
-    for (const [z, y, x] of sliceCells(axis, index)) {
-      const o = occupant(z, y, x);
-      const f = document.createElement("figure");
+    for (const [f, i, j] of cellsOf(line)) {
+      const o = occupant(f, i, j);
+      const fig = document.createElement("figure");
+      fig.className = `fc${f}`;
       const cap = document.createElement("figcaption");
       cap.textContent = o.mon.display_name;
-      f.append(img(o.mon, false), cap);
-      slice.appendChild(f);
+      fig.append(spriteImg(o.mon, false, true), cap);
+      slice.appendChild(fig);
     }
     $("cgSearch").value = "";
     groupFilter = "all";
-    drawGroups();
-    drawRules();
+    drawGroups(); drawRules();
     setStatus("cgStatus", "");
     updateGuessFoot();
-    renderStack();
-    renderLayer();
+    paintStickers(); renderLabels();
     show($("cmGuess"));
   }
-
   function drawGroups() {
     const box = $("cgGroups");
     box.textContent = "";
@@ -858,53 +915,39 @@
       box.appendChild(b);
     });
   }
-
   function drawRules() {
     const q = $("cgSearch").value.trim().toLowerCase();
     const list = $("cgList");
     list.textContent = "";
     const groups = groupFilter === "all" ? Object.keys(S.catalog.groups) : [groupFilter];
     let n = 0;
-    for (const g of groups) {
-      for (const r of S.catalog.groups[g]) {
-        if (q && !r.label.toLowerCase().includes(q)) continue;
-        const b = document.createElement("button");
-        b.type = "button";
-        b.setAttribute("role", "option");
-        b.setAttribute("aria-selected", String(S.guess?.rule?.rule_id === r.rule_id));
-        b.textContent = r.label;
-        b.addEventListener("click", () => {
-          S.guess.rule = r;
-          drawRules();
-          updateGuessFoot();
-        });
-        list.appendChild(b);
-        n++;
-      }
+    for (const g of groups) for (const r of S.catalog.groups[g]) {
+      if (q && !r.label.toLowerCase().includes(q)) continue;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "option");
+      b.setAttribute("aria-selected", String(S.guess?.rule?.rule_id === r.rule_id));
+      b.textContent = r.label;
+      b.addEventListener("click", () => { S.guess.rule = r; drawRules(); updateGuessFoot(); });
+      list.appendChild(b);
+      n++;
     }
-    if (!n) {
-      const p = document.createElement("p");
-      p.className = "cm-status";
-      p.textContent = "No category matches that search.";
-      list.appendChild(p);
-    }
+    if (!n) { const p = document.createElement("p"); p.className = "cm-status"; p.textContent = "No category matches that search."; list.appendChild(p); }
   }
-
   function updateGuessFoot() {
     const run = S.revRun;
     pips($("cgLives"), S.rev.lives, run.lives_left, "pip-life");
     $("cgHint").disabled = run.hints_left <= 0;
-    $("cgHint").textContent = run.hints_left > 0 ? "Reveal this one" : "No reveals left";
+    $("cgHint").textContent = run.hints_left > 0 ? `Reveal this one (${run.hints_left} left)` : "No reveals left";
     $("cgGo").disabled = !S.guess?.rule;
     $("cgGo").textContent = S.guess?.rule ? `Guess ${S.guess.rule.label}` : "Guess";
   }
-
   async function submitGuess(hint) {
     const g = S.guess;
     if (!g || (!hint && !g.rule)) return;
     try {
       const r = await api(hint ? "/cube/reverse/hint" : "/cube/reverse/validate",
-        { board_id: S.rev.board_id, axis: g.axis, index: g.index, rule_id: hint ? "" : g.rule.rule_id });
+        { board_id: S.rev.board_id, line: g.line, rule_id: hint ? "" : g.rule.rule_id });
       S.revRun = r.run;
       if (S.rev === S.revPractice) S.revPractice.run = r.run;
       if (r.ok) {
@@ -914,41 +957,29 @@
         setStatus("cgStatus", `Not ${r.label}. ${r.run.lives_left} ${r.run.lives_left === 1 ? "life" : "lives"} left.`, "err");
         updateGuessFoot();
         if (r.run.finished) hide($("cmGuess"));
-      } else if (r.reason === "board_locked") {
-        hide($("cmGuess"));
-      } else {
-        setStatus("cgStatus", r.reason === "no_hints" ? "No reveals left." : "That didn't work.", "err");
-      }
+      } else if (r.reason === "board_locked") hide($("cmGuess"));
+      else setStatus("cgStatus", r.reason === "no_hints" ? "No reveals left." : "That didn't work.", "err");
       render();
-    } catch (e) {
-      setStatus("cgStatus", e.message, "err");
-    }
+    } catch (e) { setStatus("cgStatus", e.message, "err"); }
   }
-
   function setupGuess() {
     $("cgSearch").addEventListener("input", drawRules);
     $("cgGo").addEventListener("click", () => submitGuess(false));
     $("cgHint").addEventListener("click", () => submitGuess(true));
-    $("cmGuess").addEventListener("close", () => { S.guess = null; renderStack(); renderLayer(); });
+    $("cmGuess").addEventListener("close", () => { S.guess = null; paintStickers(); renderLabels(); });
   }
 
   // ── Console + dialogs ────────────────────────────────────────────────────
   function setupConsole() {
     document.querySelectorAll("[data-kind]").forEach((b) => b.addEventListener("click", () => {
       if (S.kind === b.dataset.kind) return;
-      S.kind = b.dataset.kind;
-      S.layer = 0;
-      writeHash();
-      load();
+      S.kind = b.dataset.kind; writeHash(); load();
     }));
     document.querySelectorAll("[data-which]").forEach((b) => b.addEventListener("click", () => {
       if (S.which === b.dataset.which) return;
-      S.which = b.dataset.which;
-      S.layer = 0;
-      writeHash();
-      load();
+      S.which = b.dataset.which; writeHash(); load();
     }));
-    $("ccNew").addEventListener("click", newPractice);
+    $("ccNew").addEventListener("click", () => newPractice());
     $("ccBannerBtn").addEventListener("click", () => {
       if (S.which === "daily") { S.which = "practice"; writeHash(); }
       newPractice();
@@ -957,18 +988,10 @@
     document.querySelectorAll("dialog.cm").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d) hide(d); }));
     $("cubeHowBtn").addEventListener("click", () => show($("cmHow")));
   }
-
   async function newPractice() {
-    $("ccNew").hidden = false;
-    S.layer = 0;
-    try {
-      if (S.kind === "fill") { store(PRACTICE_KEY, null); await loadFill(true); }
-      else await loadReverse(true);
-    } catch (e) { toast(e.message, "err"); }
-    render();
+    if (S.kind === "fill") store(PRACTICE_KEY, null);
+    await load(true);
   }
-
-  // #reverse, #practice and #reverse-practice open those directly.
   function readHash() {
     const h = (location.hash || "").slice(1);
     S.kind = h.startsWith("reverse") ? "reverse" : "fill";
@@ -981,15 +1004,17 @@
 
   // ── Start ────────────────────────────────────────────────────────────────
   readHash();
-  setupStack();
-  setupGrid();
+  window.addEventListener("hashchange", () => { readHash(); load(); });
+  buildCube();
+  setupDrag();
   setupPick();
   setupGuess();
   setupConsole();
   load();
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => renderLabels());
   try {
-    if (!localStorage.getItem("route81.cube.seenHow")) {
-      localStorage.setItem("route81.cube.seenHow", "1");
+    if (!localStorage.getItem("route81.cube54.seenHow")) {
+      localStorage.setItem("route81.cube54.seenHow", "1");
       setTimeout(() => show($("cmHow")), 300);
     }
   } catch (_) { /* storage blocked */ }
